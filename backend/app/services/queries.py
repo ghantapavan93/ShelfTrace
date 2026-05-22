@@ -138,6 +138,7 @@ def batch_detail(db: Session, batch: PriceBatch) -> BatchDetail:
 
 def incident_view(db: Session, incident: Incident) -> IncidentView:
     action = db.get(PriceAction, incident.action_id)
+    batch = db.get(PriceBatch, incident.batch_id)
     channels = _channels_for(action)
     observed = None
     if incident.offending_channel is not None:
@@ -148,6 +149,8 @@ def incident_view(db: Session, incident: Incident) -> IncidentView:
     return IncidentView(
         id=incident.id,
         batch_id=incident.batch_id,
+        batch_external_id=batch.external_id if batch else "",
+        zone=batch.zone if batch else "",
         action_id=incident.action_id,
         type=incident.type.value,
         severity=incident.severity.value,

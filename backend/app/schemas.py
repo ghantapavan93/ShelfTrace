@@ -93,6 +93,8 @@ class BatchDetail(BatchSummary):
 class IncidentView(BaseModel):
     id: str
     batch_id: str
+    batch_external_id: str
+    zone: str
     action_id: str
     type: str
     severity: str

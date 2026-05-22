@@ -26,14 +26,22 @@ def _get_incident(db: Session, incident_id: str) -> Incident:
 
 @router.get("/incidents", response_model=list[IncidentView])
 def list_incidents(run_mode: str = "live_rollout", db: Session = Depends(get_db)):
-    # Scope to a run mode so live-rollout and certification incidents stay separate.
-    stmt = (
-        select(Incident)
-        .join(PriceBatch, PriceBatch.id == Incident.batch_id)
+    # Scope to the CURRENT run (latest batch of this run mode) so older test
+    # incidents from previous runs don't clutter the demo view.
+    current = db.scalar(
+        select(PriceBatch)
         .where(PriceBatch.run_mode == RunMode(run_mode))
-        .order_by(Incident.created_at.desc())
+        .order_by(PriceBatch.created_at.desc())
     )
-    incidents = list(db.scalars(stmt))
+    if current is None:
+        return []
+    incidents = list(
+        db.scalars(
+            select(Incident)
+            .where(Incident.batch_id == current.id)
+            .order_by(Incident.created_at.desc())
+        )
+    )
     return [queries.incident_view(db, i) for i in incidents]
 
 

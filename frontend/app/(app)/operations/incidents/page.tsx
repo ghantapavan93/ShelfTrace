@@ -19,6 +19,12 @@ export default function IncidentsPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Incidents</h1>
         <p className="text-sm text-slate-400">Execution failures detected during canary verification.</p>
+        {data.length > 0 && (
+          <p className="mt-1 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-400">
+            Current run: <span className="font-medium text-slate-200">{data[0].zone}</span>
+            <span className="mono text-slate-500">{data[0].batch_external_id}</span>
+          </p>
+        )}
       </div>
       <div className="space-y-3">
         {data.map((i) => (

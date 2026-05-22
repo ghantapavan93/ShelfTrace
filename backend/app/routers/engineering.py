@@ -20,9 +20,9 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
-    "command": "pytest -q  (PostgreSQL-backed)",
-    "passed": 22,
-    "duration_s": 3.6,
+    "command": "pytest -q  (PostgreSQL-backed, isolated test DB)",
+    "passed": 31,
+    "duration_s": 14.0,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -44,6 +44,15 @@ TEST_PROOF = {
         "tests/test_certification.py::test_certification_overall_fails_while_pos_failed",
         "tests/test_certification.py::test_rerun_failed_checks_can_pass",
         "tests/test_certification.py::test_live_rollout_behaviour_unchanged",
+        "tests/test_scenarios.py::test_custom_scenario_creates_mismatch_incident",
+        "tests/test_scenarios.py::test_success_only_scenario_completes_without_incidents",
+        "tests/test_scenarios.py::test_timeout_then_success_resolves_after_retry",
+        "tests/test_scenarios.py::test_duplicate_ack_does_not_duplicate_delivery",
+        "tests/test_scenarios.py::test_memorial_day_is_loaded_from_configuration",
+        "tests/test_scenarios.py::test_validation_rejects_canary_not_subset",
+        "tests/test_scenarios.py::test_validation_rejects_behavior_for_unknown_sku",
+        "tests/test_scenarios.py::test_delete_scenario_removes_config_and_orphan_batch",
+        "tests/test_scenarios.py::test_seeded_scenario_cannot_be_deleted",
         "tests/test_concurrency_pg.py::test_concurrent_resolution_is_serialized",
         "tests/test_concurrency_pg.py::test_outbox_not_double_processed",
     ],
@@ -76,9 +85,20 @@ def engineering(
         for e in outbox
     ]
 
-    # Raw adapter receipt — prefer the egg POS mismatch (the hero example).
+    # Raw adapter receipt — scoped to THIS batch (prefer a MISMATCH so the hero
+    # case shows up first). Without scoping, the receipt could leak from another
+    # run and misrepresent what this trace is showing.
+    from app.models import ChannelDelivery, PriceAction as _PA
+
     receipts = list(
-        db.scalars(select(ExecutionReceipt).order_by(ExecutionReceipt.received_at.desc()).limit(12))
+        db.scalars(
+            select(ExecutionReceipt)
+            .join(ChannelDelivery, ChannelDelivery.id == ExecutionReceipt.delivery_id)
+            .join(_PA, _PA.id == ChannelDelivery.action_id)
+            .where(_PA.batch_id == batch.id)
+            .order_by(ExecutionReceipt.received_at.desc())
+            .limit(20)
+        )
     )
     raw_receipt = None
     for r in receipts:

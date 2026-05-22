@@ -54,6 +54,8 @@ export interface BatchDetail extends BatchSummary {
 export interface IncidentView {
   id: string;
   batch_id: string;
+  batch_external_id: string;
+  zone: string;
   action_id: string;
   type: "price_mismatch" | "channel_timeout" | "deadline_risk";
   severity: "critical" | "urgent" | "warning";
