@@ -33,8 +33,8 @@ from app.models import (
     RunMode,
 )
 from app.schemas import PriceBatchIn
-from app.seed import demo_payload, wipe_batch
-from app.services import orchestrator, recovery
+from app.seed import wipe_batch
+from app.services import orchestrator, recovery, scenarios
 from app.services.ingestion import ingest_batch
 
 SANDBOX_PROFILE = dict(
@@ -66,16 +66,18 @@ def _cert_external_id(run_id: str) -> str:
     return f"certification-{run_id}"
 
 
-def _certification_payload(profile_id: str, run_id: str) -> PriceBatchIn:
-    base = demo_payload()
-    return base.model_copy(
+def _certification_payload(db: Session, profile_id: str, run_id: str, config=None) -> PriceBatchIn:
+    # Certification runs the SAME configurable scenario as live rollout — the egg
+    # failure comes from the scenario's connector behavior profile, not code.
+    config = config or scenarios.ensure_memorial_day(db)
+    payload = scenarios.build_payload(
+        config, "certification", _cert_external_id(run_id), f"idem-cert-{run_id}"
+    )
+    return payload.model_copy(
         update={
-            "external_id": _cert_external_id(run_id),
-            "idempotency_key": f"idem-cert-{run_id}",
             "name": "Connector Certification Run",
             "zone": "Dallas Market Sandbox",
             "approved_by": "certification-harness",
-            "run_mode": "certification",
             "environment": "sandbox",
             "connector_profile_id": profile_id,
         }
@@ -84,6 +86,11 @@ def _certification_payload(profile_id: str, run_id: str) -> PriceBatchIn:
 
 def _action(batch: PriceBatch, sku: str, store_id: str) -> PriceAction | None:
     return next((a for a in batch.actions if a.sku == sku and a.store_id == store_id), None)
+
+
+def batch_canary_stores(batch: PriceBatch) -> list[str]:
+    g = next((g for g in batch.rollout_groups if g.kind == "canary"), None)
+    return g.store_ids if g else []
 
 
 def _receipt(action: PriceAction, channel: str):
@@ -139,7 +146,7 @@ def ensure_profile(db: Session) -> ConnectorProfile:
     return profile
 
 
-def create_run(db: Session, execute_now: bool = True) -> CertificationRun:
+def create_run(db: Session, config=None, execute_now: bool = True) -> CertificationRun:
     profile = ensure_profile(db)
     run = CertificationRun(
         id=new_id("cert"),
@@ -150,20 +157,25 @@ def create_run(db: Session, execute_now: bool = True) -> CertificationRun:
     db.commit()
     db.refresh(run)
     if execute_now:
-        execute_run(db, run)
+        execute_run(db, run, config)
     return run
 
 
-def execute_run(db: Session, run: CertificationRun) -> CertificationRun:
+def run_for_config(db: Session, config) -> CertificationRun:
+    """Create + execute a certification run for an arbitrary scenario configuration."""
+    return create_run(db, config=config, execute_now=True)
+
+
+def execute_run(db: Session, run: CertificationRun, config=None) -> CertificationRun:
     """Run the shared pipeline for this certification run, then derive checks.
 
-    The strawberry shelf-label timeout is *recovered* (retry) as part of the
-    test — that is the markdown-recovery scenario. The egg POS mismatch is left
-    failed: it is the connector defect the certification is meant to catch.
+    Any markdown shelf-label timeout is *recovered* (retry) as part of the test;
+    a POS price mismatch is left failed — that is the connector defect the
+    certification is meant to catch. Behaviors come from the scenario config.
     """
     batch = _cert_batch(db, run)
     if batch is None:
-        result = ingest_batch(db, _certification_payload(run.connector_profile_id, run.id))
+        result = ingest_batch(db, _certification_payload(db, run.connector_profile_id, run.id, config))
         orchestrator.drain(db)
         batch = result.batch
         run.batch_id = batch.id
@@ -232,62 +244,72 @@ def _derive_checks(db: Session, run: CertificationRun, batch: PriceBatch) -> Non
     db.execute(delete(CertificationCheck).where(CertificationCheck.certification_run_id == run.id))
     db.flush()
 
-    # 1. Price Agreement — egg POS checkout vs approved.
-    egg = _action(batch, _EGG_SKU, _CANARY_STORE)
-    pos = _receipt(egg, "pos") if egg else None
-    if pos is not None and pos.status == ReceiptStatus.MISMATCH:
+    canary = set(batch_canary_stores(batch))
+    canary_actions = [a for a in batch.actions if a.store_id in canary]
+
+    # 1. Price Agreement — any POS checkout that disagrees with the approved price.
+    mismatch = next(
+        ((a, _receipt(a, "pos")) for a in canary_actions
+         if _receipt(a, "pos") is not None and _receipt(a, "pos").status == ReceiptStatus.MISMATCH),
+        None,
+    )
+    if mismatch is not None:
+        a, r = mismatch
         _add_check(
-            db, run, CheckType.PRICE_AGREEMENT, "Cage-Free Eggs", CheckStatus.FAILED,
-            {
-                "channel": "pos", "store_id": _CANARY_STORE,
-                "approved_price": egg.approved_price, "observed_price": pos.observed_price,
-                "detail": f"POS returned ${pos.observed_price:.2f} instead of ${egg.approved_price:.2f}",
-            },
+            db, run, CheckType.PRICE_AGREEMENT, a.product_name.split(",")[0], CheckStatus.FAILED,
+            {"channel": "pos", "store_id": a.store_id, "approved_price": a.approved_price,
+             "observed_price": r.observed_price,
+             "detail": f"POS returned ${r.observed_price:.2f} instead of ${a.approved_price:.2f}"},
         )
     else:
-        observed = pos.observed_price if pos else None
         _add_check(
-            db, run, CheckType.PRICE_AGREEMENT, "Cage-Free Eggs", CheckStatus.PASSED,
-            {"channel": "pos", "store_id": _CANARY_STORE, "observed_price": observed,
-             "detail": "POS checkout matches the approved price"},
+            db, run, CheckType.PRICE_AGREEMENT, "POS Checkout", CheckStatus.PASSED,
+            {"channel": "pos", "detail": "Every POS checkout matches the approved price"},
         )
 
-    # 2. Markdown SLA — strawberry shelf label recovered after retry.
-    straw_incident = db.scalar(
+    # 2. Markdown SLA — any markdown shelf-label that timed out then recovered.
+    deadline_incident = db.scalar(
         select(Incident).where(
             Incident.batch_id == batch.id, Incident.type == IncidentType.DEADLINE_RISK
         )
     )
-    straw = _action(batch, _STRAWBERRY_SKU, _CANARY_STORE)
-    if straw_incident is not None and straw_incident.status == IncidentStatus.RESOLVED:
+    if deadline_incident is None:
         _add_check(
-            db, run, CheckType.MARKDOWN_SLA, "Fresh Strawberries", CheckStatus.RECOVERED,
-            {"channel": "esl", "initial": "timeout", "after_retry": "verified",
-             "detail": "ESL shelf-label timed out, then succeeded after retry"},
+            db, run, CheckType.MARKDOWN_SLA, "Markdown", CheckStatus.PASSED,
+            {"channel": "esl", "detail": "No markdown deadlines configured in this scenario"},
         )
     else:
-        _add_check(
-            db, run, CheckType.MARKDOWN_SLA, "Fresh Strawberries", CheckStatus.FAILED,
-            {"channel": "esl", "detail": "ESL shelf-label did not acknowledge the markdown"},
-        )
+        md_action = db.get(PriceAction, deadline_incident.action_id)
+        md_name = md_action.product_name.split(",")[0] if md_action else "Markdown"
+        if deadline_incident.status == IncidentStatus.RESOLVED:
+            _add_check(
+                db, run, CheckType.MARKDOWN_SLA, md_name, CheckStatus.RECOVERED,
+                {"channel": "esl", "initial": "timeout", "after_retry": "verified",
+                 "detail": "ESL shelf-label timed out, then succeeded after retry"},
+            )
+        else:
+            _add_check(
+                db, run, CheckType.MARKDOWN_SLA, md_name, CheckStatus.FAILED,
+                {"channel": "esl", "detail": "ESL shelf-label did not acknowledge the markdown"},
+            )
 
-    # 3. Ecommerce Verification — orange juice.
-    oj = _action(batch, _OJ_SKU, _CANARY_STORE)
-    oj_ecom = _receipt(oj, "ecommerce") if oj else None
-    if oj_ecom is not None and oj_ecom.status == ReceiptStatus.VERIFIED:
-        _add_check(
-            db, run, CheckType.ECOMMERCE_VERIFICATION, "Premium Orange Juice", CheckStatus.PASSED,
-            {"channel": "ecommerce", "price": oj.approved_price, "detail": "Price confirmed online"},
-        )
-    else:
-        _add_check(
-            db, run, CheckType.ECOMMERCE_VERIFICATION, "Premium Orange Juice", CheckStatus.FAILED,
-            {"channel": "ecommerce", "detail": "Ecommerce did not confirm the price"},
-        )
+    # 3. Ecommerce Verification — every ecommerce channel confirms the approved price.
+    ecom_bad = next(
+        (a for a in canary_actions
+         if _receipt(a, "ecommerce") is not None and _receipt(a, "ecommerce").status != ReceiptStatus.VERIFIED),
+        None,
+    )
+    _add_check(
+        db, run, CheckType.ECOMMERCE_VERIFICATION, "Ecommerce",
+        CheckStatus.FAILED if ecom_bad is not None else CheckStatus.PASSED,
+        {"channel": "ecommerce",
+         "detail": "Ecommerce did not confirm the price" if ecom_bad is not None
+         else "Every ecommerce price confirmed online"},
+    )
 
     # 4. Idempotent Batch — re-submitting the same key creates no second workflow.
     before = db.scalar(select(PriceBatch).where(PriceBatch.external_id == batch.external_id))
-    again = ingest_batch(db, _certification_payload(run.connector_profile_id, run.id))
+    again = ingest_batch(db, _certification_payload(db, run.connector_profile_id, run.id))
     idempotent = (not again.created) and again.batch.id == before.id
     _add_check(
         db, run, CheckType.IDEMPOTENT_BATCH, "Duplicate Submission",
@@ -297,11 +319,18 @@ def _derive_checks(db: Session, run: CertificationRun, batch: PriceBatch) -> Non
     )
 
     # 5. Recovery Safety — a second resolution of an already-resolved incident is rejected.
-    recovery_ok = False
-    rec_detail = "No resolved incident available to test"
-    if straw_incident is not None and straw_incident.status == IncidentStatus.RESOLVED:
+    # If nothing needed recovery in this scenario, the row-lock guard still holds (PASSED).
+    resolved_incident = db.scalar(
+        select(Incident).where(
+            Incident.batch_id == batch.id, Incident.status == IncidentStatus.RESOLVED
+        )
+    )
+    recovery_ok = True
+    rec_detail = "No incident required recovery; row-lock guard structurally enforced"
+    if resolved_incident is not None:
+        recovery_ok = False
         try:
-            recovery.resolve_incident(db, straw_incident.id)
+            recovery.resolve_incident(db, resolved_incident.id)
             rec_detail = "Second resolution unexpectedly succeeded"
         except recovery.RecoveryError as exc:
             recovery_ok = True

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.base import ADAPTERS
 from app.ids import new_id
+from app.services import behavior
 from app.models import (
     ActionDecision,
     BatchStatus,
@@ -32,13 +33,26 @@ def _channel_enum(name: str) -> Channel:
 
 
 def verify_channel(db: Session, delivery: ChannelDelivery, action: PriceAction) -> ExecutionReceipt:
-    """Ask the adapter what the channel currently reports and persist a normalized receipt."""
+    """Resolve the channel's configured behavior, ask the adapter to build a
+    normalized receipt from it, and persist it. Behavior comes from the scenario
+    config — the adapter and engine have no product-specific logic."""
     adapter = ADAPTERS[delivery.channel.value]
-    raw = adapter.verify_current_price(
+    batch = db.get(PriceBatch, action.batch_id)
+    profile = behavior.resolve_profile(
+        db,
+        batch.scenario_config_id if batch else None,
+        action.sku,
+        action.store_id,
+        delivery.channel.value,
+    )
+    observed = behavior.observe(profile, action.approved_price, max(delivery.attempts, 1))
+    raw = adapter.build_verify_receipt(
         sku=action.sku,
         store_id=action.store_id,
         approved_price=action.approved_price,
-        attempt=max(delivery.attempts, 1),
+        observed=observed,
+        behavior_type=profile.behavior_type.value if profile else "success",
+        duplicate_ack=behavior.is_duplicate_ack(profile),
     )
 
     if raw["status"] == "TIMEOUT":
@@ -54,10 +68,11 @@ def verify_channel(db: Session, delivery: ChannelDelivery, action: PriceAction) 
         receipt_status = ReceiptStatus.VERIFIED
         observed = raw["observed_price"]
 
-    # Replace any prior receipt for this delivery (re-verification after retry).
-    if delivery.receipt is not None:
-        db.delete(delivery.receipt)
-        db.flush()
+    # Replace any prior receipt(s) for this delivery (re-verification after retry).
+    from sqlalchemy import delete as _delete
+
+    db.execute(_delete(ExecutionReceipt).where(ExecutionReceipt.delivery_id == delivery.id))
+    db.flush()
 
     receipt = ExecutionReceipt(
         id=new_id("rcpt"),

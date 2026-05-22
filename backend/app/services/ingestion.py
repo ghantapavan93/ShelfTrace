@@ -40,8 +40,9 @@ def ingest_batch(db: Session, payload: PriceBatchIn) -> IngestionResult:
     if existing is not None:
         return IngestionResult(existing, created=False)
 
-    canary_ids = payload.store_ids[: settings.canary_store_count]
-    expansion_ids = payload.store_ids[settings.canary_store_count :]
+    canary_count = payload.canary_store_count or settings.canary_store_count
+    canary_ids = payload.store_ids[:canary_count]
+    expansion_ids = payload.store_ids[canary_count:]
 
     batch = PriceBatch(
         id=new_id("batch"),
@@ -55,6 +56,7 @@ def ingest_batch(db: Session, payload: PriceBatchIn) -> IngestionResult:
         run_mode=RunMode(payload.run_mode),
         environment=Environment(payload.environment),
         connector_profile_id=payload.connector_profile_id,
+        scenario_config_id=payload.scenario_config_id,
     )
     db.add(batch)
 

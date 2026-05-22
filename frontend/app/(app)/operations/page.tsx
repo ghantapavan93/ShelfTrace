@@ -15,7 +15,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import clsx from "clsx";
-import { api, DEMO_BATCH } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { money, timeOf } from "@/lib/format";
 import { MetricCard } from "@/components/MetricCard";
@@ -58,7 +58,7 @@ function ChannelMini({ c }: { c: ChannelView }) {
 const STEPS = ["Select Stores", "Canary", "Evaluate", "Expand"];
 
 export default function OperationsPage() {
-  const { data, error, reload } = useLive(() => api.operations(DEMO_BATCH));
+  const { data, error, reload } = useLive(() => api.operations());
   const [resetting, setResetting] = useState(false);
 
   async function resetLive() {

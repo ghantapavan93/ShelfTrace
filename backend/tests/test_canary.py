@@ -5,10 +5,9 @@ from app.services.ingestion import ingest_batch
 
 
 def _seed(db):
-    batch = ingest_batch(db, demo_payload()).batch
-    orchestrator.drain(db)
-    db.refresh(batch)
-    return batch
+    from tests._helpers import seed_live_demo
+
+    return seed_live_demo(db)
 
 
 def test_canary_blocks_zone_expansion(db):

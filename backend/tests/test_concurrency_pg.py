@@ -30,8 +30,9 @@ pg_only = pytest.mark.skipif(
 def test_concurrent_resolution_is_serialized(db):
     """Two operators acting on the same incident at once: the FOR UPDATE row lock
     serializes them so exactly one succeeds and the other is cleanly rejected."""
-    batch = ingest_batch(db, demo_payload()).batch
-    orchestrator.drain(db)
+    from tests._helpers import seed_live_demo
+
+    seed_live_demo(db)
     incident = db.query(Incident).filter(Incident.type == IncidentType.PRICE_MISMATCH).one()
     inc_id = incident.id
 

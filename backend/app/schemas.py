@@ -33,6 +33,8 @@ class PriceBatchIn(BaseModel):
     run_mode: str = "live_rollout"
     environment: str = "simulated_production"
     connector_profile_id: str | None = None
+    scenario_config_id: str | None = None
+    canary_store_count: int | None = None  # defaults to settings.canary_store_count
 
 
 # ---------------------------------------------------------------------------
@@ -184,3 +186,67 @@ class CertificationReport(BaseModel):
     connector: ConnectorProfileView
     checks: list[CertificationCheckView]
     summary: dict
+
+
+# ---------------------------------------------------------------------------
+# Configurable Connector Test Runner (scenarios)
+# ---------------------------------------------------------------------------
+class ConnectorBehaviorIn(BaseModel):
+    store_id: str
+    sku: str
+    channel_type: str  # pos | esl | ecommerce
+    behavior_type: str  # success | stale_price | timeout | timeout_then_success | duplicate_ack
+    configured_observed_price: float | None = None
+    configured_delay_ms: int | None = None
+    retry_success_price: float | None = None
+
+
+class ScenarioActionIn(BaseModel):
+    product_name: str
+    sku: str
+    previous_price: float
+    approved_price: float
+    reason: str = "Price update"
+    is_kvi: bool = False
+    deadline_at: datetime | None = None
+
+
+class ScenarioIn(BaseModel):
+    name: str
+    run_mode: str = "live_rollout"
+    environment: str = "simulated_production"
+    zone_name: str = "Custom Zone"
+    store_ids: list[str]
+    canary_store_ids: list[str]
+    actions: list[ScenarioActionIn]
+    behaviors: list[ConnectorBehaviorIn] = []
+
+
+class ConnectorBehaviorView(ConnectorBehaviorIn):
+    id: str
+
+
+class ScenarioActionView(ScenarioActionIn):
+    id: str
+
+
+class ScenarioView(BaseModel):
+    id: str
+    name: str
+    run_mode: str
+    environment: str
+    zone_name: str
+    store_ids: list[str]
+    canary_store_ids: list[str]
+    is_seeded: bool
+    created_at: datetime
+    actions: list[ScenarioActionView]
+    behaviors: list[ConnectorBehaviorView]
+
+
+class ScenarioExecuteResult(BaseModel):
+    mode: str
+    redirect: str
+    scenario_id: str
+    batch_external_id: str | None = None
+    run_id: str | None = None

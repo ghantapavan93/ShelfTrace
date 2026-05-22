@@ -23,6 +23,7 @@ _PRICE_BATCH_COLUMNS = [
     ("run_mode", "VARCHAR(32) NOT NULL DEFAULT 'LIVE_ROLLOUT'"),
     ("environment", "VARCHAR(32) NOT NULL DEFAULT 'SIMULATED_PRODUCTION'"),
     ("connector_profile_id", "VARCHAR"),
+    ("scenario_config_id", "VARCHAR"),
 ]
 
 

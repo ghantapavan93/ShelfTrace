@@ -2,19 +2,20 @@
 
 These simulate the three customer-facing price channels. In production each
 would wrap a real integration (POS API, ESL/wireless gateway, ecommerce feed);
-here they return structured, normalized receipts driven by the demo scenario.
+here they return structured, normalized receipts. What a channel "observes" is
+supplied by the caller from the scenario's connector behavior profile — the
+adapters contain no product-specific logic.
 
 Interface mirrors a real adapter contract:
-    publish_price_change() -> ack
-    verify_current_price() -> observed receipt
-    retry_update()         -> re-publish + re-verify
-    rollback_price_change()-> restore prior price
+    publish_price_change()  -> ack
+    build_verify_receipt()  -> normalized observed receipt (from resolved behavior)
+    rollback_price_change() -> restore prior price
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from app.adapters import scenario
+from app.services.behavior import TIMEOUT
 from app.ids import new_id
 
 
@@ -43,11 +44,21 @@ class ChannelAdapter:
             timestamp=_now(),
         )
 
-    def verify_current_price(
-        self, *, sku: str, store_id: str, approved_price: float, attempt: int
+    def build_verify_receipt(
+        self,
+        *,
+        sku: str,
+        store_id: str,
+        approved_price: float,
+        observed,
+        behavior_type: str = "success",
+        duplicate_ack: bool = False,
     ) -> AdapterReceipt:
-        observed = scenario.observe(sku, store_id, self.channel, approved_price, attempt)
-        if observed == scenario.TIMEOUT:
+        """Build a normalized receipt from a resolved observation.
+
+        ``observed`` is either a float price or the TIMEOUT marker.
+        """
+        if observed == TIMEOUT:
             return AdapterReceipt(
                 adapter=self.system_name,
                 channel=self.channel,
@@ -58,12 +69,13 @@ class ChannelAdapter:
                 observed_price=None,
                 ack=False,
                 status="TIMEOUT",
+                behavior=behavior_type,
                 receipt_id=new_id("rcpt"),
                 correlation_id=new_id("corr"),
                 timestamp=_now(),
             )
         status = "VERIFIED" if abs(observed - approved_price) < 0.001 else "MISMATCH"
-        return AdapterReceipt(
+        receipt = AdapterReceipt(
             adapter=self.system_name,
             channel=self.channel,
             store_id=store_id,
@@ -73,16 +85,15 @@ class ChannelAdapter:
             observed_price=observed,
             ack=True,
             status=status,
+            behavior=behavior_type,
             receipt_id=new_id("rcpt"),
             correlation_id=new_id("corr"),
             timestamp=_now(),
         )
-
-    def retry_update(self, *, sku: str, store_id: str, approved_price: float, attempt: int) -> AdapterReceipt:
-        self.publish_price_change(sku=sku, store_id=store_id, approved_price=approved_price)
-        return self.verify_current_price(
-            sku=sku, store_id=store_id, approved_price=approved_price, attempt=attempt
-        )
+        if duplicate_ack:
+            receipt["duplicate_ack_received"] = True
+            receipt["duplicate_ack_dropped"] = True
+        return receipt
 
     def rollback_price_change(self, *, sku: str, store_id: str, prior_price: float) -> AdapterReceipt:
         return AdapterReceipt(

@@ -86,10 +86,12 @@ def test_rerun_failed_checks_can_pass(db):
 
 
 def test_live_rollout_behaviour_unchanged(db):
-    """Default live batches keep behaving exactly as before the certification phase."""
-    batch = ingest_batch(db, demo_payload()).batch
-    orchestrator.drain(db)
-    db.refresh(batch)
+    """The live Memorial Day demo keeps behaving exactly as before — now driven by
+    the scenario configuration rather than hardcoded logic."""
+    from tests._helpers import seed_live_demo
+
+    batch = seed_live_demo(db)
     assert batch.run_mode == RunMode.LIVE_ROLLOUT
+    assert batch.scenario_config_id is not None  # config-driven, not hardcoded
     assert batch.status == BatchStatus.BLOCKED
     assert batch.expansion_blocked is True

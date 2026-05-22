@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import {
   Activity,
@@ -14,11 +14,13 @@ import {
   RotateCcw,
   ChevronDown,
   ShieldCheck,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Brand } from "./Brand";
 import { api } from "@/lib/api";
 
 const NAV = [
+  { href: "/scenarios", label: "Scenario Builder", sub: "Configure a test run", icon: SlidersHorizontal, match: /^\/scenarios/ },
   { href: "/certification", label: "Certification Lab", sub: "Before go-live", icon: ShieldCheck, match: /^\/certification/ },
   { href: "/operations", label: "Live Operations", sub: "Command Center", icon: LayoutGrid, match: /^\/operations$/ },
   {
@@ -37,16 +39,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [resetting, setResetting] = useState(false);
+  const [status, setStatus] = useState<{ label: string; tone: string } | null>(null);
+
+  // Global rollout health, derived from real batch state and refreshed lightly.
+  useEffect(() => {
+    let alive = true;
+    const tick = () =>
+      api
+        .systemStatus()
+        .then((s) => alive && setStatus(s))
+        .catch(() => {});
+    tick();
+    const id = setInterval(tick, 5000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [pathname]);
 
   async function reset() {
     setResetting(true);
     try {
       await api.reset();
       router.refresh();
+      const s = await api.systemStatus().catch(() => null);
+      if (s) setStatus(s);
     } finally {
       setResetting(false);
     }
   }
+
+  const toneCls =
+    status?.tone === "verified"
+      ? "bg-verified"
+      : status?.tone === "danger"
+        ? "bg-danger"
+        : status?.tone === "warn"
+          ? "bg-warn"
+          : "bg-slate-400";
 
   return (
     <div className="bg-aurora flex min-h-screen">
@@ -89,8 +119,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
             <div className="flex items-center gap-2 text-xs">
-              <span className="h-2 w-2 rounded-full bg-verified animate-pulse-glow" />
-              <span className="text-slate-300">All systems nominal</span>
+              <span className={clsx("h-2 w-2 rounded-full animate-pulse-glow", toneCls)} />
+              <span className="text-slate-300">{status?.label ?? "Checking rollout status…"}</span>
             </div>
           </div>
           <div className="flex items-center gap-2.5 rounded-xl px-1 py-1">

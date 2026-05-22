@@ -63,6 +63,14 @@ class CheckStatus(str, enum.Enum):
     RECOVERED = "recovered"
 
 
+class BehaviorType(str, enum.Enum):
+    SUCCESS = "success"
+    STALE_PRICE = "stale_price"
+    TIMEOUT = "timeout"
+    TIMEOUT_THEN_SUCCESS = "timeout_then_success"
+    DUPLICATE_ACK = "duplicate_ack"
+
+
 class BatchStatus(str, enum.Enum):
     RECEIVED = "received"
     CANARY_PUBLISHING = "canary_publishing"
@@ -155,6 +163,8 @@ class PriceBatch(Base):
         Enum(Environment, native_enum=False, length=32), default=Environment.SIMULATED_PRODUCTION
     )
     connector_profile_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Links the batch to the scenario configuration that produced it (drives adapter behavior).
+    scenario_config_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     approved_by: Mapped[str] = mapped_column(String, default="upstream-pricing-system")
     total_store_count: Mapped[int] = mapped_column(Integer, default=4)
     expansion_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -342,3 +352,74 @@ class CertificationCheck(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     run: Mapped[CertificationRun] = relationship(back_populates="checks")
+
+
+# ---------------------------------------------------------------------------
+# Configurable Connector Test Runner — scenarios drive adapter behavior so the
+# engine is reusable, not hardcoded to specific products.
+# ---------------------------------------------------------------------------
+class TestRunConfig(Base):
+    __tablename__ = "test_run_configs"
+    __test__ = False  # not a pytest test class
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    run_mode: Mapped[RunMode] = mapped_column(Enum(RunMode, native_enum=False, length=32), default=RunMode.LIVE_ROLLOUT)
+    environment: Mapped[Environment] = mapped_column(
+        Enum(Environment, native_enum=False, length=32), default=Environment.SIMULATED_PRODUCTION
+    )
+    zone_name: Mapped[str] = mapped_column(String, default="Custom Zone")
+    store_ids_csv: Mapped[str] = mapped_column(Text, default="")
+    canary_store_ids_csv: Mapped[str] = mapped_column(Text, default="")
+    is_seeded: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    actions: Mapped[list[TestRunAction]] = relationship(back_populates="config", cascade="all, delete-orphan")
+    behaviors: Mapped[list[ConnectorBehaviorProfile]] = relationship(
+        back_populates="config", cascade="all, delete-orphan"
+    )
+
+    @property
+    def store_ids(self) -> list[str]:
+        return [s for s in self.store_ids_csv.split(",") if s]
+
+    @property
+    def canary_store_ids(self) -> list[str]:
+        return [s for s in self.canary_store_ids_csv.split(",") if s]
+
+
+class TestRunAction(Base):
+    __tablename__ = "test_run_actions"
+    __test__ = False  # not a pytest test class
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    test_run_config_id: Mapped[str] = mapped_column(
+        ForeignKey("test_run_configs.id", ondelete="CASCADE"), index=True
+    )
+    product_name: Mapped[str] = mapped_column(String)
+    sku: Mapped[str] = mapped_column(String)
+    previous_price: Mapped[float] = mapped_column(Float)
+    approved_price: Mapped[float] = mapped_column(Float)
+    reason: Mapped[str] = mapped_column(String, default="Price update")
+    is_kvi: Mapped[bool] = mapped_column(Boolean, default=False)
+    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    config: Mapped[TestRunConfig] = relationship(back_populates="actions")
+
+
+class ConnectorBehaviorProfile(Base):
+    __tablename__ = "connector_behavior_profiles"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    test_run_config_id: Mapped[str] = mapped_column(
+        ForeignKey("test_run_configs.id", ondelete="CASCADE"), index=True
+    )
+    store_id: Mapped[str] = mapped_column(String, index=True)
+    sku: Mapped[str] = mapped_column(String, index=True)
+    channel_type: Mapped[Channel] = mapped_column(Enum(Channel, native_enum=False, length=16))
+    behavior_type: Mapped[BehaviorType] = mapped_column(Enum(BehaviorType, native_enum=False, length=32))
+    configured_observed_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    configured_delay_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    retry_success_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    config: Mapped[TestRunConfig] = relationship(back_populates="behaviors")

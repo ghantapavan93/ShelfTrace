@@ -5,12 +5,32 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import PriceAction, PriceBatch
+from app.models import PriceAction, PriceBatch, RunMode
 from app.routers.common import get_batch_or_404
 from app.schemas import OperationsOverview
 from app.services import queries
 
 router = APIRouter(prefix="/api/v1", tags=["operations"])
+
+
+@router.get("/system-status")
+def system_status(db: Session = Depends(get_db)):
+    """Global rollout health, derived from the latest live-rollout batch state."""
+    batch = db.scalar(
+        select(PriceBatch)
+        .where(PriceBatch.run_mode == RunMode.LIVE_ROLLOUT)
+        .order_by(PriceBatch.created_at.desc())
+    )
+    if batch is None:
+        return {"label": "No active rollout", "tone": "neutral", "status": None}
+    status = batch.status.value
+    if status in ("blocked", "partially_blocked", "canary_verifying"):
+        return {"label": "Rollout intervention required", "tone": "danger", "status": status}
+    if status in ("ready_for_expansion", "expanding"):
+        return {"label": "Ready to expand", "tone": "warn", "status": status}
+    if status == "completed":
+        return {"label": "All systems verified", "tone": "verified", "status": status}
+    return {"label": "Rollout in progress", "tone": "warn", "status": status}
 
 
 @router.get("/operations", response_model=OperationsOverview)

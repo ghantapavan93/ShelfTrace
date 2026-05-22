@@ -6,6 +6,8 @@ import type {
   IncidentExplanation,
   IncidentView,
   OperationsOverview,
+  Scenario,
+  ScenarioExecuteResult,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -60,12 +62,23 @@ export const api = {
   resolve: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/resolve`),
   storeTask: (id: string) => post<unknown>(`/api/v1/incidents/${id}/store-task`),
   reset: () => post<BatchSummary>(`/api/v1/demo/reset`),
+  systemStatus: () =>
+    get<{ label: string; tone: "neutral" | "danger" | "warn" | "verified"; status: string | null }>(
+      `/api/v1/system-status`,
+    ),
 
   // Certification Lab
   certificationCurrent: () => get<CertificationReport>(`/api/v1/certification/current`),
   certificationReset: () => post<CertificationReport>(`/api/v1/certification/demo/reset`),
   certificationRerun: (runId: string) =>
     post<CertificationReport>(`/api/v1/certification/runs/${runId}/rerun-failed-checks`),
+
+  // Connector Scenario Builder
+  scenarios: () => get<Scenario[]>(`/api/v1/scenarios`),
+  scenario: (id: string) => get<Scenario>(`/api/v1/scenarios/${id}`),
+  createScenario: (body: unknown) => post<Scenario>(`/api/v1/scenarios`, body),
+  executeScenario: (id: string, mode: string) =>
+    post<ScenarioExecuteResult>(`/api/v1/scenarios/${id}/execute?mode=${mode}`),
 };
 
 export const DEMO_BATCH = "memorial-day-dallas-02";

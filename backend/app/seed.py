@@ -11,8 +11,6 @@ from app.models import (
     PriceBatch,
 )
 from app.schemas import ApprovedActionIn, PriceBatchIn
-from app.services import orchestrator
-from app.services.ingestion import ingest_batch
 
 DEMO_EXTERNAL_ID = "memorial-day-dallas-02"
 DEMO_STORES = ["214", "302", "317", "401"]
@@ -84,12 +82,12 @@ def wipe_batch(db: Session, external_id: str) -> None:
 
 
 def seed_live(db: Session) -> PriceBatch:
-    """Reset ONLY the live-rollout demo (Memorial Day / Dallas Zone 2) to its blocked state."""
-    wipe_batch(db, DEMO_EXTERNAL_ID)
-    result = ingest_batch(db, demo_payload())
-    orchestrator.drain(db)
-    db.refresh(result.batch)
-    return result.batch
+    """Reset the live-rollout demo to its blocked state by executing the seeded
+    Memorial Day scenario configuration (config-driven, not hardcoded)."""
+    from app.services import scenarios  # lazy import to avoid a module cycle
+
+    config = scenarios.ensure_memorial_day(db)
+    return scenarios.execute_live(db, config)
 
 
 # Backwards-compatible alias.

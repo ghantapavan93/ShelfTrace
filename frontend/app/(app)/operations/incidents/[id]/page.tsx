@@ -73,9 +73,16 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold text-white">Price Integrity Incident</h1>
-            <StatusPill value={i.severity} />
+            {resolved ? (
+              <span className="inline-flex items-center gap-2">
+                <StatusPill value={i.status} />
+                <span className="text-xs text-slate-500">Initial severity: {i.severity}</span>
+              </span>
+            ) : (
+              <StatusPill value={i.severity} />
+            )}
           </div>
           <p className="mt-1 text-slate-400">
             {i.product_name} · Store {i.store_id}
@@ -142,20 +149,35 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
         </section>
       )}
 
-      {/* Actions */}
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <ActionButton
-          primary
-          icon={RotateCcw}
-          label="Retry POS Update"
-          loading={busy === "retry"}
-          disabled={resolved}
-          onClick={() => act("retry")}
-        />
-        <ActionButton icon={Undo2} label="Roll Back Shelf Label" loading={busy === "rollback"} disabled={resolved} onClick={() => act("rollback")} />
-        <ActionButton icon={ClipboardList} label="Create Store Task" loading={busy === "task"} onClick={() => act("task")} />
-        <ActionButton icon={CheckCircle2} label="Resolve" loading={busy === "resolve"} disabled={resolved} onClick={() => act("resolve")} />
-      </section>
+      {/* Actions — replaced by a verified confirmation once resolved */}
+      {resolved ? (
+        <section className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-5 py-4">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-verified" />
+          <div className="text-sm">
+            <div className="font-medium text-verified">
+              {i.status === "rolled_back"
+                ? "Shelf label rolled back — incident closed"
+                : `${(i.offending_channel ?? "channel").toUpperCase()} verified at ${money(i.approved_price)}`}
+            </div>
+            <div className="text-xs text-slate-400">
+              Recovery actions are closed for this incident. The audit timeline below is preserved.
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <ActionButton
+            primary
+            icon={RotateCcw}
+            label="Retry POS Update"
+            loading={busy === "retry"}
+            onClick={() => act("retry")}
+          />
+          <ActionButton icon={Undo2} label="Roll Back Shelf Label" loading={busy === "rollback"} onClick={() => act("rollback")} />
+          <ActionButton icon={ClipboardList} label="Create Store Task" loading={busy === "task"} onClick={() => act("task")} />
+          <ActionButton icon={CheckCircle2} label="Resolve" loading={busy === "resolve"} onClick={() => act("resolve")} />
+        </section>
+      )}
 
       {toast && (
         <div className="rounded-xl border border-brand/30 bg-brand/10 px-4 py-2.5 text-sm text-brand-400">{toast}</div>

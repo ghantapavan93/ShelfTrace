@@ -133,10 +133,71 @@ export interface CertificationReport {
   summary: { total: number; passed: number; recovered: number; failed: number };
 }
 
+export interface ScenarioAction {
+  id?: string;
+  product_name: string;
+  sku: string;
+  previous_price: number;
+  approved_price: number;
+  reason: string;
+  is_kvi: boolean;
+  deadline_at: string | null;
+}
+
+export type BehaviorType =
+  | "success"
+  | "stale_price"
+  | "timeout"
+  | "timeout_then_success"
+  | "duplicate_ack";
+
+export interface ConnectorBehavior {
+  id?: string;
+  store_id: string;
+  sku: string;
+  channel_type: "pos" | "esl" | "ecommerce";
+  behavior_type: BehaviorType;
+  configured_observed_price: number | null;
+  configured_delay_ms: number | null;
+  retry_success_price: number | null;
+}
+
+export interface Scenario {
+  id: string;
+  name: string;
+  run_mode: string;
+  environment: string;
+  zone_name: string;
+  store_ids: string[];
+  canary_store_ids: string[];
+  is_seeded: boolean;
+  created_at: string;
+  actions: ScenarioAction[];
+  behaviors: ConnectorBehavior[];
+}
+
+export interface ScenarioExecuteResult {
+  mode: string;
+  redirect: string;
+  scenario_id: string;
+  batch_external_id: string | null;
+  run_id: string | null;
+}
+
 export interface EngineeringTrace {
   batch: BatchSummary;
   run_mode: string;
   environment: string;
+  scenario_config_id: string | null;
+  behavior_profiles: {
+    store_id: string;
+    sku: string;
+    channel: string;
+    behavior: string;
+    configured_observed_price: number | null;
+    retry_success_price: number | null;
+  }[];
+  incident_from_configured_behavior: boolean;
   shared_engine_statement: string;
   pipeline: { stage: string; status: string; detail: string }[];
   outbox_events: {

@@ -58,11 +58,57 @@ export default function EngineeringPage() {
 
       {/* Shared-engine statement (real run context) */}
       <div className="glass rounded-2xl border border-violet-500/20 p-4">
-        <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-violet-300">
-          One shared reliability engine · viewing{" "}
-          <span className="text-white">{data.run_mode}</span> ({data.environment})
+        <div className="mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-widest text-violet-300">
+          One shared reliability engine · viewing <span className="text-white">{data.run_mode}</span> ({data.environment})
+          {data.scenario_config_id && (
+            <span className="mono rounded bg-white/5 px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-slate-400">
+              scenario {data.scenario_config_id}
+            </span>
+          )}
         </div>
         <p className="text-sm leading-relaxed text-slate-300">{data.shared_engine_statement}</p>
+      </div>
+
+      {/* Connector behavior profiles applied for this run */}
+      <div className="glass rounded-2xl p-5">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold text-white">Connector Behavior Profiles Applied</h3>
+          {data.incident_from_configured_behavior && (
+            <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-warn">
+              Incident created from configured behavior
+            </span>
+          )}
+        </div>
+        {data.behavior_profiles.length === 0 ? (
+          <p className="text-xs text-slate-500">No behavior overrides — every channel configured to succeed.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-white/5">
+                  <th className="py-2 pr-3 font-medium">Store</th>
+                  <th className="py-2 pr-3 font-medium">SKU</th>
+                  <th className="py-2 pr-3 font-medium">Channel</th>
+                  <th className="py-2 pr-3 font-medium">Behavior</th>
+                  <th className="py-2 pr-3 font-medium">Observed $</th>
+                  <th className="py-2 font-medium">Retry $</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.behavior_profiles.map((b, i) => (
+                  <tr key={i} className="border-b border-white/5 last:border-0">
+                    <td className="py-2 pr-3 text-slate-300">{b.store_id}</td>
+                    <td className="mono py-2 pr-3 text-slate-300">{b.sku}</td>
+                    <td className="py-2 pr-3 text-slate-300">{b.channel.toUpperCase()}</td>
+                    <td className="py-2 pr-3 text-warn">{b.behavior}</td>
+                    <td className="py-2 pr-3 text-slate-400">{b.configured_observed_price ?? "—"}</td>
+                    <td className="py-2 text-slate-400">{b.retry_success_price ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Pipeline strip */}
