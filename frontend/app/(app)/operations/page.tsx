@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   ShieldX,
@@ -11,6 +12,7 @@ import {
   Tag,
   ScanLine,
   Globe,
+  RotateCcw,
 } from "lucide-react";
 import clsx from "clsx";
 import { api, DEMO_BATCH } from "@/lib/api";
@@ -56,7 +58,18 @@ function ChannelMini({ c }: { c: ChannelView }) {
 const STEPS = ["Select Stores", "Canary", "Evaluate", "Expand"];
 
 export default function OperationsPage() {
-  const { data, error } = useLive(() => api.operations(DEMO_BATCH));
+  const { data, error, reload } = useLive(() => api.operations(DEMO_BATCH));
+  const [resetting, setResetting] = useState(false);
+
+  async function resetLive() {
+    setResetting(true);
+    try {
+      await api.reset();
+      await reload();
+    } finally {
+      setResetting(false);
+    }
+  }
 
   if (error)
     return (
@@ -108,6 +121,15 @@ export default function OperationsPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <button
+          onClick={resetLive}
+          disabled={resetting}
+          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
+        >
+          <RotateCcw className={clsx("h-3.5 w-3.5", resetting && "animate-spin")} /> Reset Live Rollout Demo
+        </button>
+      </div>
       {/* Hero */}
       <motion.section
         initial={{ opacity: 0, y: 12 }}

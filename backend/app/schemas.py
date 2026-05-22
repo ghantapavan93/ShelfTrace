@@ -29,6 +29,10 @@ class PriceBatchIn(BaseModel):
     total_store_count: int = 4
     store_ids: list[str] = Field(..., description="All target stores; first N become the canary")
     actions: list[ApprovedActionIn]
+    # Run mode: live batches default to live_rollout; certification runs pass certification.
+    run_mode: str = "live_rollout"
+    environment: str = "simulated_production"
+    connector_profile_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -145,3 +149,38 @@ class StoreTaskView(BaseModel):
     instruction: str
     status: str
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Certification Lab
+# ---------------------------------------------------------------------------
+class ConnectorProfileView(BaseModel):
+    id: str
+    name: str
+    retailer_name: str
+    pos_provider: str
+    esl_provider: str
+    ecommerce_provider: str
+    status: str
+    created_at: datetime
+
+
+class CertificationCheckView(BaseModel):
+    id: str
+    check_type: str
+    scenario_name: str
+    status: str
+    evidence: dict
+    created_at: datetime
+
+
+class CertificationReport(BaseModel):
+    run_id: str
+    status: str
+    final_recommendation: str | None
+    started_at: datetime
+    completed_at: datetime | None
+    batch_external_id: str | None
+    connector: ConnectorProfileView
+    checks: list[CertificationCheckView]
+    summary: dict

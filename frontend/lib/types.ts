@@ -101,8 +101,43 @@ export interface OperationsOverview {
   };
 }
 
+export interface ConnectorProfile {
+  id: string;
+  name: string;
+  retailer_name: string;
+  pos_provider: string;
+  esl_provider: string;
+  ecommerce_provider: string;
+  status: string;
+  created_at: string;
+}
+
+export interface CertificationCheck {
+  id: string;
+  check_type: string;
+  scenario_name: string;
+  status: "passed" | "failed" | "recovered";
+  evidence: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface CertificationReport {
+  run_id: string;
+  status: "running" | "failed_pending_remediation" | "passed";
+  final_recommendation: string | null;
+  started_at: string;
+  completed_at: string | null;
+  batch_external_id: string | null;
+  connector: ConnectorProfile;
+  checks: CertificationCheck[];
+  summary: { total: number; passed: number; recovered: number; failed: number };
+}
+
 export interface EngineeringTrace {
   batch: BatchSummary;
+  run_mode: string;
+  environment: string;
+  shared_engine_statement: string;
   pipeline: { stage: string; status: string; detail: string }[];
   outbox_events: {
     id: string;

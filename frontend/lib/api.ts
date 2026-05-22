@@ -1,6 +1,7 @@
 import type {
   BatchDetail,
   BatchSummary,
+  CertificationReport,
   EngineeringTrace,
   IncidentExplanation,
   IncidentView,
@@ -46,13 +47,25 @@ export const api = {
     get<{ zone: string; markdowns: { action: import("./types").ActionView; markdown_deadline: string }[] }>(
       `/api/v1/markdowns${externalId ? `?external_id=${externalId}` : ""}`,
     ),
-  engineering: (externalId?: string) =>
-    get<EngineeringTrace>(`/api/v1/engineering${externalId ? `?external_id=${externalId}` : ""}`),
+  engineering: (opts?: { externalId?: string; runMode?: string }) => {
+    const q = opts?.externalId
+      ? `?external_id=${opts.externalId}`
+      : opts?.runMode
+        ? `?run_mode=${opts.runMode}`
+        : "";
+    return get<EngineeringTrace>(`/api/v1/engineering${q}`);
+  },
   retry: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/retry`),
   rollback: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/rollback`),
   resolve: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/resolve`),
   storeTask: (id: string) => post<unknown>(`/api/v1/incidents/${id}/store-task`),
   reset: () => post<BatchSummary>(`/api/v1/demo/reset`),
+
+  // Certification Lab
+  certificationCurrent: () => get<CertificationReport>(`/api/v1/certification/current`),
+  certificationReset: () => post<CertificationReport>(`/api/v1/certification/demo/reset`),
+  certificationRerun: (runId: string) =>
+    post<CertificationReport>(`/api/v1/certification/runs/${runId}/rerun-failed-checks`),
 };
 
 export const DEMO_BATCH = "memorial-day-dallas-02";

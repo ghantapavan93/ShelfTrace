@@ -1,15 +1,15 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { PackageCheck, Store, ShieldCheck, ShieldX, Globe } from "lucide-react";
+import { FlaskConical, BadgeCheck, Store, ShieldCheck, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 
 const STAGES = [
-  { n: 1, title: "Approved Batch", sub: "Approved upstream · ready for rollout", Icon: PackageCheck, tone: "sky" },
-  { n: 2, title: "Canary Stores", sub: "First few stores · low-risk probe", Icon: Store, tone: "sky" },
-  { n: 3, title: "POS / ESL / Ecommerce", sub: "Price, promo & display verified", Icon: ShieldCheck, tone: "violet" },
-  { n: 4, title: "Block Risky Changes", sub: "Auto-hold & alert before expansion", Icon: ShieldX, tone: "danger" },
-  { n: 5, title: "Recover & Expand", sub: "Auto rollback or safe expansion", Icon: Globe, tone: "sky" },
+  { n: 1, title: "Test Connector", sub: "Exercise POS / ESL / ecommerce paths", Icon: FlaskConical, tone: "violet" },
+  { n: 2, title: "Certify Readiness", sub: "Pass/fail before automation is enabled", Icon: BadgeCheck, tone: "violet" },
+  { n: 3, title: "Canary Rollout", sub: "Approved actions to a few stores first", Icon: Store, tone: "sky" },
+  { n: 4, title: "Verify Every Channel", sub: "Checkout, shelf label & online agree", Icon: ShieldCheck, tone: "sky" },
+  { n: 5, title: "Recover or Expand", sub: "Block & recover, or expand safely", Icon: RefreshCw, tone: "sky" },
 ];
 
 const TONE: Record<string, string> = {

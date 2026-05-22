@@ -9,11 +9,13 @@ from app.config import settings
 from app.ids import new_id
 from app.models import (
     BatchStatus,
+    Environment,
     OutboxEvent,
     OutboxStatus,
     PriceAction,
     PriceBatch,
     RolloutGroup,
+    RunMode,
 )
 from app.schemas import PriceBatchIn
 from app.services.audit import record_audit
@@ -50,6 +52,9 @@ def ingest_batch(db: Session, payload: PriceBatchIn) -> IngestionResult:
         approved_by=payload.approved_by,
         total_store_count=payload.total_store_count,
         status=BatchStatus.CANARY_PUBLISHING,
+        run_mode=RunMode(payload.run_mode),
+        environment=Environment(payload.environment),
+        connector_profile_id=payload.connector_profile_id,
     )
     db.add(batch)
 

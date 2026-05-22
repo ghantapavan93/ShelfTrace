@@ -13,12 +13,14 @@ import {
   Network,
   RotateCcw,
   ChevronDown,
+  ShieldCheck,
 } from "lucide-react";
 import { Brand } from "./Brand";
 import { api } from "@/lib/api";
 
 const NAV = [
-  { href: "/operations", label: "Operations", sub: "Command Center", icon: LayoutGrid, match: /^\/operations$/ },
+  { href: "/certification", label: "Certification Lab", sub: "Before go-live", icon: ShieldCheck, match: /^\/certification/ },
+  { href: "/operations", label: "Live Operations", sub: "Command Center", icon: LayoutGrid, match: /^\/operations$/ },
   {
     href: "/operations/batches/memorial-day-dallas-02",
     label: "Batches",
@@ -27,8 +29,8 @@ const NAV = [
     match: /^\/operations\/batches/,
   },
   { href: "/operations/incidents", label: "Incidents", sub: "Manage & triage", icon: Bell, match: /^\/operations\/incidents/ },
-  { href: "/operations/markdowns", label: "Markdowns", sub: "Price & promo risks", icon: Tag, match: /^\/operations\/markdowns/ },
-  { href: "/engineering", label: "Engineering", sub: "Data lineage", icon: Network, match: /^\/engineering/ },
+  { href: "/operations/markdowns", label: "Markdown SLAs", sub: "Perishable deadlines", icon: Tag, match: /^\/operations\/markdowns/ },
+  { href: "/engineering", label: "Engineering Trace", sub: "Data lineage", icon: Network, match: /^\/engineering/ },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -109,10 +111,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/5 bg-ink-950/70 px-5 py-3 backdrop-blur-xl">
           <div className="flex items-center gap-2 text-sm font-medium text-white">
             <Activity className="h-4 w-4 text-brand-400" />
-            Memorial Day · Dallas Zone 2
+            ShelfTrace Control Plane
           </div>
-          <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-verified">
-            <span className="h-1.5 w-1.5 rounded-full bg-verified animate-pulse-glow" /> Canary Active
+          <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs font-medium text-slate-300 sm:flex">
+            Test before go-live · guard after approval
           </span>
           <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
             <span className="h-1.5 w-1.5 rounded-full bg-verified animate-pulse-glow" />

@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import AuditEvent, Incident, IncidentStatus
+from app.models import AuditEvent, Incident, PriceBatch, RunMode
 from app.schemas import (
     AuditEventView,
     IncidentExplanation,
@@ -25,8 +25,14 @@ def _get_incident(db: Session, incident_id: str) -> Incident:
 
 
 @router.get("/incidents", response_model=list[IncidentView])
-def list_incidents(external_id: str | None = None, db: Session = Depends(get_db)):
-    stmt = select(Incident).order_by(Incident.created_at.desc())
+def list_incidents(run_mode: str = "live_rollout", db: Session = Depends(get_db)):
+    # Scope to a run mode so live-rollout and certification incidents stay separate.
+    stmt = (
+        select(Incident)
+        .join(PriceBatch, PriceBatch.id == Incident.batch_id)
+        .where(PriceBatch.run_mode == RunMode(run_mode))
+        .order_by(Incident.created_at.desc())
+    )
     incidents = list(db.scalars(stmt))
     return [queries.incident_view(db, i) for i in incidents]
 

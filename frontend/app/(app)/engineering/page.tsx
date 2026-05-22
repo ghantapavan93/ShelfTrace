@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ChevronRight, CheckCircle2 } from "lucide-react";
-import { api, DEMO_BATCH } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { timeOf } from "@/lib/format";
 import type { EngineeringTrace } from "@/lib/types";
@@ -15,17 +16,53 @@ function Json({ value }: { value: unknown }) {
   );
 }
 
+type Mode = "live_rollout" | "certification";
+
 export default function EngineeringPage() {
-  const { data, error } = useLive<EngineeringTrace>(() => api.engineering(DEMO_BATCH));
+  const [mode, setMode] = useState<Mode>("live_rollout");
+
+  // Honor ?mode=certification deep link from the Certification Lab.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("mode=certification")) {
+      setMode("certification");
+    }
+  }, []);
+
+  const { data, error } = useLive<EngineeringTrace>(() => api.engineering({ runMode: mode }), [mode]);
 
   if (error) return <div className="glass rounded-2xl p-6 text-slate-300">Could not load engineering trace.</div>;
   if (!data) return <div className="text-slate-400">Loading trace…</div>;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Engineering Execution Trace</h1>
-        <p className="text-sm text-slate-400">From approved batch to verified store rollout — the real pipeline.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Engineering Execution Trace</h1>
+          <p className="text-sm text-slate-400">From approved batch to verified store rollout — the real pipeline.</p>
+        </div>
+        <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1 text-xs">
+          {(["certification", "live_rollout"] as Mode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={clsx(
+                "rounded-lg px-3 py-1.5 font-medium transition",
+                mode === m ? "bg-brand text-white" : "text-slate-300 hover:text-white",
+              )}
+            >
+              {m === "certification" ? "Certification Run" : "Live Rollout"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Shared-engine statement (real run context) */}
+      <div className="glass rounded-2xl border border-violet-500/20 p-4">
+        <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-violet-300">
+          One shared reliability engine · viewing{" "}
+          <span className="text-white">{data.run_mode}</span> ({data.environment})
+        </div>
+        <p className="text-sm leading-relaxed text-slate-300">{data.shared_engine_statement}</p>
       </div>
 
       {/* Pipeline strip */}

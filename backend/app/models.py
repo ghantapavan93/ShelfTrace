@@ -26,6 +26,43 @@ def utcnow() -> datetime:
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
+class RunMode(str, enum.Enum):
+    CERTIFICATION = "certification"
+    LIVE_ROLLOUT = "live_rollout"
+
+
+class Environment(str, enum.Enum):
+    SANDBOX = "sandbox"
+    SIMULATED_PRODUCTION = "simulated_production"
+
+
+class ConnectorStatus(str, enum.Enum):
+    PENDING_CERTIFICATION = "pending_certification"
+    CERTIFIED = "certified"
+    FAILED = "failed"
+
+
+class CertificationRunStatus(str, enum.Enum):
+    RUNNING = "running"
+    FAILED_PENDING_REMEDIATION = "failed_pending_remediation"
+    PASSED = "passed"
+
+
+class CheckType(str, enum.Enum):
+    PRICE_AGREEMENT = "price_agreement"
+    MARKDOWN_SLA = "markdown_sla"
+    ECOMMERCE_VERIFICATION = "ecommerce_verification"
+    IDEMPOTENT_BATCH = "idempotent_batch"
+    RECOVERY_SAFETY = "recovery_safety"
+    CANARY_PROTECTION = "canary_protection"
+
+
+class CheckStatus(str, enum.Enum):
+    PASSED = "passed"
+    FAILED = "failed"
+    RECOVERED = "recovered"
+
+
 class BatchStatus(str, enum.Enum):
     RECEIVED = "received"
     CANARY_PUBLISHING = "canary_publishing"
@@ -109,6 +146,15 @@ class PriceBatch(Base):
     name: Mapped[str] = mapped_column(String)
     zone: Mapped[str] = mapped_column(String)
     status: Mapped[BatchStatus] = mapped_column(Enum(BatchStatus), default=BatchStatus.RECEIVED)
+    # native_enum=False -> stored as VARCHAR so the additive migration can add
+    # these columns to a pre-existing price_batches table without a PG enum type.
+    run_mode: Mapped[RunMode] = mapped_column(
+        Enum(RunMode, native_enum=False, length=32), default=RunMode.LIVE_ROLLOUT, index=True
+    )
+    environment: Mapped[Environment] = mapped_column(
+        Enum(Environment, native_enum=False, length=32), default=Environment.SIMULATED_PRODUCTION
+    )
+    connector_profile_id: Mapped[str | None] = mapped_column(String, nullable=True)
     approved_by: Mapped[str] = mapped_column(String, default="upstream-pricing-system")
     total_store_count: Mapped[int] = mapped_column(Integer, default=4)
     expansion_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -242,3 +288,57 @@ class AuditEvent(Base):
     detail: Mapped[str] = mapped_column(Text)
     actor: Mapped[str] = mapped_column(String, default="system")  # system | automated | operator
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Certification Lab (reuses the same execution engine as live rollout)
+# ---------------------------------------------------------------------------
+class ConnectorProfile(Base):
+    __tablename__ = "connector_profiles"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    retailer_name: Mapped[str] = mapped_column(String)
+    pos_provider: Mapped[str] = mapped_column(String)
+    esl_provider: Mapped[str] = mapped_column(String)
+    ecommerce_provider: Mapped[str] = mapped_column(String)
+    status: Mapped[ConnectorStatus] = mapped_column(
+        Enum(ConnectorStatus), default=ConnectorStatus.PENDING_CERTIFICATION
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CertificationRun(Base):
+    __tablename__ = "certification_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    connector_profile_id: Mapped[str] = mapped_column(
+        ForeignKey("connector_profiles.id", ondelete="CASCADE"), index=True
+    )
+    batch_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[CertificationRunStatus] = mapped_column(
+        Enum(CertificationRunStatus), default=CertificationRunStatus.RUNNING
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    final_recommendation: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    checks: Mapped[list[CertificationCheck]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+
+
+class CertificationCheck(Base):
+    __tablename__ = "certification_checks"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    certification_run_id: Mapped[str] = mapped_column(
+        ForeignKey("certification_runs.id", ondelete="CASCADE"), index=True
+    )
+    check_type: Mapped[CheckType] = mapped_column(Enum(CheckType))
+    scenario_name: Mapped[str] = mapped_column(String)
+    status: Mapped[CheckStatus] = mapped_column(Enum(CheckStatus))
+    evidence_json: Mapped[str] = mapped_column(Text)  # JSON evidence derived from real records
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    run: Mapped[CertificationRun] = relationship(back_populates="checks")

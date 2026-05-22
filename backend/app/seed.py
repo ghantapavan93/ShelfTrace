@@ -1,20 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models import (
     AuditEvent,
-    ChannelDelivery,
-    ExecutionReceipt,
-    Incident,
     OutboxEvent,
-    PriceAction,
     PriceBatch,
-    RolloutGroup,
-    StoreTask,
 )
 from app.schemas import ApprovedActionIn, PriceBatchIn
 from app.services import orchestrator
@@ -71,26 +65,32 @@ def demo_payload() -> PriceBatchIn:
     )
 
 
-def wipe(db: Session) -> None:
-    for model in (
-        ExecutionReceipt,
-        ChannelDelivery,
-        StoreTask,
-        Incident,
-        AuditEvent,
-        OutboxEvent,
-        PriceAction,
-        RolloutGroup,
-        PriceBatch,
-    ):
-        db.execute(delete(model))
+def wipe_batch(db: Session, external_id: str) -> None:
+    """Delete a single batch and everything that hangs off it.
+
+    Scoped so the live-rollout and certification demos can be reset
+    independently without disturbing each other.
+    """
+    batch = db.scalar(select(PriceBatch).where(PriceBatch.external_id == external_id))
+    if batch is None:
+        return
+    action_ids = [a.id for a in batch.actions]
+    if action_ids:
+        db.execute(delete(OutboxEvent).where(OutboxEvent.aggregate_id.in_(action_ids)))
+    db.execute(delete(AuditEvent).where(AuditEvent.batch_id == batch.id))
+    # Cascades to actions -> deliveries -> receipts, incidents -> store_tasks, rollout_groups.
+    db.delete(batch)
     db.commit()
 
 
-def seed_demo(db: Session) -> PriceBatch:
-    """Reset to the canonical Memorial Day / Dallas Zone 2 demo state."""
-    wipe(db)
+def seed_live(db: Session) -> PriceBatch:
+    """Reset ONLY the live-rollout demo (Memorial Day / Dallas Zone 2) to its blocked state."""
+    wipe_batch(db, DEMO_EXTERNAL_ID)
     result = ingest_batch(db, demo_payload())
     orchestrator.drain(db)
     db.refresh(result.batch)
     return result.batch
+
+
+# Backwards-compatible alias.
+seed_demo = seed_live

@@ -21,8 +21,8 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
     "command": "pytest -q  (PostgreSQL-backed)",
-    "passed": 15,
-    "duration_s": 2.41,
+    "passed": 22,
+    "duration_s": 3.6,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -37,6 +37,13 @@ TEST_PROOF = {
         "tests/test_expansion.py::test_expansion_creates_deliveries_only_when_ready_and_completes",
         "tests/test_audit.py::test_all_transitions_are_audited",
         "tests/test_audit.py::test_explanation_is_grounded_in_records",
+        "tests/test_certification.py::test_certification_uses_shared_pipeline",
+        "tests/test_certification.py::test_certification_records_egg_pos_failure",
+        "tests/test_certification.py::test_certification_records_strawberry_recovered",
+        "tests/test_certification.py::test_certification_records_orange_juice_pass",
+        "tests/test_certification.py::test_certification_overall_fails_while_pos_failed",
+        "tests/test_certification.py::test_rerun_failed_checks_can_pass",
+        "tests/test_certification.py::test_live_rollout_behaviour_unchanged",
         "tests/test_concurrency_pg.py::test_concurrent_resolution_is_serialized",
         "tests/test_concurrency_pg.py::test_outbox_not_double_processed",
     ],
@@ -44,8 +51,10 @@ TEST_PROOF = {
 
 
 @router.get("/engineering")
-def engineering(external_id: str | None = None, db: Session = Depends(get_db)):
-    batch = get_batch_or_404(db, external_id)
+def engineering(
+    external_id: str | None = None, run_mode: str | None = None, db: Session = Depends(get_db)
+):
+    batch = get_batch_or_404(db, external_id, run_mode)
     action_ids = [a.id for a in batch.actions]
 
     outbox = list(
@@ -119,8 +128,18 @@ def engineering(external_id: str | None = None, db: Session = Depends(get_db)):
         {"stage": "UI / Audit", "status": "done", "detail": "Trace available"},
     ]
 
+    shared_engine_statement = (
+        "Certification and live rollout use the same reliability engine: FastAPI ingestion, "
+        "PostgreSQL transactional outbox, Redis worker delivery, typed POS/ESL/ecommerce adapters, "
+        "deterministic reconciliation, concurrency-safe recovery and audit events. The difference is "
+        "whether the run occurs before activation (certification) or during active execution (live rollout)."
+    )
+
     return {
         "batch": queries.batch_summary(db, batch).model_dump(),
+        "run_mode": batch.run_mode.value,
+        "environment": batch.environment.value,
+        "shared_engine_statement": shared_engine_statement,
         "pipeline": pipeline,
         "outbox_events": outbox_view,
         "raw_receipt": raw_receipt,

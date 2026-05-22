@@ -32,8 +32,15 @@ docker compose logs --tail=15 worker
 echo "==> 8. Test suite against PostgreSQL (all 15, incl. row-lock concurrency)"
 docker compose exec -T backend pytest -q
 
-echo "==> 9. Prove the state sequence over the live API (reset -> egg -> strawberry -> expand)"
+echo "==> 9. Prove the LIVE state sequence over the API (reset -> egg -> strawberry -> expand)"
 docker compose exec -T backend python -m tests.prove_sequence
+
+echo "==> 10. Prove the CERTIFICATION lab over the API (shared engine + pass/fail + remediation)"
+docker compose exec -T backend python -m tests.prove_certification
+
+echo "==> 11. Restore canonical default demo states (live blocked, certification failed)"
+curl -s -X POST http://localhost:8000/api/v1/demo/reset >/dev/null && echo "live -> blocked"
+curl -s -X POST http://localhost:8000/api/v1/certification/demo/reset >/dev/null && echo "certification -> failed_pending_remediation"
 
 echo
 echo "ALL VERIFIED. Frontend: http://localhost:3000   API docs: http://localhost:8000/docs"
