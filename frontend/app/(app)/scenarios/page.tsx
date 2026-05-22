@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Plus, Trash2, FlaskConical, ShieldCheck, Rocket, Download } from "lucide-react";
+import { Plus, Trash2, FlaskConical, ShieldCheck, Rocket, Download, Copy, Pencil, Lock } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BehaviorType, ConnectorBehavior, Scenario, ScenarioAction } from "@/lib/types";
 
@@ -36,19 +36,64 @@ export default function ScenarioBuilder() {
   const [behaviors, setBehaviors] = useState<ConnectorBehavior[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<Scenario[]>([]);
+
+  async function refreshList() {
+    setSaved(await api.scenarios().catch(() => []));
+  }
+  useEffect(() => {
+    refreshList();
+  }, []);
+
+  function loadInto(s: Scenario) {
+    setName(s.is_seeded ? `${s.name} (custom)` : s.name);
+    setZone(s.zone_name);
+    setStores(s.store_ids.join(","));
+    setCanary(s.canary_store_ids.join(","));
+    setActions(s.actions.map((a) => ({ ...a, id: undefined })));
+    setBehaviors(s.behaviors.map((b) => ({ ...b, id: undefined })));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   async function loadMemorialDay() {
     setBusy("load");
     try {
       const all = await api.scenarios();
       const seeded = all.find((s) => s.is_seeded) ?? all[0];
-      if (!seeded) return;
-      setName(`${seeded.name} (custom)`);
-      setZone(seeded.zone_name);
-      setStores(seeded.store_ids.join(","));
-      setCanary(seeded.canary_store_ids.join(","));
-      setActions(seeded.actions.map((a) => ({ ...a, id: undefined })));
-      setBehaviors(seeded.behaviors.map((b) => ({ ...b, id: undefined })));
+      if (seeded) loadInto(seeded);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runSaved(id: string, mode: "live_rollout" | "certification") {
+    setBusy(`run-${id}`);
+    try {
+      const res = await api.executeScenario(id, mode);
+      router.push(res.redirect);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function cloneSaved(id: string) {
+    setBusy(`clone-${id}`);
+    try {
+      await api.cloneScenario(id);
+      await refreshList();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deleteSaved(id: string) {
+    setBusy(`del-${id}`);
+    setError(null);
+    try {
+      await api.deleteScenario(id);
+      await refreshList();
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setBusy(null);
     }
@@ -114,6 +159,39 @@ export default function ScenarioBuilder() {
         </button>
       </div>
       {error && <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 px-4 py-2.5 text-sm text-rose-200">{error}</div>}
+
+      {/* Saved scenarios */}
+      <section className="glass rounded-2xl p-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">Saved Scenarios</h2>
+        <div className="space-y-2">
+          {saved.map((s) => (
+            <div key={s.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-white">{s.name}</span>
+                  {s.is_seeded && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                      <Lock className="h-3 w-3" /> Seeded
+                    </span>
+                  )}
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-400">{s.run_mode}</span>
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  {s.zone_name} · {s.actions.length} product(s) · {s.store_ids.length} store(s) · {s.behaviors.length} behavior(s)
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button onClick={() => loadInto(s)} className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-white/10"><Pencil className="h-3.5 w-3.5" /> Load</button>
+                <button onClick={() => runSaved(s.id, "certification")} disabled={busy !== null} className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-xs font-medium text-violet-200 hover:bg-violet-500/20 disabled:opacity-50">Run Cert</button>
+                <button onClick={() => runSaved(s.id, "live_rollout")} disabled={busy !== null} className="rounded-lg border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs font-medium text-brand-400 hover:bg-brand/20 disabled:opacity-50">Run Live</button>
+                <button onClick={() => cloneSaved(s.id)} disabled={busy !== null} className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-white/10 disabled:opacity-50"><Copy className="h-3.5 w-3.5" /> Clone</button>
+                <button onClick={() => deleteSaved(s.id)} disabled={busy !== null || s.is_seeded} title={s.is_seeded ? "Seeded scenario can't be deleted" : "Delete"} className="flex items-center gap-1 rounded-lg border border-rose-500/20 bg-rose-500/5 px-2.5 py-1.5 text-xs text-rose-300 hover:bg-rose-500/15 disabled:opacity-30"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+          ))}
+          {saved.length === 0 && <div className="text-xs text-slate-500">No saved scenarios yet.</div>}
+        </div>
+      </section>
 
       {/* Scope */}
       <section className="glass rounded-2xl p-5">

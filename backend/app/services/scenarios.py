@@ -144,7 +144,45 @@ def execute_live(db: Session, config: TestRunConfig) -> PriceBatch:
 # ---------------------------------------------------------------------------
 # CRUD helpers
 # ---------------------------------------------------------------------------
+class ScenarioValidationError(ValueError):
+    """Raised when a scenario configuration is invalid."""
+
+
+def validate_scenario(payload: ScenarioIn) -> None:
+    if not payload.store_ids:
+        raise ScenarioValidationError("At least one store is required.")
+    if not payload.canary_store_ids:
+        raise ScenarioValidationError("At least one canary store is required.")
+    stores = set(payload.store_ids)
+    extra = set(payload.canary_store_ids) - stores
+    if extra:
+        raise ScenarioValidationError(f"Canary stores must be a subset of stores; unknown: {sorted(extra)}.")
+    if not payload.actions:
+        raise ScenarioValidationError("At least one price action is required.")
+    skus = set()
+    for a in payload.actions:
+        if not a.sku or not a.product_name:
+            raise ScenarioValidationError("Each price action needs a product name and SKU.")
+        if a.approved_price <= 0 or a.previous_price < 0:
+            raise ScenarioValidationError(f"Invalid prices for {a.sku}: approved must be > 0, previous >= 0.")
+        skus.add(a.sku)
+    valid_channels = {"pos", "esl", "ecommerce"}
+    valid_behaviors = {"success", "stale_price", "timeout", "timeout_then_success", "duplicate_ack"}
+    for b in payload.behaviors:
+        if b.store_id not in stores:
+            raise ScenarioValidationError(f"Behavior references unknown store '{b.store_id}'.")
+        if b.sku not in skus:
+            raise ScenarioValidationError(f"Behavior references unknown SKU '{b.sku}'.")
+        if b.channel_type not in valid_channels:
+            raise ScenarioValidationError(f"Invalid channel '{b.channel_type}'.")
+        if b.behavior_type not in valid_behaviors:
+            raise ScenarioValidationError(f"Invalid behavior '{b.behavior_type}'.")
+        if b.behavior_type == "stale_price" and b.configured_observed_price is None:
+            raise ScenarioValidationError(f"'stale_price' on {b.sku}/{b.channel_type} needs an observed price.")
+
+
 def create_config(db: Session, payload: ScenarioIn) -> TestRunConfig:
+    validate_scenario(payload)
     cfg = TestRunConfig(
         id=new_id("cfg"),
         name=payload.name,
@@ -198,6 +236,17 @@ def list_configs(db: Session) -> list[TestRunConfig]:
 
 def get_config(db: Session, config_id: str) -> TestRunConfig | None:
     return db.get(TestRunConfig, config_id)
+
+
+def delete_config(db: Session, config: TestRunConfig) -> None:
+    if config.is_seeded:
+        raise ScenarioValidationError("The seeded showcase scenario cannot be deleted.")
+    # Clean up any batches this scenario produced (no orphan live batches).
+    batches = db.scalars(select(PriceBatch).where(PriceBatch.scenario_config_id == config.id)).all()
+    for b in batches:
+        wipe_batch(db, b.external_id)
+    db.delete(config)  # cascades actions + behaviors
+    db.commit()
 
 
 def clone_config(db: Session, config: TestRunConfig, new_name: str | None = None) -> TestRunConfig:

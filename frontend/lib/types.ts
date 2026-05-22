@@ -195,6 +195,7 @@ export interface EngineeringTrace {
     channel: string;
     behavior: string;
     configured_observed_price: number | null;
+    configured_delay_ms: number | null;
     retry_success_price: number | null;
   }[];
   incident_from_configured_behavior: boolean;

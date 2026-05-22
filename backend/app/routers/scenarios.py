@@ -55,7 +55,10 @@ def _get_or_404(db: Session, config_id: str) -> TestRunConfig:
 
 @router.post("", response_model=ScenarioView, status_code=201)
 def create_scenario(payload: ScenarioIn, db: Session = Depends(get_db)):
-    return _view(scenarios.create_config(db, payload))
+    try:
+        return _view(scenarios.create_config(db, payload))
+    except scenarios.ScenarioValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("", response_model=list[ScenarioView])
@@ -88,3 +91,12 @@ def reset_scenario(config_id: str, mode: str | None = None, db: Session = Depend
 def clone_scenario(config_id: str, db: Session = Depends(get_db)):
     config = _get_or_404(db, config_id)
     return _view(scenarios.clone_config(db, config))
+
+
+@router.delete("/{config_id}", status_code=204)
+def delete_scenario(config_id: str, db: Session = Depends(get_db)):
+    config = _get_or_404(db, config_id)
+    try:
+        scenarios.delete_config(db, config)
+    except scenarios.ScenarioValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))

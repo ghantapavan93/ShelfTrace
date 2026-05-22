@@ -153,6 +153,7 @@ def engineering(
                 "channel": b.channel_type.value,
                 "behavior": b.behavior_type.value,
                 "configured_observed_price": b.configured_observed_price,
+                "configured_delay_ms": b.configured_delay_ms,
                 "retry_success_price": b.retry_success_price,
             }
             for b in rows

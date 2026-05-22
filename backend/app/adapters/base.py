@@ -53,13 +53,15 @@ class ChannelAdapter:
         observed,
         behavior_type: str = "success",
         duplicate_ack: bool = False,
+        delay_ms: int | None = None,
     ) -> AdapterReceipt:
         """Build a normalized receipt from a resolved observation.
 
-        ``observed`` is either a float price or the TIMEOUT marker.
+        ``observed`` is either a float price or the TIMEOUT marker. ``delay_ms``
+        is the channel's acknowledgement latency from the behavior profile.
         """
         if observed == TIMEOUT:
-            return AdapterReceipt(
+            receipt = AdapterReceipt(
                 adapter=self.system_name,
                 channel=self.channel,
                 store_id=store_id,
@@ -74,25 +76,28 @@ class ChannelAdapter:
                 correlation_id=new_id("corr"),
                 timestamp=_now(),
             )
-        status = "VERIFIED" if abs(observed - approved_price) < 0.001 else "MISMATCH"
-        receipt = AdapterReceipt(
-            adapter=self.system_name,
-            channel=self.channel,
-            store_id=store_id,
-            sku=sku,
-            action="verify",
-            expected_price=approved_price,
-            observed_price=observed,
-            ack=True,
-            status=status,
-            behavior=behavior_type,
-            receipt_id=new_id("rcpt"),
-            correlation_id=new_id("corr"),
-            timestamp=_now(),
-        )
-        if duplicate_ack:
-            receipt["duplicate_ack_received"] = True
-            receipt["duplicate_ack_dropped"] = True
+        else:
+            status = "VERIFIED" if abs(observed - approved_price) < 0.001 else "MISMATCH"
+            receipt = AdapterReceipt(
+                adapter=self.system_name,
+                channel=self.channel,
+                store_id=store_id,
+                sku=sku,
+                action="verify",
+                expected_price=approved_price,
+                observed_price=observed,
+                ack=True,
+                status=status,
+                behavior=behavior_type,
+                receipt_id=new_id("rcpt"),
+                correlation_id=new_id("corr"),
+                timestamp=_now(),
+            )
+            if duplicate_ack:
+                receipt["duplicate_ack_received"] = True
+                receipt["duplicate_ack_dropped"] = True
+        if delay_ms is not None:
+            receipt["ack_latency_ms"] = delay_ms
         return receipt
 
     def rollback_price_change(self, *, sku: str, store_id: str, prior_price: float) -> AdapterReceipt:

@@ -32,6 +32,14 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function del(path: string): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, { method: "DELETE", cache: "no-store" });
+  if (!res.ok && res.status !== 204) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { detail?: string }).detail || `DELETE ${path} -> ${res.status}`);
+  }
+}
+
 export const api = {
   base: BASE,
   operations: (externalId?: string) =>
@@ -79,6 +87,8 @@ export const api = {
   createScenario: (body: unknown) => post<Scenario>(`/api/v1/scenarios`, body),
   executeScenario: (id: string, mode: string) =>
     post<ScenarioExecuteResult>(`/api/v1/scenarios/${id}/execute?mode=${mode}`),
+  cloneScenario: (id: string) => post<Scenario>(`/api/v1/scenarios/${id}/clone`),
+  deleteScenario: (id: string) => del(`/api/v1/scenarios/${id}`),
 };
 
 export const DEMO_BATCH = "memorial-day-dallas-02";

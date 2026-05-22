@@ -91,7 +91,8 @@ export default function EngineeringPage() {
                   <th className="py-2 pr-3 font-medium">Channel</th>
                   <th className="py-2 pr-3 font-medium">Behavior</th>
                   <th className="py-2 pr-3 font-medium">Observed $</th>
-                  <th className="py-2 font-medium">Retry $</th>
+                  <th className="py-2 pr-3 font-medium">Retry $</th>
+                  <th className="py-2 font-medium">Delay ms</th>
                 </tr>
               </thead>
               <tbody>
@@ -102,7 +103,8 @@ export default function EngineeringPage() {
                     <td className="py-2 pr-3 text-slate-300">{b.channel.toUpperCase()}</td>
                     <td className="py-2 pr-3 text-warn">{b.behavior}</td>
                     <td className="py-2 pr-3 text-slate-400">{b.configured_observed_price ?? "—"}</td>
-                    <td className="py-2 text-slate-400">{b.retry_success_price ?? "—"}</td>
+                    <td className="py-2 pr-3 text-slate-400">{b.retry_success_price ?? "—"}</td>
+                    <td className="py-2 text-slate-400">{b.configured_delay_ms ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

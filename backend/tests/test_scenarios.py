@@ -13,6 +13,8 @@ from app.models import (
     ReceiptStatus,
     TestRunConfig,
 )
+import pytest
+
 from app.schemas import ConnectorBehaviorIn, ScenarioActionIn, ScenarioIn
 from app.services import recovery, scenarios
 
@@ -109,3 +111,39 @@ def test_memorial_day_is_loaded_from_configuration(db):
     batch = scenarios.execute_live(db, cfg)
     assert batch.scenario_config_id == cfg.id
     assert batch.status == BatchStatus.BLOCKED
+
+
+def test_validation_rejects_canary_not_subset(db):
+    bad = ScenarioIn(
+        name="Bad", run_mode="live_rollout", zone_name="Z",
+        store_ids=["s1"], canary_store_ids=["s9"],  # s9 not in stores
+        actions=[ScenarioActionIn(product_name="X", sku="x", previous_price=1.0, approved_price=1.0)],
+    )
+    with pytest.raises(scenarios.ScenarioValidationError):
+        scenarios.create_config(db, bad)
+
+
+def test_validation_rejects_behavior_for_unknown_sku(db):
+    bad = _milk_scenario([
+        ConnectorBehaviorIn(store_id="s1", sku="not-a-real-sku", channel_type="pos", behavior_type="timeout"),
+    ])
+    with pytest.raises(scenarios.ScenarioValidationError):
+        scenarios.create_config(db, bad)
+
+
+def test_delete_scenario_removes_config_and_orphan_batch(db):
+    cfg = scenarios.create_config(db, _milk_scenario([]))
+    batch = scenarios.execute_live(db, cfg)
+    ext = batch.external_id
+
+    scenarios.delete_config(db, cfg)
+
+    assert scenarios.get_config(db, cfg.id) is None
+    from app.models import PriceBatch
+    assert db.query(PriceBatch).filter(PriceBatch.external_id == ext).count() == 0
+
+
+def test_seeded_scenario_cannot_be_deleted(db):
+    cfg = scenarios.ensure_memorial_day(db)
+    with pytest.raises(scenarios.ScenarioValidationError):
+        scenarios.delete_config(db, cfg)

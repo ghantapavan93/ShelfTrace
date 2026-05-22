@@ -53,6 +53,7 @@ def verify_channel(db: Session, delivery: ChannelDelivery, action: PriceAction) 
         observed=observed,
         behavior_type=profile.behavior_type.value if profile else "success",
         duplicate_ack=behavior.is_duplicate_ack(profile),
+        delay_ms=profile.configured_delay_ms if profile else None,
     )
 
     if raw["status"] == "TIMEOUT":
