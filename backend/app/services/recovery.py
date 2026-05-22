@@ -71,23 +71,13 @@ def retry_incident(db: Session, incident_id: str) -> Incident:
             sku=action.sku, store_id=action.store_id, approved_price=action.approved_price
         )
 
-    # Re-run reconciliation; verify_channel will observe the healed channel.
-    decision = reconciliation.reconcile_action(db, action)
+    # Re-run reconciliation; verify_channel observes the healed channel and
+    # _sync_incident emits the causal sequence (ack -> reconciliation verified
+    # -> resolved -> eligible) when the action becomes eligible.
+    reconciliation.reconcile_action(db, action)
     batch = db.get(PriceBatch, action.batch_id)
     if batch is not None:
         reconciliation.refresh_batch(db, batch)
-
-    if decision == ActionDecision.ELIGIBLE:
-        record_audit(
-            db,
-            incident_id=incident.id,
-            action_id=action.id,
-            batch_id=action.batch_id,
-            event=f"{channel.value.upper()} acknowledgement received",
-            detail=f"{channel.value.upper()} now reports ${action.approved_price:.2f}. "
-            f"{action.product_name} at Store {action.store_id} is verified and eligible for expansion.",
-            actor="automated",
-        )
 
     db.commit()
     db.refresh(incident)

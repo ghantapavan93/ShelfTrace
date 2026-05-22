@@ -114,19 +114,56 @@ def _sync_incident(db: Session, action: PriceAction, receipts: list[ExecutionRec
 
     if decision == ActionDecision.ELIGIBLE:
         if open_incident is not None:
-            open_incident.status = IncidentStatus.RESOLVED
+            from datetime import timedelta
+
             from app.models import utcnow
 
+            # Strictly increasing timestamps guarantee causal ordering on the
+            # timeline (ack -> reconciliation verified -> resolved -> eligible),
+            # even if the clock resolution would otherwise tie them.
+            t = utcnow()
+            offending = open_incident.offending_channel
+            ack_receipt = next((r for r in receipts if offending and r.channel == offending), None)
+            if ack_receipt is not None and ack_receipt.status == ReceiptStatus.VERIFIED:
+                record_audit(
+                    db,
+                    incident_id=open_incident.id, action_id=action.id, batch_id=action.batch_id,
+                    event=f"{offending.value.upper()} acknowledgement received",
+                    detail=f"{offending.value.upper()} now reports ${action.approved_price:.2f} for "
+                    f"{action.product_name} at Store {action.store_id}.",
+                    actor="automated", created_at=t,
+                )
+                t = t + timedelta(microseconds=1)
+
+            record_audit(
+                db,
+                incident_id=open_incident.id, action_id=action.id, batch_id=action.batch_id,
+                event="Reconciliation verified all required channels",
+                detail=f"POS, ESL and ecommerce all agree on ${action.approved_price:.2f} for "
+                f"{action.product_name} at Store {action.store_id}.",
+                actor="automated", created_at=t,
+            )
+            t = t + timedelta(microseconds=1)
+
+            open_incident.status = IncidentStatus.RESOLVED
             open_incident.resolved_at = utcnow()
             record_audit(
                 db,
-                incident_id=open_incident.id,
-                action_id=action.id,
-                batch_id=action.batch_id,
+                incident_id=open_incident.id, action_id=action.id, batch_id=action.batch_id,
                 event="Incident resolved",
                 detail=f"All channels for {action.product_name} at Store {action.store_id} now verified at "
                 f"${action.approved_price:.2f}.",
-                actor="automated",
+                actor="automated", created_at=t,
+            )
+            t = t + timedelta(microseconds=1)
+
+            record_audit(
+                db,
+                incident_id=open_incident.id, action_id=action.id, batch_id=action.batch_id,
+                event="Action eligible for expansion",
+                detail=f"{action.product_name} at Store {action.store_id} is verified across every channel and "
+                f"may now expand to the remaining stores.",
+                actor="automated", created_at=t,
             )
         return
 

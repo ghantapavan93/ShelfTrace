@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from app.ids import new_id
@@ -15,7 +17,11 @@ def record_audit(
     batch_id: str | None = None,
     incident_id: str | None = None,
     action_id: str | None = None,
+    created_at: datetime | None = None,
 ) -> AuditEvent:
+    """Persist an audit event. ``created_at`` may be supplied explicitly so the
+    caller can guarantee strictly increasing timestamps for a causal sequence
+    (the model default uses utcnow at row creation otherwise)."""
     ev = AuditEvent(
         id=new_id("audit"),
         batch_id=batch_id,
@@ -25,5 +31,7 @@ def record_audit(
         detail=detail,
         actor=actor,
     )
+    if created_at is not None:
+        ev.created_at = created_at
     db.add(ev)
     return ev

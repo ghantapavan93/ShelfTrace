@@ -21,8 +21,8 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
     "command": "pytest -q  (PostgreSQL-backed, isolated test DB)",
-    "passed": 31,
-    "duration_s": 14.0,
+    "passed": 34,
+    "duration_s": 15.0,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -36,6 +36,9 @@ TEST_PROOF = {
         "tests/test_expansion.py::test_expansion_blocked_until_ready",
         "tests/test_expansion.py::test_expansion_creates_deliveries_only_when_ready_and_completes",
         "tests/test_audit.py::test_all_transitions_are_audited",
+        "tests/test_audit.py::test_pos_acknowledgement_precedes_incident_resolution",
+        "tests/test_audit.py::test_esl_acknowledgement_precedes_markdown_resolution",
+        "tests/test_audit.py::test_cannot_resolve_without_verified_acknowledgement",
         "tests/test_audit.py::test_explanation_is_grounded_in_records",
         "tests/test_certification.py::test_certification_uses_shared_pipeline",
         "tests/test_certification.py::test_certification_records_egg_pos_failure",

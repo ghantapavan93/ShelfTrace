@@ -1,7 +1,5 @@
-from app.models import AuditEvent, Incident, IncidentType
-from app.seed import demo_payload
-from app.services import orchestrator, queries, recovery
-from app.services.ingestion import ingest_batch
+from app.models import AuditEvent, Incident, IncidentStatus, IncidentType
+from app.services import queries, recovery
 
 
 def _seed(db):
@@ -24,6 +22,63 @@ def test_all_transitions_are_audited(db):
     assert "Approved batch accepted" in events
     assert any("retry requested" in e.lower() for e in events)
     assert any("resolved" in e.lower() for e in events)
+
+
+def _audit_order(db, incident_id: str):
+    return [
+        e.event
+        for e in db.query(AuditEvent)
+        .filter(AuditEvent.incident_id == incident_id)
+        .order_by(AuditEvent.created_at)
+        .all()
+    ]
+
+
+def test_pos_acknowledgement_precedes_incident_resolution(db):
+    """Retry-driven recovery must record the POS acknowledgement BEFORE the
+    incident is marked resolved. This is the causality the audit timeline shows."""
+    batch = _seed(db)
+    egg = db.query(Incident).filter(Incident.type == IncidentType.PRICE_MISMATCH).one()
+
+    recovery.retry_incident(db, egg.id)
+    order = _audit_order(db, egg.id)
+
+    ack_idx = next(i for i, e in enumerate(order) if "acknowledgement received" in e.lower())
+    res_idx = next(i for i, e in enumerate(order) if e.lower() == "incident resolved")
+    assert ack_idx < res_idx, f"Audit order wrong: {order}"
+    # The channel-specific acknowledgement names the offending channel.
+    assert "POS acknowledgement received" in order
+
+
+def test_esl_acknowledgement_precedes_markdown_resolution(db):
+    """Same causality applies to ESL timeout-then-success markdown recovery."""
+    batch = _seed(db)
+    straw = (
+        db.query(Incident)
+        .filter(Incident.type == IncidentType.DEADLINE_RISK)
+        .one()
+    )
+    recovery.retry_incident(db, straw.id)
+    order = _audit_order(db, straw.id)
+
+    ack_idx = next(i for i, e in enumerate(order) if e == "ESL acknowledgement received")
+    res_idx = next(i for i, e in enumerate(order) if e.lower() == "incident resolved")
+    assert ack_idx < res_idx, f"Audit order wrong: {order}"
+
+
+def test_cannot_resolve_without_verified_acknowledgement(db):
+    """An incident cannot be marked resolved while channels still disagree.
+    resolve_incident re-verifies and rejects with RecoveryError; the egg
+    incident stays unresolved until a real acknowledgement comes through."""
+    batch = _seed(db)
+    egg = db.query(Incident).filter(Incident.type == IncidentType.PRICE_MISMATCH).one()
+    import pytest as _pytest
+    with _pytest.raises(recovery.RecoveryError):
+        recovery.resolve_incident(db, egg.id)
+    db.refresh(egg)
+    assert egg.status in (IncidentStatus.OPEN, IncidentStatus.RETRYING)
+    # Audit trail must not contain a resolution event.
+    assert not any("resolved" in e.lower() for e in _audit_order(db, egg.id))
 
 
 def test_explanation_is_grounded_in_records(db):
