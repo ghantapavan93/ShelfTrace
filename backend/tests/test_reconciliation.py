@@ -29,7 +29,7 @@ def test_checkout_mismatch_creates_critical_incident(db):
 def test_esl_timeout_creates_deadline_risk(db):
     batch = _seed(db)
     deadline = db.query(Incident).filter(Incident.type == IncidentType.DEADLINE_RISK).all()
-    # One per strawberry canary action.
-    assert len(deadline) == 2
+    # Strawberry shelf-label times out at canary store 214 only.
+    assert len(deadline) == 1
     assert all(i.severity == IncidentSeverity.URGENT for i in deadline)
     assert all(i.offending_channel.value == "esl" for i in deadline)

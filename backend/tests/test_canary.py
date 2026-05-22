@@ -28,8 +28,8 @@ def test_expansion_excludes_unresolved_actions(db):
     eligible = [a for a in canary_actions if a.decision == ActionDecision.ELIGIBLE]
     retrying = [a for a in canary_actions if a.decision == ActionDecision.RETRY]
 
-    # Egg @214 blocked; strawberries timing out; OJ + egg@302 eligible.
+    # Egg @214 blocked; strawberry @214 timing out; OJ + egg@302 + strawberry@302 eligible.
     assert any(a.sku == "egg-cage-free-brown-12" and a.store_id == "214" for a in blocked)
     assert all(a.decision != ActionDecision.ELIGIBLE for a in blocked)
     assert len(eligible) >= 2
-    assert len(retrying) == 2  # both strawberry canary actions
+    assert len(retrying) == 1  # strawberry @214 only

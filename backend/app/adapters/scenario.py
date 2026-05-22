@@ -34,9 +34,10 @@ def observe(sku: str, store_id: str, channel: str, approved_price: float, attemp
             return 4.49  # stale prior price still at the register
         return approved_price
 
-    # Strawberry markdown: the ESL shelf label times out (no ack) in the canary
-    # stores. Retrying the label update succeeds.
-    if sku == STRAWBERRIES and channel == "esl" and store_id in (CANARY_STORE_A, CANARY_STORE_B):
+    # Strawberry markdown: the ESL shelf label times out (no ack) at canary
+    # store 214. Retrying the label update succeeds. (Store 302 updates cleanly,
+    # keeping the demo to a single deadline-risk incident.)
+    if sku == STRAWBERRIES and channel == "esl" and store_id == CANARY_STORE_A:
         if attempt < 2:
             return TIMEOUT
         return approved_price

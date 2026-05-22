@@ -54,7 +54,7 @@ def main() -> int:
     print("canary decisions    =", action_decisions(b))
     assert b["status"] == "partially_blocked" and b["expansion_blocked"] is True
 
-    line("C. Retry strawberry ESL (both canary stores)")
+    line("C. Retry strawberry ESL (canary store 214)")
     for s in straws:
         c.post(f"{BASE}/api/v1/incidents/{s['id']}/retry")
     b = batch_state(c)
