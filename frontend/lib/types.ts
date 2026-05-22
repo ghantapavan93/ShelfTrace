@@ -1,0 +1,119 @@
+export type ChannelStatus = "verified" | "mismatch" | "timeout" | "pending";
+export type Decision = "pending" | "verified" | "eligible" | "retry" | "blocked";
+
+export interface ChannelView {
+  channel: "pos" | "esl" | "ecommerce";
+  status: ChannelStatus;
+  expected_price: number;
+  observed_price: number | null;
+  attempts: number;
+}
+
+export interface ActionView {
+  id: string;
+  sku: string;
+  product_name: string;
+  store_id: string;
+  approved_price: number;
+  prior_price: number;
+  reason: string;
+  is_kvi: boolean;
+  is_perishable: boolean;
+  markdown_deadline: string | null;
+  projected_impact: string | null;
+  decision: Decision;
+  channels: ChannelView[];
+}
+
+export interface BatchSummary {
+  id: string;
+  external_id: string;
+  name: string;
+  zone: string;
+  status: string;
+  approved_by: string;
+  total_store_count: number;
+  canary_store_ids: string[];
+  expansion_store_ids: string[];
+  expansion_blocked: boolean;
+  block_reason: string | null;
+  created_at: string;
+  total_actions: number;
+  canary_action_count: number;
+  verified_actions: number;
+  blocked_actions: number;
+  retry_actions: number;
+  critical_incidents: number;
+  deadline_risks: number;
+}
+
+export interface BatchDetail extends BatchSummary {
+  actions: ActionView[];
+}
+
+export interface IncidentView {
+  id: string;
+  batch_id: string;
+  action_id: string;
+  type: "price_mismatch" | "channel_timeout" | "deadline_risk";
+  severity: "critical" | "urgent" | "warning";
+  status: "open" | "retrying" | "resolved" | "rolled_back";
+  summary: string;
+  offending_channel: string | null;
+  product_name: string;
+  sku: string;
+  store_id: string;
+  approved_price: number;
+  observed_price: number | null;
+  created_at: string;
+  resolved_at: string | null;
+  channels: ChannelView[];
+}
+
+export interface IncidentExplanation {
+  incident_id: string;
+  what_happened: string;
+  why_it_matters: string;
+  recommended_next_actions: string[];
+  channels: ChannelView[];
+}
+
+export interface AuditEventView {
+  id: string;
+  event: string;
+  detail: string;
+  actor: "system" | "automated" | "operator";
+  created_at: string;
+}
+
+export interface OperationsOverview {
+  batch: BatchSummary;
+  critical_incident: IncidentView | null;
+  deadline_risk: IncidentView | null;
+  eligible_action: ActionView | null;
+  recent_activity: AuditEventView[];
+  rollout_progress: {
+    verified: number;
+    blocked: number;
+    pending: number;
+    total: number;
+    verified_pct: number;
+  };
+}
+
+export interface EngineeringTrace {
+  batch: BatchSummary;
+  pipeline: { stage: string; status: string; detail: string }[];
+  outbox_events: {
+    id: string;
+    event_type: string;
+    aggregate_id: string;
+    status: string;
+    attempts: number;
+    created_at: string;
+  }[];
+  raw_receipt: Record<string, unknown> | null;
+  reconciliation_result: Record<string, unknown>;
+  recent_incidents: IncidentView[];
+  test_proof: { command: string; passed: number; duration_s: number; tests: string[] };
+}
