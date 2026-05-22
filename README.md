@@ -1,10 +1,10 @@
 # ShelfTrace Control Plane
 
-**Canary rollout, execution reconciliation, and incident recovery for AI-approved grocery price changes.**
+**Test every connector before go-live. Guard every price rollout after approval.**
 
-> Athena decides the right price. ShelfTrace makes sure it actually reaches every channel safely — checkout, shelf label, and ecommerce — before touching the full zone.
+One reliability platform with two modes: a **Certification Lab** that validates POS, shelf-label and ecommerce connectors before automated pricing is enabled, and a **Live Control Plane** that canaries approved price rollouts, verifies every customer-facing channel, and recovers incidents after activation.
 
-> **Disclaimer.** Inspired by BetterBasket's publicly demonstrated signal-to-shelf workflow. This is an **independent prototype** using sample data and simulated integrations. It is not affiliated with BetterBasket or Athena and makes no claim about any company's internal systems. The line above is illustrative framing for this prototype only.
+> **Disclaimer.** Independent prototype inspired by public grocery pricing workflows. Uses sample data and simulated POS, ESL and ecommerce integrations. Not affiliated with, and makes no claim about, any company's internal systems.
 
 ---
 
@@ -14,7 +14,7 @@ An AI pricing system can approve a perfect price. The hard part is the **last mi
 
 ShelfTrace Control Plane is the **release-safety layer that runs after approval**:
 
-1. **Accepts** an already-approved price batch from an upstream (Athena-style) system.
+1. **Accepts** an already-approved price batch from an upstream pricing system.
 2. **Canaries** the batch to a small set of stores first instead of the whole zone.
 3. **Verifies** that POS, ESL, and ecommerce all agree with the approved price.
 4. **Blocks** zone expansion, **retries**, **rolls back**, or **creates a store task** when a channel disagrees — and explains exactly what happened and what to do next.
@@ -53,7 +53,7 @@ Every transition is written to the audit trail. The exact API responses for this
 ## Architecture
 
 ```
- Approved Price Batch (upstream / Athena-style)
+ Approved Price Batch (upstream pricing system)
             │  POST /api/v1/price-batches  (idempotent)
             ▼
  FastAPI ── Pydantic validation + idempotency check

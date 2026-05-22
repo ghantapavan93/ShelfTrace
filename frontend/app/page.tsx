@@ -226,10 +226,11 @@ export default function Landing() {
         <div className="flex flex-col items-center justify-between gap-4 rounded-3xl border border-white/10 bg-gradient-to-r from-ink-850 to-black p-7 md:flex-row">
           <div>
             <h3 className="text-2xl font-bold text-white">
-              Execution is your last mile. <span className="text-brand-400">Make it your strongest.</span>
+              Test every connector before go-live.{" "}
+              <span className="text-brand-400">Guard every price rollout after approval.</span>
             </h3>
             <p className="mt-1 text-sm text-slate-400">
-              ShelfTrace Control Plane — the execution reliability layer for AI-approved pricing.
+              ShelfTrace Control Plane — one reliability engine, from certification to live rollout.
             </p>
           </div>
           <Link
@@ -240,8 +241,8 @@ export default function Landing() {
           </Link>
         </div>
         <p className="mt-6 text-center text-xs text-slate-600">
-          Independent prototype inspired by public grocery pricing workflows. Uses sample data and simulated
-          integrations. Not affiliated with, or a claim about, any company&apos;s internal systems.
+          Independent prototype inspired by public grocery pricing workflows. Uses sample data and simulated POS, ESL
+          and ecommerce integrations. Not affiliated with, and makes no claim about, any company&apos;s internal systems.
         </p>
       </section>
     </div>

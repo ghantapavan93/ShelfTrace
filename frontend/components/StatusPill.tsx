@@ -3,6 +3,10 @@ import clsx from "clsx";
 const MAP: Record<string, { label: string; cls: string }> = {
   verified: { label: "Verified", cls: "text-verified bg-emerald-500/10 border-emerald-500/30" },
   eligible: { label: "Eligible", cls: "text-verified bg-emerald-500/10 border-emerald-500/30" },
+  // certification check statuses
+  passed: { label: "Passed", cls: "text-verified bg-emerald-500/10 border-emerald-500/30" },
+  failed: { label: "Failed", cls: "text-danger bg-rose-500/10 border-rose-500/30" },
+  recovered: { label: "Recovered", cls: "text-warn bg-amber-500/10 border-amber-500/30" },
   mismatch: { label: "Mismatch", cls: "text-danger bg-rose-500/10 border-rose-500/30" },
   blocked: { label: "Blocked", cls: "text-danger bg-rose-500/10 border-rose-500/30" },
   critical: { label: "Critical", cls: "text-danger bg-rose-500/10 border-rose-500/40" },

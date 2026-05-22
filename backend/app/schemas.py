@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 # ---------------------------------------------------------------------------
-# Inbound contract: an already-approved price batch from an Athena-style system
+# Inbound contract: an already-approved price batch from an upstream pricing system
 # ---------------------------------------------------------------------------
 class ApprovedActionIn(BaseModel):
     sku: str
