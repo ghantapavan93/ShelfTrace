@@ -6,10 +6,11 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Layers3 } from "lucide-react";
 import type { ReactNode } from "react";
 
-export type PageId = "signal" | "theater" | "horizon" | "aisle" | "mission" | "orbit";
+export type PageId = "keynote" | "signal" | "theater" | "horizon" | "aisle" | "mission" | "orbit";
 export type Tone = "neutral" | "orange" | "green" | "red" | "purple" | "sky";
 
 export const PAGES: { id: PageId; href: string; label: string; number: string }[] = [
+  { id: "keynote", href: "/vision/keynote", label: "Keynote", number: "00" },
   { id: "signal", href: "/vision", label: "Signal to Shelf", number: "01" },
   { id: "theater", href: "/vision/reliability", label: "Reliability Theater", number: "02" },
   { id: "horizon", href: "/vision/horizon", label: "Horizon Studio", number: "03" },
@@ -19,6 +20,7 @@ export const PAGES: { id: PageId; href: string; label: string; number: string }[
 ];
 
 export function currentPageId(pathname: string): PageId {
+  if (pathname.startsWith("/vision/keynote")) return "keynote";
   if (pathname.startsWith("/vision/reliability")) return "theater";
   if (pathname.startsWith("/vision/horizon")) return "horizon";
   if (pathname.startsWith("/vision/aisle")) return "aisle";
