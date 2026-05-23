@@ -169,6 +169,15 @@ DATABASE_URL=postgresql+psycopg2://shelftrace:shelftrace@localhost:5432/shelftra
 
 ---
 
+## Real Data Replay
+
+The configurable engine accepts **real public grocery records** as execution-replay inputs. Two attributed fixtures are bundled (extracted from the local USDA dumps, not scraped):
+
+- **USDA FoodData Central — Branded Foods** (CC0, public domain). `fdcId=1871817`, "ORGANIC WHOLE MILK", brand HORIZON, owner Danone US LLC, GTIN `742365228407`, 1 GAL package. *Product identity only — FDC carries no retail prices.*
+- **USDA AMS Specialty Crops Market News — Hart County KY Produce Auction Summary** (`AH_FV160`, May 20 2026, released by University of Kentucky / Center for Crop Diversification via USDA Federal-State Market News). Strawberries, 3-quart pails: low $8.00 / high $10.50 / **avg $9.25**. *Honest label: auction grower price, **not** retail advertised.*
+
+**ShelfTrace does not decide the optimal price.** Real public data is used to create traceable execution-replay scenarios; store connectors stay simulated. The engineering trace shows full **source lineage** alongside the technical artifacts (outbox events, adapter receipts, reconciliation result, audit). See `/data-replay`.
+
 ## What this is — and is not
 
 **Is:** an adjacent prototype exploring safe rollout, verification, and recovery around AI-approved price *execution*, using simulated adapters and sample data.

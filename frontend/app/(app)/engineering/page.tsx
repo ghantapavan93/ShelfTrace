@@ -69,6 +69,64 @@ export default function EngineeringPage() {
         <p className="text-sm leading-relaxed text-slate-300">{data.shared_engine_statement}</p>
       </div>
 
+      {/* Source lineage: only present when the scenario was created from a real public-data record */}
+      {data.source_lineage && (
+        <div className="glass rounded-2xl border border-sky-500/25 p-5">
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-widest text-sky-300">
+            Source lineage · public-data replay
+          </div>
+          <div className="grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">Source</div>
+              <div className="text-white">{data.source_lineage.source.source_name}</div>
+              <a
+                href={data.source_lineage.source.source_url ?? "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mono text-[11px] text-brand-400 hover:underline"
+              >
+                {data.source_lineage.source.source_url}
+              </a>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">Record</div>
+              <div className="mono text-slate-200">{data.source_lineage.external_record_id}</div>
+              <div className="text-xs text-slate-400">
+                {data.source_lineage.product_name}
+                {data.source_lineage.brand && ` · ${data.source_lineage.brand}`}
+                {data.source_lineage.gtin_upc && ` · GTIN ${data.source_lineage.gtin_upc}`}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3 text-xs text-slate-400 sm:grid-cols-3">
+            <div>
+              <span className="text-slate-500">Observation type:</span> {data.source_lineage.observation_type}
+            </div>
+            {data.source_lineage.observed_price != null && (
+              <div>
+                <span className="text-slate-500">Observed:</span> ${data.source_lineage.observed_price}
+              </div>
+            )}
+            {data.source_lineage.observation_date && (
+              <div>
+                <span className="text-slate-500">Date:</span> {data.source_lineage.observation_date}
+              </div>
+            )}
+            {data.source_lineage.region && (
+              <div>
+                <span className="text-slate-500">Region:</span> {data.source_lineage.region}
+              </div>
+            )}
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+            {data.source_lineage.source.attribution_text}
+          </p>
+          <p className="mt-1 text-[10px] italic text-slate-600">
+            {data.source_lineage.source.license_or_usage_note}
+          </p>
+        </div>
+      )}
+
       {/* Connector behavior profiles applied for this run */}
       <div className="glass rounded-2xl p-5">
         <div className="mb-3 flex flex-wrap items-center gap-2">

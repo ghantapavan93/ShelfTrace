@@ -18,12 +18,17 @@ from app.database import engine
 
 logger = logging.getLogger("shelftrace.migrate")
 
-# Additive, idempotent column additions for price_batches (Postgres).
+# Additive, idempotent column additions (Postgres).
 _PRICE_BATCH_COLUMNS = [
     ("run_mode", "VARCHAR(32) NOT NULL DEFAULT 'LIVE_ROLLOUT'"),
     ("environment", "VARCHAR(32) NOT NULL DEFAULT 'SIMULATED_PRODUCTION'"),
     ("connector_profile_id", "VARCHAR"),
     ("scenario_config_id", "VARCHAR"),
+]
+
+# Real Data Replay phase: scenarios may link to a real public-data observation.
+_TEST_RUN_CONFIG_COLUMNS = [
+    ("source_observation_id", "VARCHAR"),
 ]
 
 
@@ -35,4 +40,14 @@ def run_migrations() -> None:
             conn.execute(
                 text(f"ALTER TABLE price_batches ADD COLUMN IF NOT EXISTS {name} {ddl}")
             )
-    logger.info("Additive migrations applied (price_batches run_mode/environment/connector_profile_id)")
+        # The test_run_configs table only exists after the Certification Lab phase
+        # has been applied; guard the ALTER so this works on a fresh deploy too.
+        exists = conn.execute(
+            text("SELECT 1 FROM information_schema.tables WHERE table_name = 'test_run_configs'")
+        ).scalar()
+        if exists:
+            for name, ddl in _TEST_RUN_CONFIG_COLUMNS:
+                conn.execute(
+                    text(f"ALTER TABLE test_run_configs ADD COLUMN IF NOT EXISTS {name} {ddl}")
+                )
+    logger.info("Additive migrations applied (price_batches + test_run_configs)")

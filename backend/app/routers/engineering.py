@@ -21,8 +21,8 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
     "command": "pytest -q  (PostgreSQL-backed, isolated test DB)",
-    "passed": 34,
-    "duration_s": 15.0,
+    "passed": 40,
+    "duration_s": 17.0,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -40,6 +40,12 @@ TEST_PROOF = {
         "tests/test_audit.py::test_esl_acknowledgement_precedes_markdown_resolution",
         "tests/test_audit.py::test_cannot_resolve_without_verified_acknowledgement",
         "tests/test_audit.py::test_explanation_is_grounded_in_records",
+        "tests/test_data_replay.py::test_usda_fdc_fixture_imports",
+        "tests/test_data_replay.py::test_usda_ams_fixture_imports_with_real_pricing",
+        "tests/test_data_replay.py::test_import_is_idempotent",
+        "tests/test_data_replay.py::test_scenario_from_observation_carries_source_lineage",
+        "tests/test_data_replay.py::test_source_linked_scenario_runs_through_shared_engine",
+        "tests/test_data_replay.py::test_product_identity_source_requires_explicit_price",
         "tests/test_certification.py::test_certification_uses_shared_pipeline",
         "tests/test_certification.py::test_certification_records_egg_pos_failure",
         "tests/test_certification.py::test_certification_records_strawberry_recovered",
@@ -183,11 +189,23 @@ def engineering(
         ]
     incident_from_behavior = any(b["behavior"] in ("stale_price", "timeout", "timeout_then_success") for b in behaviors)
 
+    # Source lineage: if the scenario was created from a real public-data
+    # observation, surface its provenance alongside the technical trace.
+    from app.models import TestRunConfig
+    from app.services import data_replay
+
+    source_lineage = None
+    if batch.scenario_config_id:
+        cfg = db.get(TestRunConfig, batch.scenario_config_id)
+        if cfg is not None and cfg.source_observation_id:
+            source_lineage = data_replay.lineage_for_scenario(db, cfg.source_observation_id)
+
     return {
         "batch": queries.batch_summary(db, batch).model_dump(),
         "run_mode": batch.run_mode.value,
         "environment": batch.environment.value,
         "scenario_config_id": batch.scenario_config_id,
+        "source_lineage": source_lineage,
         "behavior_profiles": behaviors,
         "incident_from_configured_behavior": incident_from_behavior,
         "shared_engine_statement": shared_engine_statement,

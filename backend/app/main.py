@@ -10,9 +10,20 @@ from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.db_migrate import run_migrations
 from app.models import ConnectorProfile, PriceBatch, RunMode
-from app.routers import batches, certification, demo, engineering, incidents, operations, scenarios
+from app.models import SourceDatasetType
+from app.routers import (
+    batches,
+    certification,
+    data_replay,
+    demo,
+    engineering,
+    incidents,
+    operations,
+    scenarios,
+)
 from app.seed import seed_live
 from app.services import certification as cert_service
+from app.services import data_replay as data_replay_service
 from app.services import scenarios as scenario_service
 
 logging.basicConfig(level=settings.log_level.upper())
@@ -39,6 +50,7 @@ app.include_router(incidents.router)
 app.include_router(engineering.router)
 app.include_router(certification.router)
 app.include_router(scenarios.router)
+app.include_router(data_replay.router)
 app.include_router(demo.router)
 
 
@@ -58,6 +70,12 @@ def on_startup() -> None:
             if profile is None:
                 logger.info("Demo mode: seeding certification sandbox run")
                 cert_service.reset_demo(db)
+            # Real Data Replay: pre-import both bundled USDA fixtures (idempotent).
+            try:
+                data_replay_service.import_source(db, SourceDatasetType.USDA_FDC)
+                data_replay_service.import_source(db, SourceDatasetType.USDA_AMS)
+            except Exception:
+                logger.exception("Real Data Replay fixture import skipped")
 
 
 @app.get("/health")

@@ -71,6 +71,17 @@ class BehaviorType(str, enum.Enum):
     DUPLICATE_ACK = "duplicate_ack"
 
 
+class SourceDatasetType(str, enum.Enum):
+    USDA_FDC = "usda_fdc"
+    USDA_AMS = "usda_ams"
+    OPEN_PRICES = "open_prices"
+
+
+class ObservationType(str, enum.Enum):
+    PRODUCT_IDENTITY = "product_identity"
+    ADVERTISED_PRICE = "advertised_price"
+
+
 class BatchStatus(str, enum.Enum):
     RECEIVED = "received"
     CANARY_PUBLISHING = "canary_publishing"
@@ -372,6 +383,8 @@ class TestRunConfig(Base):
     store_ids_csv: Mapped[str] = mapped_column(Text, default="")
     canary_store_ids_csv: Mapped[str] = mapped_column(Text, default="")
     is_seeded: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Optional link to a real public-data observation this scenario was created from.
+    source_observation_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     actions: Mapped[list[TestRunAction]] = relationship(back_populates="config", cascade="all, delete-orphan")
@@ -405,6 +418,53 @@ class TestRunAction(Base):
     deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     config: Mapped[TestRunConfig] = relationship(back_populates="actions")
+
+
+# ---------------------------------------------------------------------------
+# Real Data Replay — public source records imported with provenance and then
+# turned into ShelfTrace execution scenarios.
+# ---------------------------------------------------------------------------
+class SourceDataset(Base):
+    __tablename__ = "source_datasets"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    source_type: Mapped[SourceDatasetType] = mapped_column(
+        Enum(SourceDatasetType, native_enum=False, length=32), index=True
+    )
+    source_name: Mapped[str] = mapped_column(String)
+    attribution_text: Mapped[str] = mapped_column(Text)
+    source_url: Mapped[str] = mapped_column(Text)
+    license_or_usage_note: Mapped[str] = mapped_column(Text)
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    observations: Mapped[list[SourceObservation]] = relationship(
+        back_populates="dataset", cascade="all, delete-orphan"
+    )
+
+
+class SourceObservation(Base):
+    __tablename__ = "source_observations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    source_dataset_id: Mapped[str] = mapped_column(
+        ForeignKey("source_datasets.id", ondelete="CASCADE"), index=True
+    )
+    external_record_id: Mapped[str] = mapped_column(String, index=True)
+    observation_type: Mapped[ObservationType] = mapped_column(
+        Enum(ObservationType, native_enum=False, length=32)
+    )
+    product_name: Mapped[str] = mapped_column(String)
+    category: Mapped[str | None] = mapped_column(String, nullable=True)
+    brand: Mapped[str | None] = mapped_column(String, nullable=True)
+    gtin_upc: Mapped[str | None] = mapped_column(String, nullable=True)
+    region: Mapped[str | None] = mapped_column(String, nullable=True)
+    observation_date: Mapped[str | None] = mapped_column(String, nullable=True)
+    observed_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    raw_payload_json: Mapped[str] = mapped_column(Text)
+    normalized_payload_json: Mapped[str] = mapped_column(Text)
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    dataset: Mapped[SourceDataset] = relationship(back_populates="observations")
 
 
 class ConnectorBehaviorProfile(Base):

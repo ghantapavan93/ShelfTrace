@@ -8,6 +8,8 @@ import type {
   OperationsOverview,
   Scenario,
   ScenarioExecuteResult,
+  SourceDataset,
+  SourceObservation,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -89,6 +91,14 @@ export const api = {
     post<ScenarioExecuteResult>(`/api/v1/scenarios/${id}/execute?mode=${mode}`),
   cloneScenario: (id: string) => post<Scenario>(`/api/v1/scenarios/${id}/clone`),
   deleteScenario: (id: string) => del(`/api/v1/scenarios/${id}`),
+
+  // Real Data Replay
+  dataSources: () => get<SourceDataset[]>(`/api/v1/data-sources`),
+  sourceObservations: () => get<SourceObservation[]>(`/api/v1/source-observations`),
+  importUsdaFdc: () => post<SourceObservation>(`/api/v1/data-sources/import/usda-fdc`),
+  importUsdaAms: () => post<SourceObservation>(`/api/v1/data-sources/import/usda-ams`),
+  createScenarioFromObservation: (id: string, body: unknown) =>
+    post<ScenarioExecuteResult>(`/api/v1/source-observations/${id}/create-scenario`, body),
 };
 
 export const DEMO_BATCH = "memorial-day-dallas-02";

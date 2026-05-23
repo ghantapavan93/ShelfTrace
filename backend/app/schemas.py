@@ -252,3 +252,46 @@ class ScenarioExecuteResult(BaseModel):
     scenario_id: str
     batch_external_id: str | None = None
     run_id: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Real Data Replay (public-source records)
+# ---------------------------------------------------------------------------
+class SourceDatasetView(BaseModel):
+    id: str
+    source_type: str
+    source_name: str
+    attribution_text: str
+    source_url: str
+    license_or_usage_note: str
+    imported_at: datetime
+
+
+class SourceObservationView(BaseModel):
+    id: str
+    source_dataset_id: str
+    source: SourceDatasetView
+    external_record_id: str
+    observation_type: str
+    product_name: str
+    category: str | None
+    brand: str | None
+    gtin_upc: str | None
+    region: str | None
+    observation_date: str | None
+    observed_price: float | None
+    normalized: dict
+    raw_payload: dict
+    imported_at: datetime
+
+
+class CreateScenarioFromObservationIn(BaseModel):
+    mode: str = "live_rollout"  # live_rollout | certification
+    name: str | None = None
+    zone_name: str | None = None
+    store_ids: list[str] | None = None
+    canary_store_ids: list[str] | None = None
+    approved_price: float | None = None
+    previous_price: float | None = None
+    reason: str | None = None
+    behaviors: list["ConnectorBehaviorIn"] | None = None

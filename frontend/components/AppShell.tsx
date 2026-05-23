@@ -15,11 +15,13 @@ import {
   ChevronDown,
   ShieldCheck,
   SlidersHorizontal,
+  Database,
 } from "lucide-react";
 import { Brand } from "./Brand";
 import { api } from "@/lib/api";
 
 const NAV = [
+  { href: "/data-replay", label: "Real Data Replay", sub: "Public-source records", icon: Database, match: /^\/data-replay/ },
   { href: "/scenarios", label: "Scenario Builder", sub: "Configure a test run", icon: SlidersHorizontal, match: /^\/scenarios/ },
   { href: "/certification", label: "Certification Lab", sub: "Before go-live", icon: ShieldCheck, match: /^\/certification/ },
   { href: "/operations", label: "Live Operations", sub: "Command Center", icon: LayoutGrid, match: /^\/operations$/ },
