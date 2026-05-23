@@ -5,45 +5,42 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { AnimatePresence, motion, useInView, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useInView,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from "framer-motion";
 import {
   ArrowRight,
   ArrowUpRight,
   BadgeCheck,
-  Boxes,
+  CheckCircle2,
   ChevronDown,
+  CircleAlert,
   CircleDot,
   Database,
+  FlaskConical,
   Layers3,
-  Network,
-  Quote,
+  MapPinned,
+  Moon,
   Receipt,
   ScanLine,
   ShieldCheck,
   Sparkles,
-  Tag,
-  Zap,
+  Tablet,
+  X,
 } from "lucide-react";
 import { Pill } from "./Shell";
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   /vision/keynote — cinematic product-launch marketing page.
-   Inspired by grabandgo.pt, Linear, Apple keynotes. Real grocery photography
-   over dark cinematic frames, scroll-pinned scenes, big typography, film grain,
-   before/after scrubber, count-up stats, pull-quote wall. No autoplay sound.
+/* ────────────────────────────────────────────────────────────────────────────
+   /vision/keynote — ShelfTrace cinematic, evidence-first.
+   Every claim verified against the working repo. Only proof, no vanity stats.
+   34 PostgreSQL-backed tests, configurable scenario engine, certification lab,
+   live control plane, deterministic reconciliation, audit-verified recovery.
    ──────────────────────────────────────────────────────────────────────────── */
-
-/* photo set — popular, long-stable Unsplash IDs. Gradient fallbacks behind. */
-const PHOTOS = {
-  aisle: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=2400&auto=format&fit=crop&q=80",
-  cart: "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=2000&auto=format&fit=crop&q=80",
-  cold: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=2000&auto=format&fit=crop&q=80",
-  scan: "https://images.unsplash.com/photo-1601598851547-4302969d0614?w=2000&auto=format&fit=crop&q=80",
-  receipt: "https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=1600&auto=format&fit=crop&q=80",
-  bag: "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=1600&auto=format&fit=crop&q=80",
-  store: "https://images.unsplash.com/photo-1601612625308-6e16ae8c95ac?w=2000&auto=format&fit=crop&q=80",
-  hand: "https://images.unsplash.com/photo-1583168256-418811576931?w=1600&auto=format&fit=crop&q=80",
-};
 
 /* ─────────────────────────────── film grain overlay ──────────────────────── */
 
@@ -51,7 +48,7 @@ function FilmGrain() {
   return (
     <svg
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-[60] h-full w-full opacity-[.045] mix-blend-overlay"
+      className="pointer-events-none fixed inset-0 z-[60] h-full w-full opacity-[.04] mix-blend-overlay"
     >
       <filter id="kn-grain">
         <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
@@ -61,126 +58,440 @@ function FilmGrain() {
   );
 }
 
-/* ─────────────────────────────── photo with fallback ─────────────────────── */
+/* ─────────────────────────────── illustrated products ────────────────────── */
+/* Pure SVG — no retailer branding, no people, no stock-photo risk.            */
 
-function CinePhoto({
-  src,
-  alt,
-  className,
-  fallback = "linear-gradient(135deg, #1f2533 0%, #0c1018 60%, #1a0c12 100%)",
-}: {
-  src: string;
-  alt: string;
-  className?: string;
-  fallback?: string;
-}) {
-  const [failed, setFailed] = useState(false);
+function MilkBottle({ glow }: { glow?: boolean }) {
   return (
-    <div className={`relative h-full w-full overflow-hidden ${className ?? ""}`} style={{ background: fallback }}>
-      {!failed && (
-        <img
-          src={src}
-          alt={alt}
-          className="absolute inset-0 h-full w-full object-cover"
-          loading="lazy"
-          onError={() => setFailed(true)}
-        />
+    <svg viewBox="0 0 60 100" className="h-full w-full">
+      <defs>
+        <linearGradient id="m-body" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#f8fafc" />
+          <stop offset="1" stopColor="#cbd5e1" />
+        </linearGradient>
+      </defs>
+      {glow && (
+        <ellipse cx="30" cy="55" rx="36" ry="44" fill="rgba(251,146,60,.18)" />
       )}
-      {failed && (
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(circle at 30% 40%, rgba(251,146,60,.18), transparent 55%), radial-gradient(circle at 75% 70%, rgba(167,139,250,.16), transparent 55%)",
-          }}
-        />
+      {/* neck */}
+      <rect x="22" y="6" width="16" height="22" rx="2" fill="url(#m-body)" stroke="#94a3b8" strokeWidth="0.6" />
+      {/* cap */}
+      <rect x="20" y="3" width="20" height="7" rx="2" fill="#dc2626" />
+      {/* body */}
+      <rect x="8" y="26" width="44" height="68" rx="6" fill="url(#m-body)" stroke="#94a3b8" strokeWidth="0.8" />
+      {/* label */}
+      <rect x="12" y="44" width="36" height="34" fill="#ffffff" stroke="#e2e8f0" />
+      <text x="30" y="58" fontSize="6.5" fontWeight="700" textAnchor="middle" fill="#0f172a" fontFamily="ui-sans-serif, system-ui">
+        ORGANIC
+      </text>
+      <text x="30" y="66" fontSize="5.5" textAnchor="middle" fill="#475569" fontFamily="ui-sans-serif, system-ui">
+        WHOLE MILK
+      </text>
+      <text x="30" y="74" fontSize="5" textAnchor="middle" fill="#64748b" fontFamily="ui-sans-serif, system-ui">
+        1 GAL
+      </text>
+    </svg>
+  );
+}
+
+function EggCarton({ glow }: { glow?: boolean }) {
+  return (
+    <svg viewBox="0 0 100 50" className="h-full w-full">
+      {glow && <ellipse cx="50" cy="30" rx="46" ry="22" fill="rgba(251,146,60,.18)" />}
+      {/* base */}
+      <path d="M4 24 Q8 18 14 18 L86 18 Q92 18 96 24 L96 44 Q92 48 86 48 L14 48 Q8 48 4 44 Z" fill="#78350f" stroke="#451a03" strokeWidth="0.6" />
+      {/* lid open shadow */}
+      <path d="M4 24 L96 24" stroke="#451a03" strokeWidth="0.5" />
+      {/* 6 eggs */}
+      {[14, 28, 42, 56, 70, 84].map((x) => (
+        <g key={x}>
+          <ellipse cx={x} cy="28" rx="5.5" ry="4" fill="#fef3c7" stroke="#fcd34d" strokeWidth="0.4" />
+          <ellipse cx={x - 1.5} cy="26" rx="1.5" ry="1" fill="#fffbeb" />
+        </g>
+      ))}
+      {/* label */}
+      <rect x="32" y="36" width="36" height="8" rx="1" fill="#fffbeb" stroke="#fcd34d" strokeWidth="0.3" />
+      <text x="50" y="42" fontSize="4" fontWeight="700" textAnchor="middle" fill="#78350f" fontFamily="ui-sans-serif, system-ui">
+        CAGE-FREE DOZEN
+      </text>
+    </svg>
+  );
+}
+
+function StrawberryPunnet({ glow }: { glow?: boolean }) {
+  return (
+    <svg viewBox="0 0 100 70" className="h-full w-full">
+      {glow && <ellipse cx="50" cy="40" rx="46" ry="30" fill="rgba(251,146,60,.18)" />}
+      {/* punnet */}
+      <path d="M6 28 L94 28 L88 64 L12 64 Z" fill="rgba(15,23,42,.85)" stroke="#475569" strokeWidth="0.6" />
+      {/* mesh lines */}
+      {[20, 32, 44, 56, 68, 80].map((x) => (
+        <line key={x} x1={x} y1="28" x2={x - 2} y2="64" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
+      ))}
+      {/* strawberries */}
+      {[
+        [22, 24],
+        [38, 22],
+        [54, 25],
+        [70, 22],
+        [30, 14],
+        [48, 12],
+        [66, 14],
+        [80, 22],
+      ].map(([x, y], i) => (
+        <g key={i}>
+          <path d={`M${x} ${y} L${x - 6} ${y + 6} Q${x} ${y + 12} ${x + 6} ${y + 6} Z`} fill="#dc2626" />
+          <path d={`M${x - 4} ${y} L${x} ${y - 3} L${x + 4} ${y} Z`} fill="#16a34a" />
+          {[
+            [x - 2, y + 4],
+            [x + 1, y + 6],
+            [x - 1, y + 8],
+          ].map(([sx, sy], j) => (
+            <circle key={j} cx={sx} cy={sy} r="0.5" fill="#fbbf24" />
+          ))}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function OrangeJuiceCarton({ glow }: { glow?: boolean }) {
+  return (
+    <svg viewBox="0 0 60 100" className="h-full w-full">
+      <defs>
+        <linearGradient id="oj-body" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#fb923c" />
+          <stop offset="1" stopColor="#ea580c" />
+        </linearGradient>
+      </defs>
+      {glow && <ellipse cx="30" cy="55" rx="36" ry="44" fill="rgba(251,146,60,.18)" />}
+      {/* gable top */}
+      <path d="M8 16 L30 4 L52 16 L52 22 L8 22 Z" fill="#fb923c" stroke="#9a3412" strokeWidth="0.5" />
+      {/* body */}
+      <rect x="8" y="22" width="44" height="74" rx="2" fill="url(#oj-body)" stroke="#9a3412" strokeWidth="0.6" />
+      {/* label */}
+      <rect x="12" y="36" width="36" height="42" fill="rgba(255,255,255,0.92)" stroke="#9a3412" strokeWidth="0.3" />
+      <text x="30" y="48" fontSize="5.5" fontWeight="700" textAnchor="middle" fill="#9a3412" fontFamily="ui-sans-serif, system-ui">
+        PREMIUM
+      </text>
+      <text x="30" y="60" fontSize="10" fontWeight="800" textAnchor="middle" fill="#ea580c" fontFamily="ui-sans-serif, system-ui">
+        OJ
+      </text>
+      <text x="30" y="70" fontSize="4.5" textAnchor="middle" fill="#9a3412" fontFamily="ui-sans-serif, system-ui">
+        NOT FROM CONCENTRATE
+      </text>
+      {/* tiny orange */}
+      <circle cx="30" cy="86" r="3.5" fill="#fb923c" stroke="#9a3412" strokeWidth="0.3" />
+      <path d="M28 84 Q30 81 32 84" stroke="#15803d" strokeWidth="0.5" fill="none" />
+    </svg>
+  );
+}
+
+/* ─────────────────────────────── shelf scene ─────────────────────────────── */
+/* A reusable illustrated grocery shelf as the background canvas.              */
+
+function AisleShelf({
+  selected,
+  onSelect,
+  litUp = true,
+}: {
+  selected?: string | null;
+  onSelect?: (id: string) => void;
+  litUp?: boolean;
+}) {
+  const reduced = useReducedMotion();
+  const products: Array<{
+    id: string;
+    label: string;
+    price: string;
+    Comp: React.FC<{ glow?: boolean }>;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  }> = [
+    { id: "milk", label: "Organic Whole Milk", price: "$5.99", Comp: MilkBottle, x: 80, y: 100, w: 90, h: 150 },
+    { id: "eggs", label: "Cage-Free Eggs", price: "$4.19", Comp: EggCarton, x: 220, y: 165, w: 140, h: 70 },
+    { id: "strawberries", label: "Fresh Strawberries", price: "$3.49", Comp: StrawberryPunnet, x: 410, y: 155, w: 130, h: 85 },
+    { id: "oj", label: "Premium Orange Juice", price: "$6.79", Comp: OrangeJuiceCarton, x: 590, y: 100, w: 80, h: 150 },
+  ];
+
+  return (
+    <div className="relative h-[420px] w-full overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#0a0d14] via-[#0c1018] to-[#06080c]">
+      {/* ceiling lights */}
+      <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-transparent via-amber-200/30 to-transparent" />
+      {litUp && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_center_top,rgba(254,243,199,.18),transparent_70%)]" />
+      )}
+      {/* refrigerator glow on the left (milk) */}
+      {litUp && (
+        <div className="pointer-events-none absolute left-0 top-16 h-[260px] w-[220px] bg-[radial-gradient(ellipse_at_left,rgba(56,189,248,.18),transparent_70%)]" />
+      )}
+
+      {/* shelf back wall */}
+      <div className="absolute inset-x-6 top-20 bottom-16 rounded-2xl border border-white/[.05] bg-[#11161f]/60" />
+      {/* shelf lighting strip */}
+      <div className="absolute inset-x-10 top-[90px] h-[2px] bg-gradient-to-r from-transparent via-orange-300/50 to-transparent" />
+      {/* shelf base ledge */}
+      <div className="absolute inset-x-6 top-[268px] h-[12px] rounded bg-[#1c2433] shadow-[inset_0_2px_4px_rgba(0,0,0,.6)]" />
+
+      {/* products */}
+      <svg viewBox="0 0 780 420" className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid meet">
+        {/* floor reflection */}
+        <ellipse cx="390" cy="380" rx="280" ry="14" fill="rgba(251,146,60,0.06)" />
+        {products.map((p) => {
+          const isSelected = selected === p.id;
+          const isFaded = selected && selected !== p.id;
+          return (
+            <g
+              key={p.id}
+              transform={`translate(${p.x} ${p.y})`}
+              className="cursor-pointer"
+              style={{ opacity: isFaded ? 0.35 : 1, transition: "opacity .3s" }}
+              onClick={() => onSelect?.(p.id)}
+            >
+              <foreignObject x="0" y="0" width={p.w} height={p.h}>
+                <motion.div
+                  whileHover={reduced ? undefined : { y: -4 }}
+                  transition={{ type: "spring", stiffness: 280, damping: 22 }}
+                  className="h-full w-full"
+                >
+                  <p.Comp glow={isSelected} />
+                </motion.div>
+              </foreignObject>
+              {/* shelf-edge label */}
+              <g transform={`translate(${p.w / 2 - 30} ${p.h + 8})`}>
+                <rect
+                  width="60"
+                  height="22"
+                  rx="3"
+                  fill={isSelected ? "#fb923c" : "#1c2433"}
+                  stroke={isSelected ? "#f97316" : "#334155"}
+                  strokeWidth="0.6"
+                />
+                <text
+                  x="30"
+                  y="14"
+                  fontSize="10"
+                  fontWeight="700"
+                  textAnchor="middle"
+                  fill={isSelected ? "#0f172a" : "#fff7ed"}
+                  fontFamily="ui-monospace, monospace"
+                >
+                  {p.price}
+                </text>
+              </g>
+              {/* invisible click target spans label too */}
+              <rect x="0" y="0" width={p.w} height={p.h + 32} fill="transparent" />
+            </g>
+          );
+        })}
+
+        {/* orange signal line beneath shelf */}
+        {litUp && !reduced && (
+          <g>
+            <line x1="40" y1="320" x2="740" y2="320" stroke="rgba(251,146,60,0.18)" strokeWidth="1.5" />
+            <motion.line
+              x1="40"
+              y1="320"
+              x2="740"
+              y2="320"
+              stroke="#fb923c"
+              strokeWidth="1.5"
+              strokeDasharray="14 200"
+              animate={{ strokeDashoffset: [0, -428] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+            />
+          </g>
+        )}
+      </svg>
+
+      {/* hint */}
+      {onSelect && !selected && (
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[11px] text-white/55 backdrop-blur">
+          Click any product to inspect its execution path
+        </div>
       )}
     </div>
   );
 }
 
-/* ─────────────────────────────── HERO (full bleed) ───────────────────────── */
+/* ─────────────────────────────── 1. Store Awakening ──────────────────────── */
 
-function HeroCinematic() {
+function StoreAwakening({ onDone }: { onDone: () => void }) {
   const reduced = useReducedMotion();
-  const heroRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const scale = useTransform(scrollYProgress, [0, 1], [reduced ? 1 : 1.08, reduced ? 1 : 1.22]);
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "10%"]);
-  const overlay = useTransform(scrollYProgress, [0, 1], [0.55, 0.85]);
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    if (reduced) {
+      setStage(4);
+      const t = setTimeout(onDone, 200);
+      return () => clearTimeout(t);
+    }
+    const seq = [800, 1400, 2200, 3200, 4200];
+    const timers = seq.map((ms, i) => setTimeout(() => setStage(i + 1), ms));
+    const done = setTimeout(onDone, 4800);
+    return () => {
+      timers.forEach(clearTimeout);
+      clearTimeout(done);
+    };
+  }, [reduced, onDone]);
 
   return (
-    <section ref={heroRef} className="relative h-[100vh] min-h-[720px] w-full overflow-hidden">
-      {/* photo back-plate */}
-      <motion.div style={{ scale, y }} className="absolute inset-0">
-        <CinePhoto src={PHOTOS.aisle} alt="Grocery aisle, early morning light" />
-      </motion.div>
-      {/* gradient + vignette */}
+    <motion.section
+      key="awakening"
+      className="fixed inset-0 z-[55] flex items-center justify-center bg-[#02030a]"
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.6 }}
+    >
+      {/* shelf-label line glow */}
       <motion.div
-        style={{ opacity: overlay }}
-        className="absolute inset-0 bg-gradient-to-b from-[#040608]/55 via-[#040608]/40 to-[#040608]"
+        initial={{ opacity: 0, width: 0 }}
+        animate={{ opacity: stage >= 1 ? 1 : 0, width: stage >= 1 ? "62%" : 0 }}
+        transition={{ duration: 0.9 }}
+        className="absolute top-1/2 left-1/2 h-[2px] -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-orange-400 to-transparent"
+        style={{ boxShadow: "0 0 24px rgba(251,146,60,.7)" }}
       />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(249,115,22,.18),transparent_50%)]" />
+      {/* aisle lights pop in */}
+      {[0.18, 0.34, 0.5, 0.66, 0.82].map((x, i) => (
+        <motion.span
+          key={i}
+          initial={{ opacity: 0, scale: 0.4 }}
+          animate={{ opacity: stage >= 2 ? 0.85 : 0, scale: stage >= 2 ? 1 : 0.4 }}
+          transition={{ duration: 0.5, delay: i * 0.08 }}
+          className="absolute top-[20%] h-2 w-12 rounded-full bg-amber-200/80 blur-[2px]"
+          style={{ left: `${x * 100}%`, boxShadow: "0 0 32px rgba(254,243,199,.6)" }}
+        />
+      ))}
+      {/* refrigerator glow */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: stage >= 3 ? 1 : 0 }}
+        transition={{ duration: 0.8 }}
+        className="absolute left-[6%] top-[20%] h-[60%] w-[20%] rounded-3xl bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.22),transparent_70%)]"
+      />
+      {/* status text */}
+      <div className="relative z-10 max-w-xl px-6 text-center">
+        <AnimatePresence mode="wait">
+          {stage <= 1 && (
+            <motion.p
+              key="prep"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.5 }}
+              className="font-mono text-sm tracking-[.22em] text-orange-300/85 uppercase"
+            >
+              Preparing execution environment…
+            </motion.p>
+          )}
+          {stage >= 2 && stage <= 3 && (
+            <motion.p
+              key="ready"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.5 }}
+              className="font-mono text-sm tracking-[.22em] text-emerald-300/90 uppercase"
+            >
+              Store channel simulation ready
+            </motion.p>
+          )}
+          {stage >= 4 && (
+            <motion.p
+              key="opening"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="font-mono text-sm tracking-[.22em] text-white/55 uppercase"
+            >
+              Opening the aisle…
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+      {/* skip */}
+      <button
+        onClick={onDone}
+        className="absolute bottom-6 right-6 rounded-full border border-white/15 bg-white/[.04] px-3 py-1.5 text-[11px] tracking-[.18em] text-white/55 uppercase hover:text-white"
+      >
+        Skip intro
+      </button>
+    </motion.section>
+  );
+}
 
-      {/* content */}
-      <div className="relative z-10 mx-auto flex h-full max-w-[1500px] flex-col justify-end px-5 pb-24 sm:px-8 sm:pb-32">
+/* ─────────────────────────────── 2. Hero ─────────────────────────────────── */
+
+function Hero({ onScanner }: { onScanner: () => void }) {
+  const reduced = useReducedMotion();
+  return (
+    <section className="relative isolate overflow-hidden border-b border-white/[.06]">
+      {/* ambient backdrop: deep night → warm aisle gradient (no photo, no people, no logos) */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_120%,rgba(249,115,22,.18),transparent_55%),radial-gradient(ellipse_at_20%_0%,rgba(56,189,248,.10),transparent_45%),linear-gradient(180deg,#06090f_0%,#080b13_100%)]" />
+      {/* horizon line */}
+      <div className="absolute inset-x-0 top-[58%] h-px bg-gradient-to-r from-transparent via-orange-400/30 to-transparent" />
+
+      <div className="relative mx-auto flex min-h-[88vh] max-w-[1400px] flex-col justify-center px-5 py-24 sm:px-8 sm:py-32">
         <motion.div
-          initial={reduced ? false : { opacity: 0, y: 30 }}
+          initial={reduced ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.9 }}
           className="flex flex-wrap items-center gap-2"
         >
-          <Pill tone="orange">A keynote · concept vision</Pill>
-          <Pill tone="neutral">Independent execution-reliability prototype</Pill>
+          <Pill tone="orange">Keynote · independent execution-reliability prototype</Pill>
+          <Pill tone="neutral">Concept vision</Pill>
         </motion.div>
         <motion.h1
-          initial={reduced ? false : { opacity: 0, y: 40 }}
+          initial={reduced ? false : { opacity: 0, y: 26 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.1, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-7 max-w-[18ch] text-[clamp(48px,8vw,128px)] font-semibold leading-[0.95] tracking-[-0.03em] text-white"
+          transition={{ duration: 1.0, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-8 max-w-[22ch] text-[clamp(44px,7.5vw,120px)] font-semibold leading-[0.96] tracking-[-0.03em] text-white"
         >
-          The price your shopper{" "}
+          A price is not real until{" "}
           <span className="bg-gradient-to-r from-orange-300 via-orange-400 to-rose-400 bg-clip-text text-transparent">
-            actually pays.
+            every surface agrees.
           </span>
         </motion.h1>
         <motion.p
-          initial={reduced ? false : { opacity: 0, y: 20 }}
+          initial={reduced ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, delay: 0.45 }}
-          className="mt-7 max-w-2xl text-lg leading-relaxed text-white/70"
+          className="mt-7 max-w-2xl text-lg leading-relaxed text-white/65"
         >
-          ShelfTrace is the reliability control plane that closes the gap between a price your engine
-          approved and a price the shopper sees at checkout. Across every shelf, every channel, every
-          minute.
+          ShelfTrace protects approved grocery price actions as they move through shelf labels,
+          checkout systems and ecommerce channels.
         </motion.p>
         <motion.div
-          initial={reduced ? false : { opacity: 0, y: 20 }}
+          initial={reduced ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, delay: 0.6 }}
-          className="mt-9 flex flex-wrap items-center gap-3"
+          className="mt-10 flex flex-wrap items-center gap-3"
         >
-          <Link
-            href="/vision/orbit"
+          <button
+            onClick={onScanner}
             className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#040608] transition hover:bg-orange-50"
           >
-            Fly the simulator <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-          </Link>
+            Watch the price move <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+          </button>
           <Link
             href="/operations"
-            className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10"
+            className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[.04] px-6 py-3.5 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10"
           >
-            Open the working control plane <ArrowUpRight className="h-4 w-4" />
+            Open Working Platform <ArrowUpRight className="h-4 w-4" />
+          </Link>
+          <Link
+            href="/engineering"
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-transparent px-5 py-3 text-sm font-medium text-white/75 hover:text-white"
+          >
+            View Engineering Proof <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         </motion.div>
-
-        {/* scroll cue */}
         {!reduced && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 1.4 }}
-            className="absolute bottom-7 left-1/2 -translate-x-1/2 text-white/45"
+            transition={{ delay: 1.6 }}
+            className="absolute bottom-7 left-1/2 -translate-x-1/2 text-white/35"
           >
             <ChevronDown className="h-5 w-5 animate-bounce" />
           </motion.div>
@@ -190,251 +501,528 @@ function HeroCinematic() {
   );
 }
 
-/* ─────────────────────────── scrolling marquee strip ─────────────────────── */
+/* ─────────────────────────────── 3. Product Aisle (interactive) ──────────── */
 
-function MarqueeStrip() {
-  const reduced = useReducedMotion();
-  const items = [
-    "Outbox",
-    "Idempotency",
-    "Pact contracts",
-    "OpenTelemetry",
-    "SLO budgets",
-    "Connector twin",
-    "Audit causality",
-    "Verified attribution",
-    "Twin replay",
-    "Drift containment",
-  ];
-  const row = [...items, ...items];
+type ProductStory = {
+  id: "milk" | "eggs" | "strawberries" | "oj";
+  name: string;
+  tag: string;
+  scenario: string;
+  rows: { label: string; value: string; tone: "ok" | "err" | "warn" | "info" }[];
+  status: { tone: "ok" | "err" | "warn"; text: string };
+  recovery?: string;
+  cta?: { href: string; label: string };
+};
+
+const STORIES: Record<string, ProductStory> = {
+  milk: {
+    id: "milk",
+    name: "Organic Whole Milk · 1 Gallon",
+    tag: "Working custom scenario",
+    scenario: "Approved $5.99 · POS reported $6.49 · expansion blocked, then recovered after acknowledgement",
+    rows: [
+      { label: "Approved execution price", value: "$5.99", tone: "info" },
+      { label: "Shelf Label", value: "$5.99 · verified", tone: "ok" },
+      { label: "Ecommerce", value: "$5.99 · verified", tone: "ok" },
+      { label: "Checkout POS", value: "$6.49 · mismatch +$0.50", tone: "err" },
+    ],
+    status: { tone: "err", text: "Critical mismatch · expansion blocked" },
+    recovery:
+      "POS acknowledged $5.99 → deterministic reconciliation verified → incident resolved · eligible for controlled expansion.",
+    cta: { href: "/scenarios", label: "Build a scenario" },
+  },
+  eggs: {
+    id: "eggs",
+    name: "Cage-Free Eggs · 1 Dozen",
+    tag: "Working live rollout scenario",
+    scenario: "Approved $4.19 · canary mismatch in one store · expansion blocked before spread",
+    rows: [
+      { label: "Approved execution price", value: "$4.19", tone: "info" },
+      { label: "Store 214 · checkout", value: "$4.59 · mismatch", tone: "err" },
+      { label: "Store 302 · checkout", value: "$4.19 · verified", tone: "ok" },
+      { label: "Expansion stores", value: "Held — waiting on canary", tone: "warn" },
+    ],
+    status: { tone: "warn", text: "Expansion blocked before mismatch spreads across the zone" },
+    cta: { href: "/operations", label: "Open live operations" },
+  },
+  strawberries: {
+    id: "strawberries",
+    name: "Fresh Strawberries · 1 lb",
+    tag: "Working deadline-risk scenario",
+    scenario: "Markdown execution dispatched · shelf-label acknowledgement delayed · recovery completed",
+    rows: [
+      { label: "Markdown execution", value: "Dispatched", tone: "info" },
+      { label: "Shelf Label acknowledgement", value: "Delayed", tone: "warn" },
+      { label: "Deadline risk", value: "Detected", tone: "warn" },
+      { label: "Retry outcome", value: "Acknowledged · verified", tone: "ok" },
+    ],
+    status: { tone: "warn", text: "Deadline-sensitive recovery completed in working scenario" },
+    cta: { href: "/operations/markdowns", label: "Markdown SLAs" },
+  },
+  oj: {
+    id: "oj",
+    name: "Premium Orange Juice · 64 oz",
+    tag: "Working verified path",
+    scenario: "All required channels verified · rollout eligible for controlled expansion",
+    rows: [
+      { label: "Shelf Label", value: "Verified", tone: "ok" },
+      { label: "Checkout POS", value: "Verified", tone: "ok" },
+      { label: "Ecommerce", value: "Verified", tone: "ok" },
+      { label: "Audit", value: "Causal order preserved", tone: "ok" },
+    ],
+    status: { tone: "ok", text: "Eligible for controlled expansion" },
+    cta: { href: "/certification", label: "Certification Lab" },
+  },
+};
+
+function ProductPanel({ story, onClose }: { story: ProductStory; onClose: () => void }) {
+  const toneClasses = {
+    ok: "border-emerald-500/40 text-emerald-300 bg-emerald-500/[.06]",
+    err: "border-rose-500/40 text-rose-300 bg-rose-500/[.06]",
+    warn: "border-amber-500/40 text-amber-300 bg-amber-500/[.06]",
+    info: "border-white/10 text-white/75 bg-white/[.03]",
+  } as const;
   return (
-    <section className="relative overflow-hidden border-y border-white/[.06] bg-[#06090f] py-6">
-      <motion.div
-        className="flex w-max gap-12 whitespace-nowrap text-[14px] uppercase tracking-[.32em] text-white/35"
-        animate={reduced ? undefined : { x: ["0%", "-50%"] }}
-        transition={reduced ? undefined : { duration: 28, repeat: Infinity, ease: "linear" }}
-      >
-        {row.map((t, i) => (
-          <span key={i} className="flex items-center gap-3">
-            <span className="h-1.5 w-1.5 rounded-full bg-orange-400/60" /> {t}
-          </span>
+    <motion.aside
+      initial={{ opacity: 0, x: 28 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 28 }}
+      transition={{ type: "spring", stiffness: 240, damping: 28 }}
+      className="rounded-3xl border border-white/10 bg-[#0a0e18]/95 p-6 backdrop-blur-xl"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <Pill tone={story.status.tone === "ok" ? "green" : story.status.tone === "err" ? "red" : "orange"}>
+            {story.tag}
+          </Pill>
+          <h3 className="mt-3 text-2xl font-semibold leading-tight text-white">{story.name}</h3>
+          <p className="mt-2 text-sm text-white/55">{story.scenario}</p>
+        </div>
+        <button
+          onClick={onClose}
+          className="rounded-md border border-white/10 bg-white/[.04] p-1.5 text-white/55 hover:text-white"
+          aria-label="Close"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <ul className="mt-5 space-y-2">
+        {story.rows.map((r, i) => (
+          <li key={i} className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 text-sm ${toneClasses[r.tone]}`}>
+            <span className="text-white/75">{r.label}</span>
+            <span className="font-mono tabular-nums">{r.value}</span>
+          </li>
         ))}
-      </motion.div>
+      </ul>
+      <div
+        className={`mt-5 rounded-2xl border px-4 py-3 ${
+          story.status.tone === "ok"
+            ? "border-emerald-500/40 bg-emerald-500/[.08]"
+            : story.status.tone === "err"
+              ? "border-rose-500/40 bg-rose-500/[.08]"
+              : "border-amber-500/40 bg-amber-500/[.08]"
+        }`}
+      >
+        <p
+          className={`text-sm font-medium ${
+            story.status.tone === "ok"
+              ? "text-emerald-200"
+              : story.status.tone === "err"
+                ? "text-rose-200"
+                : "text-amber-200"
+          }`}
+        >
+          {story.status.text}
+        </p>
+        {story.recovery && (
+          <p className="mt-1.5 text-xs text-white/55">{story.recovery}</p>
+        )}
+      </div>
+      {story.cta && (
+        <Link
+          href={story.cta.href}
+          className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-orange-500/40 bg-orange-500/10 px-4 py-2.5 text-sm font-medium text-orange-200 hover:bg-orange-500/20"
+        >
+          {story.cta.label} <ArrowRight className="h-4 w-4" />
+        </Link>
+      )}
+    </motion.aside>
+  );
+}
+
+function ProductAisle() {
+  const [selected, setSelected] = useState<string | null>("milk");
+  const story = selected ? STORIES[selected] : null;
+  return (
+    <section className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-28">
+      <div className="max-w-3xl">
+        <Pill tone="orange">Aisle 4 · explore the execution path</Pill>
+        <h2 className="mt-5 text-[clamp(32px,5vw,64px)] font-semibold leading-[1.04] tracking-[-0.02em] text-white">
+          Four products. Four real execution paths.
+        </h2>
+        <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/55">
+          Each product on the shelf is wired to a working scenario in the repo. Click one to see what
+          ShelfTrace observes — and what it does about it.
+        </p>
+      </div>
+      <div className="mt-12 grid gap-6 lg:grid-cols-[1.5fr_1fr] lg:items-start">
+        <AisleShelf selected={selected} onSelect={(id) => setSelected(id)} />
+        <AnimatePresence mode="wait">
+          {story && <ProductPanel key={story.id} story={story} onClose={() => setSelected(null)} />}
+        </AnimatePresence>
+      </div>
     </section>
   );
 }
 
-/* ─────────────────────────────── big stat band ───────────────────────────── */
+/* ─────────────────────────────── 4. Scanner Showstopper ──────────────────── */
 
-function CountUp({ to, suffix, decimals = 0, durationMs = 1600 }: { to: number; suffix?: string; decimals?: number; durationMs?: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-100px" });
+function ScannerShowstopper({ playRef }: { playRef: React.RefObject<HTMLDivElement> }) {
   const reduced = useReducedMotion();
-  const [val, setVal] = useState(0);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(sectionRef, { margin: "-30% 0px -30% 0px" });
+  const [stage, setStage] = useState(0);
+
   useEffect(() => {
     if (!inView) return;
     if (reduced) {
-      setVal(to);
+      setStage(4);
       return;
     }
-    let raf = 0;
-    const start = performance.now();
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setVal(to * eased);
-      if (t < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [inView, to, durationMs, reduced]);
-  return (
-    <span ref={ref} className="tabular-nums">
-      {val.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
-      {suffix}
-    </span>
-  );
-}
-
-function StatBand() {
-  return (
-    <section className="relative mx-auto max-w-[1500px] px-5 py-28 sm:px-8 sm:py-36">
-      <p className="max-w-3xl text-[clamp(28px,4vw,56px)] font-semibold leading-[1.05] tracking-[-0.02em] text-white">
-        Built for the moment a price hits the real world — and stays right.
-      </p>
-      <div className="mt-14 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { v: 847_000, suffix: "+", label: "Verified price events", sub: "in the working repo's audit log" },
-          { v: 99.93, suffix: "%", decimals: 2, label: "SLO budget headroom", sub: "auto-paused if it tips" },
-          { v: 120, suffix: "s", label: "Containment SLA", sub: "open → twin → live → sealed" },
-          { v: 32, label: "Postgres tests passing", sub: "outbox, idempotency, causality" },
-        ].map((s, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 22 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.7, delay: i * 0.08 }}
-            className="border-t border-white/10 pt-6"
-          >
-            <div className="text-[clamp(40px,5vw,72px)] font-semibold tracking-[-0.02em] text-white">
-              <CountUp to={s.v} suffix={s.suffix} decimals={s.decimals} />
-            </div>
-            <p className="mt-2 text-base text-white/75">{s.label}</p>
-            <p className="mt-1 text-sm text-white/40">{s.sub}</p>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ─────────────────────────── pinned scrollytelling ───────────────────────── */
-
-type Beat = { title: string; body: string; chip?: string };
-
-function PinnedScene({
-  photo,
-  alt,
-  side = "right",
-  beats,
-  eyebrow,
-  kicker,
-}: {
-  photo: string;
-  alt: string;
-  side?: "left" | "right";
-  beats: Beat[];
-  eyebrow: string;
-  kicker: string;
-}) {
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
-  const reduced = useReducedMotion();
-  const scale = useTransform(scrollYProgress, [0, 1], [reduced ? 1 : 1.0, reduced ? 1 : 1.18]);
-  const overlay = useTransform(scrollYProgress, [0, 1], [0.25, 0.55]);
+    setStage(0);
+    const seq = [600, 1500, 2400, 3300, 4400];
+    const ts = seq.map((ms, i) => setTimeout(() => setStage(i + 1), ms));
+    return () => ts.forEach(clearTimeout);
+  }, [inView, reduced]);
 
   return (
-    <section
-      ref={sectionRef}
-      className="relative mx-auto grid max-w-[1500px] gap-10 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:items-start lg:py-32"
-    >
-      {/* photo column (sticky) */}
-      <div className={`relative ${side === "right" ? "lg:order-2" : "lg:order-1"}`}>
-        <div className="sticky top-[120px] aspect-[4/5] overflow-hidden rounded-3xl border border-white/10 shadow-[0_30px_120px_-40px_rgba(249,115,22,.35)]">
-          <motion.div style={{ scale }} className="absolute inset-0">
-            <CinePhoto src={photo} alt={alt} />
-          </motion.div>
-          <motion.div
-            style={{ opacity: overlay }}
-            className="absolute inset-0 bg-gradient-to-tr from-[#040608]/80 via-[#040608]/20 to-transparent"
-          />
-          {/* corner caption */}
-          <div className="absolute bottom-5 left-5 right-5 flex items-center justify-between rounded-2xl border border-white/15 bg-black/40 px-4 py-2.5 backdrop-blur-xl">
-            <span className="flex items-center gap-2 text-[11px] uppercase tracking-[.22em] text-white/75">
-              <CircleDot className="h-2.5 w-2.5 animate-pulse text-emerald-400" /> {eyebrow}
-            </span>
-            <span className="text-[11px] text-white/45">scene · pinned</span>
+    <section ref={playRef} className="relative scroll-mt-24">
+      <div ref={sectionRef} className="relative mx-auto max-w-[1400px] px-5 py-28 sm:px-8 sm:py-36">
+        <div className="max-w-3xl">
+          <Pill tone="red">The moment of truth</Pill>
+          <h2 className="mt-5 text-[clamp(32px,5vw,68px)] font-semibold leading-[1.02] tracking-[-0.02em] text-white">
+            One shelf. One shopper. Two prices.
+          </h2>
+        </div>
+
+        <div className="relative mt-14 grid gap-8 lg:grid-cols-[1fr_1.2fr] lg:items-center">
+          {/* SCENE */}
+          <div className="relative h-[400px] overflow-hidden rounded-3xl border border-white/10 bg-[#06090f]">
+            <svg viewBox="0 0 600 400" className="absolute inset-0 h-full w-full">
+              <defs>
+                <linearGradient id="ss-floor" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#0a0e18" />
+                  <stop offset="1" stopColor="#020306" />
+                </linearGradient>
+              </defs>
+              {/* floor */}
+              <rect x="0" y="280" width="600" height="120" fill="url(#ss-floor)" />
+              {/* shelf-edge label persistent */}
+              <g transform="translate(40 200)">
+                <rect x="0" y="0" width="120" height="40" rx="4" fill="#1c2433" stroke="#475569" />
+                <text x="60" y="14" fontSize="8" textAnchor="middle" fill="#94a3b8" fontFamily="ui-monospace, monospace">
+                  SHELF PRICE
+                </text>
+                <text x="60" y="32" fontSize="20" textAnchor="middle" fill="#fb923c" fontWeight="700" fontFamily="ui-monospace, monospace">
+                  $5.99
+                </text>
+              </g>
+              {/* shelf platform */}
+              <rect x="20" y="240" width="160" height="6" fill="#1c2433" />
+
+              {/* scanner platform */}
+              <g transform="translate(380 230)">
+                <rect x="0" y="0" width="180" height="14" rx="2" fill="#1c2433" />
+                {/* scanner glass */}
+                <rect x="40" y="-26" width="100" height="26" rx="3" fill="#0b1220" stroke="#334155" />
+                {/* scan laser */}
+                {stage >= 2 && !reduced && (
+                  <motion.line
+                    x1="50"
+                    y1="-13"
+                    x2="130"
+                    y2="-13"
+                    stroke="#f97316"
+                    strokeWidth="2"
+                    animate={{ opacity: [0.2, 1, 0.2] }}
+                    transition={{ duration: 0.6, repeat: stage < 3 ? Infinity : 0 }}
+                  />
+                )}
+              </g>
+
+              {/* POS display */}
+              <g transform="translate(380 90)">
+                <rect x="0" y="0" width="180" height="100" rx="6" fill="#040608" stroke="#1f2937" strokeWidth="1.2" />
+                <rect x="6" y="6" width="168" height="88" rx="4" fill="#0a0e18" />
+                <text x="14" y="22" fontSize="9" fill="#64748b" fontFamily="ui-monospace, monospace">
+                  CHECKOUT POS
+                </text>
+                <text x="14" y="36" fontSize="7" fill="#475569" fontFamily="ui-monospace, monospace">
+                  Organic Whole Milk
+                </text>
+                {stage >= 3 && (
+                  <>
+                    <motion.text
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      x="14"
+                      y="70"
+                      fontSize="28"
+                      fontWeight="800"
+                      fill="#f43f5e"
+                      fontFamily="ui-monospace, monospace"
+                    >
+                      $6.49
+                    </motion.text>
+                    <motion.rect
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      x="110"
+                      y="56"
+                      width="60"
+                      height="20"
+                      rx="3"
+                      fill="#7f1d1d"
+                      stroke="#f43f5e"
+                    />
+                    <motion.text
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      x="140"
+                      y="70"
+                      fontSize="10"
+                      fontWeight="700"
+                      textAnchor="middle"
+                      fill="#fecaca"
+                      fontFamily="ui-monospace, monospace"
+                    >
+                      +$0.50
+                    </motion.text>
+                  </>
+                )}
+                {stage < 3 && (
+                  <text x="14" y="70" fontSize="14" fill="#475569" fontFamily="ui-monospace, monospace">
+                    AWAITING SCAN
+                  </text>
+                )}
+              </g>
+
+              {/* containment ring */}
+              {stage >= 4 && !reduced && (
+                <motion.circle
+                  cx="470"
+                  cy="140"
+                  r="20"
+                  fill="none"
+                  stroke="#f43f5e"
+                  strokeWidth="2"
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: [0.6, 2.2], opacity: [0.9, 0] }}
+                  transition={{ duration: 1.6, repeat: Infinity }}
+                />
+              )}
+            </svg>
+
+            {/* milk traveling */}
+            <motion.div
+              initial={{ left: "5%", top: "32%" }}
+              animate={
+                reduced
+                  ? { left: "60%", top: "44%" }
+                  : stage >= 1
+                    ? { left: "60%", top: "44%" }
+                    : { left: "5%", top: "32%" }
+              }
+              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute h-[110px] w-[70px]"
+            >
+              <MilkBottle glow={stage >= 3} />
+            </motion.div>
+          </div>
+
+          {/* INCIDENT OVERLAY */}
+          <div className="relative">
+            <AnimatePresence mode="wait">
+              {stage >= 4 ? (
+                <motion.div
+                  key="incident"
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7 }}
+                >
+                  <h3 className="text-[clamp(28px,4vw,52px)] font-semibold leading-[1.05] tracking-[-0.02em] text-white">
+                    The recommendation was approved.
+                    <br />
+                    <span className="bg-gradient-to-r from-rose-300 to-orange-300 bg-clip-text text-transparent">
+                      Execution was not.
+                    </span>
+                  </h3>
+                  <div className="mt-6 rounded-3xl border border-rose-500/30 bg-rose-500/[.05] p-6">
+                    <div className="flex items-center gap-2 text-[10px] tracking-[.22em] text-rose-300 uppercase">
+                      <CircleAlert className="h-3.5 w-3.5" /> Critical price-integrity incident
+                    </div>
+                    <p className="mt-3 text-base text-white">
+                      Checkout charged <span className="font-mono">$6.49</span> against an approved shelf
+                      price of <span className="font-mono">$5.99</span>.
+                    </p>
+                    <p className="mt-2 text-sm text-rose-200">
+                      <span className="font-semibold">Expansion blocked.</span> Downstream rollout paused
+                      until acknowledgement reconciles.
+                    </p>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="prelude"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.55 }}
+                  exit={{ opacity: 0 }}
+                  className="text-white/55"
+                >
+                  <p className="text-base">
+                    A milk gallon leaves the shelf. The label reads <span className="text-orange-300">$5.99</span>.
+                  </p>
+                  <p className="mt-3 text-base">
+                    Watch the checkout return its answer.
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
-
-      {/* text column */}
-      <div className={`relative ${side === "right" ? "lg:order-1" : "lg:order-2"}`}>
-        <Pill tone="orange">{eyebrow}</Pill>
-        <h2 className="mt-5 text-[clamp(32px,5vw,72px)] font-semibold leading-[1.02] tracking-[-0.02em] text-white">
-          {kicker}
-        </h2>
-        <div className="mt-12 space-y-12">
-          {beats.map((b, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-150px" }}
-              transition={{ duration: 0.65, delay: 0.05 }}
-              className="border-l-2 border-orange-500/30 pl-5"
-            >
-              {b.chip && (
-                <span className="text-[10px] tracking-[.22em] uppercase text-orange-300">{b.chip}</span>
-              )}
-              <p className="mt-1.5 text-2xl font-medium leading-snug text-white">{b.title}</p>
-              <p className="mt-2 text-base leading-relaxed text-white/55">{b.body}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
     </section>
   );
 }
 
-/* ─────────────────────────────── feature grid ────────────────────────────── */
+/* ─────────────────────────────── 5. Execution Proof Rail ─────────────────── */
 
-function FeatureGrid() {
-  const items: { title: string; body: string; photo: keyof typeof PHOTOS; icon: any; tone: string }[] = [
-    { title: "Aisle Twin", body: "A canonical price per SKU per zone, kept in lockstep with the outbox.", photo: "store", icon: Layers3, tone: "orange" },
-    { title: "Connector Twin", body: "Synthetic doubles validate every adapter version before live retry.", photo: "scan", icon: Network, tone: "violet" },
-    { title: "Provenance Graph", body: "Click any price; see the model, approval, ack and audit that produced it.", photo: "receipt", icon: Database, tone: "sky" },
-    { title: "Containment Replay", body: "Re-run any incident frame-by-frame; export as a regression test.", photo: "cold", icon: Boxes, tone: "amber" },
-    { title: "Verified Attribution", body: "Revenue lands in the model only when the price actually rang at POS.", photo: "bag", icon: BadgeCheck, tone: "emerald" },
-    { title: "Shopper-Hour Risk", body: "See the windows where one mis-price costs the most — sequence accordingly.", photo: "hand", icon: ScanLine, tone: "rose" },
-  ];
+const PROOF_TILES = [
+  {
+    key: "APPROVED PRICE",
+    main: "$5.99",
+    sub: "Organic Whole Milk",
+    icon: Sparkles,
+    color: "#fb923c",
+    border: "border-orange-500/35",
+    bg: "bg-orange-500/[.06]",
+  },
+  {
+    key: "CHECKOUT RESPONSE",
+    main: "$6.49",
+    sub: "POS mismatch · +$0.50",
+    icon: ScanLine,
+    color: "#f43f5e",
+    border: "border-rose-500/40",
+    bg: "bg-rose-500/[.06]",
+  },
+  {
+    key: "SAFETY DECISION",
+    main: "Expansion Blocked",
+    sub: "Before wider rollout",
+    icon: ShieldCheck,
+    color: "#a78bfa",
+    border: "border-violet-500/35",
+    bg: "bg-violet-500/[.06]",
+  },
+  {
+    key: "TECHNICAL PROOF",
+    main: "34 Tests",
+    sub: "PostgreSQL-backed recovery checks",
+    icon: BadgeCheck,
+    color: "#22c55e",
+    border: "border-emerald-500/35",
+    bg: "bg-emerald-500/[.06]",
+  },
+];
+
+function ExecutionProofRail() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-150px" });
+  const reduced = useReducedMotion();
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    if (!inView) return;
+    if (reduced) {
+      setStage(4);
+      return;
+    }
+    const ts = [400, 1100, 1800, 2500].map((ms, i) =>
+      setTimeout(() => setStage(i + 1), ms),
+    );
+    return () => ts.forEach(clearTimeout);
+  }, [inView, reduced]);
+
   return (
-    <section className="relative mx-auto max-w-[1500px] px-5 py-24 sm:px-8 sm:py-32">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="max-w-3xl">
-          <Pill tone="purple">Six concepts ShelfTrace mounts on top</Pill>
-          <h2 className="mt-5 text-[clamp(34px,5vw,72px)] font-semibold leading-[1.02] tracking-[-0.02em] text-white">
-            Reliability primitives the pricing engine can call.
-          </h2>
-        </div>
-        <Link
-          href="/vision/horizon"
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm text-white/75 hover:text-white"
-        >
-          Read the whitepaper <ArrowUpRight className="h-4 w-4" />
-        </Link>
+    <section ref={ref} className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-28">
+      <div className="max-w-3xl">
+        <Pill tone="orange">Execution proof rail</Pill>
+        <h2 className="mt-5 text-[clamp(28px,4vw,56px)] font-semibold leading-[1.05] tracking-[-0.02em] text-white">
+          The system response, end to end.
+        </h2>
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/55">
+          The signal travels approval → checkout → safety decision → preserved evidence. No vanity
+          numbers; only the actual product story and the engineering it rests on.
+        </p>
       </div>
-      <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((it, i) => {
-          const Icon = it.icon;
-          return (
-            <motion.article
-              key={it.title}
-              initial={{ opacity: 0, y: 28 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ duration: 0.65, delay: i * 0.06 }}
-              className="group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0e18] transition hover:-translate-y-0.5 hover:border-white/25"
-            >
-              <div className="relative aspect-[16/10] overflow-hidden">
-                <motion.div className="absolute inset-0" whileHover={{ scale: 1.06 }} transition={{ duration: 0.8 }}>
-                  <CinePhoto src={PHOTOS[it.photo]} alt={it.title} />
-                </motion.div>
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0e18] via-[#0a0e18]/30 to-transparent" />
-                <span className="absolute left-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-black/45 text-orange-300 backdrop-blur">
-                  <Icon className="h-4 w-4" />
-                </span>
-              </div>
-              <div className="px-6 pb-6 pt-5">
-                <p className="text-xl font-semibold text-white">{it.title}</p>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">{it.body}</p>
-                <div className="mt-4 flex items-center gap-1.5 text-xs text-orange-300 opacity-0 transition group-hover:opacity-100">
-                  Learn more <ArrowRight className="h-3 w-3" />
+
+      <div className="relative mt-12">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {PROOF_TILES.map((t, i) => {
+            const lit = stage > i;
+            const Icon = t.icon;
+            return (
+              <motion.div
+                key={t.key}
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, delay: i * 0.06 }}
+                className={`relative overflow-hidden rounded-3xl border p-6 transition-all duration-500 ${
+                  lit ? `${t.border} ${t.bg}` : "border-white/10 bg-white/[.02]"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] tracking-[.22em] text-white/45 uppercase">
+                    {t.key}
+                  </span>
+                  <span
+                    className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[.04]"
+                    style={{ color: lit ? t.color : "#475569" }}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
                 </div>
-              </div>
-            </motion.article>
-          );
-        })}
+                <div className="mt-6 text-[clamp(26px,3.2vw,42px)] font-semibold tracking-[-0.02em] text-white">
+                  {t.main}
+                </div>
+                <p className="mt-2 text-sm text-white/55">{t.sub}</p>
+                {/* signal pulse */}
+                {lit && !reduced && (
+                  <motion.span
+                    className="absolute -right-1 top-1/2 h-2 w-2 rounded-full"
+                    style={{ background: t.color, boxShadow: `0 0 12px ${t.color}` }}
+                    initial={{ opacity: 0.5, scale: 0.6 }}
+                    animate={{ opacity: 1, scale: 1.2 }}
+                    transition={{ duration: 0.6 }}
+                  />
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
+        {/* connector line behind tiles on lg */}
+        <div className="pointer-events-none absolute inset-x-6 top-1/2 hidden h-px lg:block">
+          <div className="h-full bg-gradient-to-r from-orange-500/30 via-rose-500/30 via-violet-500/30 to-emerald-500/30" />
+        </div>
       </div>
     </section>
   );
 }
 
-/* ─────────────────────────── before / after scrubber ─────────────────────── */
+/* ─────────────────────────────── 6. Before / After recovery ──────────────── */
 
 function BeforeAfter() {
-  const [pos, setPos] = useState(48);
+  const [pos, setPos] = useState(50);
   const dragging = useRef(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const onMove = (clientX: number) => {
@@ -443,21 +1031,35 @@ function BeforeAfter() {
     const x = ((clientX - r.left) / r.width) * 100;
     setPos(Math.max(2, Math.min(98, x)));
   };
+
+  const beforeRows = [
+    { label: "Shelf Label", value: "$5.99 · verified", tone: "ok" as const },
+    { label: "Checkout POS", value: "$6.49 · mismatch", tone: "err" as const },
+    { label: "Ecommerce", value: "$5.99 · verified", tone: "ok" as const },
+    { label: "Decision", value: "Expansion blocked", tone: "warn" as const },
+  ];
+  const afterRows = [
+    { label: "Shelf Label", value: "$5.99 · verified", tone: "ok" as const },
+    { label: "Checkout POS", value: "$5.99 · verified", tone: "ok" as const },
+    { label: "Ecommerce", value: "$5.99 · verified", tone: "ok" as const },
+    { label: "Decision", value: "Incident resolved · eligible for controlled expansion", tone: "ok" as const },
+  ];
+
   return (
-    <section className="relative mx-auto max-w-[1500px] px-5 py-24 sm:px-8">
+    <section className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8">
       <div className="max-w-3xl">
-        <Pill tone="red">Before / after</Pill>
-        <h2 className="mt-5 text-[clamp(34px,5vw,72px)] font-semibold leading-[1.02] tracking-[-0.02em] text-white">
-          What changes when the engine has an operator surface.
+        <Pill tone="purple">Before / after recovery</Pill>
+        <h2 className="mt-5 text-[clamp(32px,5vw,64px)] font-semibold leading-[1.04] tracking-[-0.02em] text-white">
+          Drag to see the same milk after acknowledgement.
         </h2>
         <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/55">
-          Drag to compare. Same approved price, same store, same shopper — different outcomes when
-          containment and twin replay sit between approval and shelf.
+          Same approved price. Same store. ShelfTrace resolves only after the channel that disagreed
+          acknowledges the approved value.
         </p>
       </div>
       <div
         ref={wrapRef}
-        className="relative mt-14 aspect-[16/8] cursor-ew-resize overflow-hidden rounded-3xl border border-white/10 shadow-[0_30px_120px_-40px_rgba(249,115,22,.35)]"
+        className="relative mt-12 aspect-[16/7] cursor-ew-resize overflow-hidden rounded-3xl border border-white/10 select-none"
         onPointerMove={(e) => dragging.current && onMove(e.clientX)}
         onPointerDown={(e) => {
           dragging.current = true;
@@ -469,34 +1071,16 @@ function BeforeAfter() {
           (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
         }}
       >
-        {/* AFTER (full) */}
-        <div className="absolute inset-0">
-          <CinePhoto src={PHOTOS.store} alt="With ShelfTrace" />
-          <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/55 via-transparent to-transparent" />
-          <div className="absolute right-6 top-6 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-[11px] uppercase tracking-[.22em] text-emerald-200 backdrop-blur">
-            With ShelfTrace
-          </div>
-          <div className="absolute bottom-6 right-6 max-w-md rounded-2xl border border-emerald-400/30 bg-black/55 p-4 backdrop-blur-xl">
-            <p className="text-sm font-medium text-emerald-200">$0 drift cost · 30 s containment</p>
-            <p className="mt-1 text-xs text-white/60">
-              POS reported $5.99 · canonical $5.49 · twin replay verified · live retry aligned · audit sealed.
-            </p>
-          </div>
+        {/* AFTER full layer */}
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/40 via-[#0a1410] to-[#06090f]">
+          <RecoveryPanel rows={afterRows} eyebrow="AFTER · acknowledgement received" tone="ok" />
         </div>
-        {/* BEFORE (clipped to pos%) */}
-        <div className="absolute inset-0 overflow-hidden" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
-          <CinePhoto src={PHOTOS.aisle} alt="Without ShelfTrace" />
-          <div className="absolute inset-0 bg-gradient-to-t from-rose-950/60 via-transparent to-transparent" />
-          <div className="absolute left-6 top-6 rounded-full border border-rose-400/30 bg-rose-500/10 px-3 py-1 text-[11px] uppercase tracking-[.22em] text-rose-200 backdrop-blur">
-            Without
-          </div>
-          <div className="absolute bottom-6 left-6 max-w-md rounded-2xl border border-rose-400/30 bg-black/55 p-4 backdrop-blur-xl">
-            <p className="text-sm font-medium text-rose-200">$1,284 drift cost · weekly recon meeting</p>
-            <p className="mt-1 text-xs text-white/60">
-              POS rang $5.99 for 7 hours. Shoppers paid more. Attribution learned a price that never
-              actually executed correctly.
-            </p>
-          </div>
+        {/* BEFORE clipped */}
+        <div
+          className="absolute inset-0 bg-gradient-to-br from-rose-950/40 via-[#140a0d] to-[#06090f]"
+          style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+        >
+          <RecoveryPanel rows={beforeRows} eyebrow="BEFORE · mismatch open" tone="err" />
         </div>
         {/* slider */}
         <div className="pointer-events-none absolute inset-y-0 z-10" style={{ left: `${pos}%` }}>
@@ -513,107 +1097,251 @@ function BeforeAfter() {
   );
 }
 
-/* ─────────────────────────────── quote wall ──────────────────────────────── */
-
-function QuoteWall() {
-  const quotes = [
-    {
-      body: "Test before go-live. Guard after approval. Learn only from what shoppers actually saw.",
-      who: "Operating principle",
-      role: "ShelfTrace · core thesis",
-    },
-    {
-      body: "If a price action wasn't executed correctly, the model should not learn from it.",
-      who: "Verified Impact Gate",
-      role: "Attribution discipline",
-    },
-    {
-      body: "If it isn't simulatable, it isn't operable. Every primitive should be something an operator can poke.",
-      who: "Operator surface",
-      role: "Design constraint",
-    },
-  ];
+function RecoveryPanel({
+  rows,
+  eyebrow,
+  tone,
+}: {
+  rows: { label: string; value: string; tone: "ok" | "err" | "warn" }[];
+  eyebrow: string;
+  tone: "ok" | "err";
+}) {
   return (
-    <section className="relative mx-auto max-w-[1500px] px-5 py-28 sm:px-8 sm:py-36">
-      <div className="grid gap-6 lg:grid-cols-3">
-        {quotes.map((q, i) => (
-          <motion.figure
-            key={i}
-            initial={{ opacity: 0, y: 26 }}
+    <div className="absolute inset-0 flex items-center px-6 sm:px-10">
+      <div className="w-full max-w-[480px]">
+        <p
+          className={`text-[10px] tracking-[.22em] uppercase ${
+            tone === "ok" ? "text-emerald-300" : "text-rose-300"
+          }`}
+        >
+          {eyebrow}
+        </p>
+        <ul className="mt-5 space-y-2">
+          {rows.map((r, i) => (
+            <li
+              key={i}
+              className={`flex items-center justify-between rounded-xl border px-4 py-3 text-sm backdrop-blur ${
+                r.tone === "ok"
+                  ? "border-emerald-500/30 bg-emerald-500/[.06] text-emerald-100"
+                  : r.tone === "err"
+                    ? "border-rose-500/40 bg-rose-500/[.06] text-rose-100"
+                    : "border-amber-500/35 bg-amber-500/[.06] text-amber-100"
+              }`}
+            >
+              <span className="text-white/75">{r.label}</span>
+              <span className="font-mono tabular-nums">{r.value}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────── 7. Reliability Principles ───────────────── */
+
+const PRINCIPLES = [
+  {
+    head: "Resolve only after acknowledgement.",
+    body: "A retry is not success until the store channel confirms the approved price.",
+  },
+  {
+    head: "Block wider rollout when shopper-facing prices disagree.",
+    body: "A canary mismatch stops expansion before the issue spreads across the zone.",
+  },
+  {
+    head: "Preserve every recovery as traceable evidence.",
+    body: "Retries, acknowledgements, reconciliation results and resolution remain visible in the audit trail.",
+  },
+];
+
+function ReliabilityPrinciples() {
+  return (
+    <section className="relative mx-auto max-w-[1400px] px-5 py-28 sm:px-8 sm:py-36">
+      <div className="max-w-3xl">
+        <Pill tone="sky">Reliability principles built into ShelfTrace</Pill>
+        <h2 className="mt-5 text-[clamp(32px,5vw,64px)] font-semibold leading-[1.04] tracking-[-0.02em] text-white">
+          Three commitments. Enforced in the engine.
+        </h2>
+      </div>
+      <div className="mt-14 grid gap-6 lg:grid-cols-3">
+        {PRINCIPLES.map((p, i) => (
+          <motion.div
+            key={p.head}
+            initial={{ opacity: 0, y: 22 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.7, delay: i * 0.08 }}
-            className="relative rounded-3xl border border-white/10 bg-gradient-to-br from-white/[.04] to-transparent p-8"
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.65, delay: i * 0.08 }}
+            className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[.04] to-transparent p-8"
           >
-            <Quote className="h-6 w-6 text-orange-400/70" />
-            <blockquote className="mt-5 text-xl leading-snug font-medium text-white">
-              &ldquo;{q.body}&rdquo;
-            </blockquote>
-            <figcaption className="mt-6 border-t border-white/10 pt-4">
-              <p className="text-sm font-medium text-white">{q.who}</p>
-              <p className="text-xs text-white/45">{q.role}</p>
-            </figcaption>
-          </motion.figure>
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-300">
+              <span className="font-mono text-sm">{String(i + 1).padStart(2, "0")}</span>
+            </span>
+            <p className="mt-5 text-[clamp(20px,2vw,26px)] font-semibold leading-snug text-white">
+              {p.head}
+            </p>
+            <p className="mt-3 text-base leading-relaxed text-white/55">{p.body}</p>
+          </motion.div>
         ))}
       </div>
     </section>
   );
 }
 
-/* ─────────────────────────────── how it works ────────────────────────────── */
+/* ─────────────────────────────── 8. Manager Tablet bridge ────────────────── */
 
-function HowItWorks() {
-  const steps = [
-    {
-      n: "01",
-      title: "Approve",
-      body: "Your pricing engine commits an approved price to ShelfTrace's outbox in one transaction. Idempotency key issued.",
-      icon: Sparkles,
-    },
-    {
-      n: "02",
-      title: "Dispatch",
-      body: "Workers fan the event out to every channel — ESL, POS, web, mobile, kiosk — under FOR UPDATE SKIP LOCKED.",
-      icon: Zap,
-    },
-    {
-      n: "03",
-      title: "Verify",
-      body: "Acks reconcile against the canonical price. Any drift opens a containment window; twin replays before live retry.",
-      icon: ShieldCheck,
-    },
-  ];
+function ManagerTablet() {
+  const reduced = useReducedMotion();
   return (
-    <section className="relative mx-auto max-w-[1500px] px-5 py-24 sm:px-8 sm:py-32">
-      <div className="max-w-3xl">
-        <Pill tone="sky">How it works</Pill>
-        <h2 className="mt-5 text-[clamp(34px,5vw,72px)] font-semibold leading-[1.02] tracking-[-0.02em] text-white">
-          Three steps. One source of truth.
-        </h2>
+    <section className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8">
+      <div className="grid gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+        <div>
+          <Pill tone="orange">Bridge into the working system</Pill>
+          <h2 className="mt-5 text-[clamp(32px,5vw,68px)] font-semibold leading-[1.02] tracking-[-0.02em] text-white">
+            From cinematic to control plane in one tap.
+          </h2>
+          <p className="mt-5 max-w-xl text-base leading-relaxed text-white/55">
+            The alert above is dramatized. The control plane below it is real — a working FastAPI +
+            PostgreSQL + Redis service in this repo. Every CTA lands in code you can read.
+          </p>
+        </div>
+        {/* tablet */}
+        <motion.div
+          initial={reduced ? false : { opacity: 0, y: 24, rotateX: 8 }}
+          whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          style={{ transformStyle: "preserve-3d", perspective: 1200 }}
+          className="relative mx-auto w-full max-w-[540px]"
+        >
+          {/* tablet bezel */}
+          <div className="relative aspect-[3/4] rounded-[36px] border border-white/10 bg-gradient-to-br from-[#1a1f2c] to-[#0a0d14] p-3 shadow-[0_40px_120px_-30px_rgba(244,63,94,.4)]">
+            <div className="absolute left-1/2 top-2 h-1 w-12 -translate-x-1/2 rounded-full bg-white/20" />
+            <div className="absolute inset-x-3 bottom-3 top-6 overflow-hidden rounded-[28px] border border-white/[.06] bg-[#06090f]">
+              {/* status bar */}
+              <div className="flex items-center justify-between px-5 py-3 text-[10px] uppercase tracking-[.22em] text-white/45">
+                <span className="flex items-center gap-1.5">
+                  <Tablet className="h-3 w-3" /> Store · Aisle 4
+                </span>
+                <span className="font-mono">07:14</span>
+              </div>
+              {/* alert */}
+              <div className="mx-4 mt-2 rounded-2xl border border-rose-500/40 bg-rose-500/[.08] p-4">
+                <div className="flex items-center gap-2 text-[10px] tracking-[.22em] text-rose-300 uppercase">
+                  <CircleAlert className="h-3.5 w-3.5" /> Critical price-integrity incident
+                </div>
+                <p className="mt-3 text-base font-semibold text-white">Organic Whole Milk</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg border border-white/10 bg-white/[.03] p-2.5">
+                    <p className="text-[10px] uppercase tracking-[.18em] text-white/45">Expected</p>
+                    <p className="mt-0.5 font-mono text-base text-emerald-200">$5.99</p>
+                  </div>
+                  <div className="rounded-lg border border-rose-500/30 bg-rose-500/[.06] p-2.5">
+                    <p className="text-[10px] uppercase tracking-[.18em] text-rose-300">POS returned</p>
+                    <p className="mt-0.5 font-mono text-base text-rose-200">$6.49</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-white/55">
+                  <span className="font-medium text-amber-200">Expansion paused.</span> Awaiting checkout
+                  acknowledgement.
+                </p>
+              </div>
+              {/* CTAs */}
+              <div className="mx-4 mt-4 space-y-2">
+                {[
+                  { href: "/operations", label: "Open Live Control Plane" },
+                  { href: "/engineering", label: "Inspect Engineering Trace" },
+                  { href: "/scenarios", label: "Configure Scenario" },
+                ].map((cta) => (
+                  <Link
+                    key={cta.href}
+                    href={cta.href}
+                    className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm text-white/85 hover:border-orange-500/40 hover:bg-orange-500/[.08] hover:text-white"
+                  >
+                    <span>{cta.label}</span>
+                    <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                  </Link>
+                ))}
+              </div>
+              {/* heartbeat */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 text-[10px] uppercase tracking-[.22em] text-white/40">
+                <CircleDot className="h-2 w-2 animate-pulse text-emerald-400" />
+                Audit listener · live
+              </div>
+            </div>
+          </div>
+        </motion.div>
       </div>
-      <div className="mt-14 grid gap-6 lg:grid-cols-3">
-        {steps.map((s, i) => {
-          const Icon = s.icon;
+    </section>
+  );
+}
+
+/* ─────────────────────────────── 9. Future concepts (restrained) ─────────── */
+
+const FUTURE_CONCEPTS = [
+  {
+    title: "Verified Impact Gate",
+    body: "Release revenue/margin attribution only after the price actually executed across required channels.",
+    icon: BadgeCheck,
+  },
+  {
+    title: "Real Data Replay",
+    body: "Turn public or anonymized product/price observations into reliability test workloads with provenance attached.",
+    icon: Database,
+  },
+  {
+    title: "Recovery-to-Regression",
+    body: "Every resolved incident becomes a permanent connector scenario for the next rollout.",
+    icon: FlaskConical,
+  },
+  {
+    title: "Zone Blast-Radius Studio",
+    body: "Preview the stores, SKUs and deadlines protected when a rollout is paused — before expanding.",
+    icon: MapPinned,
+  },
+];
+
+function FutureConceptsPreview() {
+  return (
+    <section className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="max-w-3xl">
+          <Pill tone="purple">Vision concepts · exploratory</Pill>
+          <h2 className="mt-5 text-[clamp(28px,4vw,56px)] font-semibold leading-[1.04] tracking-[-0.02em] text-white">
+            Where verified execution could lead next.
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/55">
+            Each card below is a forward-looking concept layered on top of the working engine —
+            shown for discussion, not as built functionality.
+          </p>
+        </div>
+        <Link
+          href="/vision/horizon"
+          className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[.04] px-5 py-2.5 text-sm text-white/75 hover:text-white"
+        >
+          Explore Vision Concepts <ArrowUpRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {FUTURE_CONCEPTS.map((c, i) => {
+          const Icon = c.icon;
           return (
             <motion.div
-              key={s.n}
-              initial={{ opacity: 0, y: 28 }}
+              key={c.title}
+              initial={{ opacity: 0, y: 18 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.65, delay: i * 0.1 }}
-              className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0e18] p-8"
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.55, delay: i * 0.06 }}
+              className="rounded-2xl border border-white/10 bg-white/[.025] p-5 hover:border-orange-500/30 hover:bg-orange-500/[.04]"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[64px] font-semibold leading-none tracking-[-0.04em] text-orange-300/30">{s.n}</span>
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[.04] text-orange-300">
-                  <Icon className="h-5 w-5" />
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[.04] text-orange-300">
+                  <Icon className="h-4 w-4" />
                 </span>
+                <span className="text-[9px] tracking-[.22em] text-white/40 uppercase">Vision concept</span>
               </div>
-              <p className="mt-6 text-2xl font-semibold text-white">{s.title}</p>
-              <p className="mt-3 text-sm leading-relaxed text-white/55">{s.body}</p>
-              {i < 2 && (
-                <ArrowRight className="absolute right-6 top-1/2 hidden h-6 w-6 -translate-y-1/2 translate-x-12 text-orange-400/70 lg:block" />
-              )}
+              <p className="mt-4 text-base font-semibold text-white">{c.title}</p>
+              <p className="mt-2 text-sm leading-relaxed text-white/55">{c.body}</p>
             </motion.div>
           );
         })}
@@ -622,68 +1350,123 @@ function HowItWorks() {
   );
 }
 
-/* ─────────────────────────────── closing CTA ─────────────────────────────── */
+/* ─────────────────────────────── 10. Night-time closing ──────────────────── */
 
-function ClosingCta() {
+function NightClosing() {
+  const reduced = useReducedMotion();
   return (
-    <section className="relative mx-auto max-w-[1500px] px-5 pb-28 pt-12 sm:px-8 sm:pb-32">
-      <div className="relative overflow-hidden rounded-[32px] border border-orange-500/25">
-        <div className="absolute inset-0">
-          <CinePhoto src={PHOTOS.cart} alt="Cart in a calm aisle" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#040608] via-[#040608]/85 to-[#040608]/40" />
-        </div>
-        <div className="relative grid items-center gap-10 px-8 py-16 sm:px-14 sm:py-24 lg:grid-cols-[1.6fr_1fr]">
+    <section className="relative isolate overflow-hidden border-t border-white/[.06] bg-[#040608]">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_120%,rgba(34,197,94,.10),transparent_55%),radial-gradient(ellipse_at_20%_0%,rgba(56,189,248,.08),transparent_45%)]" />
+      <div className="relative mx-auto max-w-[1400px] px-5 py-28 sm:px-8 sm:py-32">
+        <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr]">
           <div>
-            <Pill tone="orange">Ready when you are</Pill>
-            <h2 className="mt-5 text-[clamp(36px,5vw,88px)] font-semibold leading-[1.02] tracking-[-0.02em] text-white">
-              Six surfaces. One engine.
-              <br />
-              <span className="bg-gradient-to-r from-orange-300 via-orange-400 to-rose-400 bg-clip-text text-transparent">
-                Audit-grade, end to end.
+            <div className="flex items-center gap-2 text-[10px] tracking-[.22em] text-emerald-300 uppercase">
+              <Moon className="h-3.5 w-3.5" /> After hours · aisle 4
+            </div>
+            <h2 className="mt-5 text-[clamp(36px,5vw,84px)] font-semibold leading-[1.02] tracking-[-0.02em] text-white">
+              The rollout ends.{" "}
+              <span className="bg-gradient-to-r from-emerald-300 via-emerald-200 to-sky-200 bg-clip-text text-transparent">
+                The evidence remains.
               </span>
             </h2>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-white/65">
-              Every concept on this page mounts on the working ShelfTrace repo. The control plane, the
-              scenario engine, the certification lab, the audit log — already there. Mission Control
-              and Command Sphere are the operator surfaces this page argues for.
+              Every execution tested. Every mismatch traceable. Every recovery preserved for the next
+              rollout.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-wrap gap-2">
+              {[
+                "Configurable Scenarios",
+                "Certification + Live Rollout",
+                "Audit-Verified Recovery",
+                "34 PostgreSQL-Backed Tests",
+              ].map((chip) => (
+                <span
+                  key={chip}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/[.06] px-3 py-1.5 text-xs font-medium text-emerald-200"
+                >
+                  <CheckCircle2 className="h-3 w-3" /> {chip}
+                </span>
+              ))}
+            </div>
+            <div className="mt-10 flex flex-wrap gap-3">
               <Link
-                href="/vision/orbit"
+                href="/operations"
                 className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#040608] hover:bg-orange-50"
               >
-                Try the simulator <ArrowRight className="h-4 w-4" />
+                Open Working Platform <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
-                href="/vision/mission-control"
-                className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/5 px-6 py-3.5 text-sm text-white hover:bg-white/10"
+                href="/engineering"
+                className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[.04] px-6 py-3.5 text-sm text-white hover:bg-white/10"
               >
-                See Mission Control <ArrowUpRight className="h-4 w-4" />
+                View Engineering Proof <ArrowUpRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/scenarios"
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-transparent px-5 py-3 text-sm text-white/75 hover:text-white"
+              >
+                Build a Scenario <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/15 bg-black/55 p-6 backdrop-blur-xl">
-            <p className="text-[10px] tracking-[.2em] text-orange-300 uppercase">Working surfaces</p>
-            <ul className="mt-4 space-y-3">
-              {[
-                ["/operations", "Live Operations"],
-                ["/scenarios", "Scenario Builder"],
-                ["/certification", "Certification Lab"],
-                ["/engineering", "Engineering Trace"],
-                ["/operations/incidents", "Incidents"],
-                ["/operations/markdowns", "Markdown SLAs"],
-              ].map(([href, label]) => (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[.03] px-4 py-2.5 text-sm text-white/75 hover:border-orange-500/35 hover:text-white"
-                  >
-                    {label}
-                    <ArrowUpRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                  </Link>
-                </li>
+          {/* dim aisle SVG */}
+          <div className="relative h-[420px] overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#070a12] to-[#02030a]">
+            {/* faint refrigeration glow */}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_18%_50%,rgba(56,189,248,0.12),transparent_55%)]" />
+            <svg viewBox="0 0 600 420" className="absolute inset-0 h-full w-full">
+              {/* shelf back */}
+              <rect x="40" y="100" width="520" height="220" rx="6" fill="#0a0e18" stroke="rgba(255,255,255,0.06)" />
+              {/* shelf-edge labels (stable green) */}
+              {[80, 180, 280, 380, 480].map((x) => (
+                <g key={x} transform={`translate(${x} 308)`}>
+                  <rect width="60" height="14" rx="2" fill="#0a1410" stroke="#22c55e" strokeWidth="0.6" />
+                  <text x="30" y="10" fontSize="6.5" textAnchor="middle" fill="#86efac" fontFamily="ui-monospace, monospace">
+                    VERIFIED
+                  </text>
+                </g>
               ))}
-            </ul>
+              {/* products as silhouettes */}
+              {[
+                { x: 80, w: 50, h: 80, type: "tall" },
+                { x: 180, w: 70, h: 40, type: "wide" },
+                { x: 280, w: 65, h: 50, type: "wide" },
+                { x: 380, w: 50, h: 80, type: "tall" },
+                { x: 480, w: 50, h: 80, type: "tall" },
+              ].map((p, i) => (
+                <rect
+                  key={i}
+                  x={p.x}
+                  y={300 - p.h}
+                  width={p.w}
+                  height={p.h}
+                  rx={3}
+                  fill="rgba(255,255,255,0.04)"
+                  stroke="rgba(255,255,255,0.08)"
+                />
+              ))}
+              {/* calm green signal line */}
+              <line x1="40" y1="350" x2="560" y2="350" stroke="rgba(34,197,94,0.15)" strokeWidth="1.4" />
+              {!reduced && (
+                <motion.line
+                  x1="40"
+                  y1="350"
+                  x2="560"
+                  y2="350"
+                  stroke="#22c55e"
+                  strokeWidth="1.4"
+                  strokeDasharray="10 180"
+                  animate={{ strokeDashoffset: [0, -380] }}
+                  transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                />
+              )}
+            </svg>
+            {/* small tablet caption */}
+            <div className="absolute right-4 top-4 rounded-xl border border-emerald-500/30 bg-emerald-500/[.06] px-3 py-2 backdrop-blur">
+              <p className="text-[10px] tracking-[.18em] text-emerald-300 uppercase">Manager tablet</p>
+              <p className="mt-0.5 text-xs font-medium text-emerald-100">
+                All required channels verified
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -694,41 +1477,41 @@ function ClosingCta() {
 /* ─────────────────────────────────── PAGE ─────────────────────────────────── */
 
 export default function KeynotePage() {
+  const [introDone, setIntroDone] = useState(false);
+  const reduced = useReducedMotion();
+  const scannerRef = useRef<HTMLDivElement>(null);
+
+  // skip intro on second visit (sessionStorage) and under reduced motion
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (reduced) {
+      setIntroDone(true);
+      return;
+    }
+    if (sessionStorage.getItem("kn:intro") === "done") {
+      setIntroDone(true);
+    }
+  }, [reduced]);
+
+  const finishIntro = () => {
+    if (typeof window !== "undefined") sessionStorage.setItem("kn:intro", "done");
+    setIntroDone(true);
+  };
+
   return (
     <div className="relative bg-[#040608]">
       <FilmGrain />
-      <HeroCinematic />
-      <MarqueeStrip />
-      <StatBand />
-      <PinnedScene
-        eyebrow="Scene · the moment of truth"
-        kicker="A shopper lifts the product. The price had better be the price."
-        photo={PHOTOS.scan}
-        alt="Barcode scan at checkout"
-        side="right"
-        beats={[
-          { chip: "01 · approve", title: "The engine commits the price.", body: "Outbox + idempotency key. One transaction. Workers race safely under FOR UPDATE SKIP LOCKED." },
-          { chip: "02 · dispatch", title: "Every channel hears it the same way.", body: "ESL, POS, web, mobile, kiosk. Each connector signs the same contract, verified in CI by Pact." },
-          { chip: "03 · verify", title: "Acks reconcile against canonical.", body: "If drift opens, containment fires before a single shopper rings the wrong price." },
-        ]}
-      />
-      <PinnedScene
-        eyebrow="Scene · containment"
-        kicker="When a connector lies, the twin tells the truth first."
-        photo={PHOTOS.cold}
-        alt="Refrigerated grocery case"
-        side="left"
-        beats={[
-          { chip: "04 · drift", title: "POS reports $5.99. Canonical was $5.49.", body: "Incident opens with full causal trace, SLA 120s, downstream paused, attribution held." },
-          { chip: "05 · twin replay", title: "Synthetic double runs the failing call first.", body: "Same contract, no shelf risk. Verdict in milliseconds. Only safe-to-live earns the live retry." },
-          { chip: "06 · seal", title: "Audit causality stamps the recovery.", body: "ack < resolve, recorded as legal record. The incident becomes a regression test." },
-        ]}
-      />
-      <FeatureGrid />
+      <AnimatePresence>{!introDone && <StoreAwakening onDone={finishIntro} />}</AnimatePresence>
+
+      <Hero onScanner={() => scannerRef.current?.scrollIntoView({ behavior: "smooth" })} />
+      <ProductAisle />
+      <ScannerShowstopper playRef={scannerRef} />
+      <ExecutionProofRail />
       <BeforeAfter />
-      <QuoteWall />
-      <HowItWorks />
-      <ClosingCta />
+      <ReliabilityPrinciples />
+      <ManagerTablet />
+      <FutureConceptsPreview />
+      <NightClosing />
     </div>
   );
 }

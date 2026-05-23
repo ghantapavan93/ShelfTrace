@@ -88,65 +88,56 @@ export function BackgroundOrbits({ variant = "orange" }: { variant?: "orange" | 
   );
 }
 
+/**
+ * Reviewer-facing navigation: deliberately minimal.
+ * Only four destinations are surfaced so the visitor stays focused on the
+ * Keynote story and the working surfaces it bridges into. Experimental routes
+ * (aisle, mission-control, orbit) remain reachable by direct URL but are
+ * intentionally not in the nav.
+ */
+const REVIEWER_NAV: { label: string; href: string; external?: boolean }[] = [
+  { label: "Keynote", href: "/vision/keynote" },
+  { label: "Working Platform", href: "/operations", external: true },
+  { label: "Engineering Proof", href: "/engineering", external: true },
+  { label: "Vision Concepts", href: "/vision/horizon" },
+];
+
 export function GlobalHeader() {
   const pathname = usePathname();
-  const page = currentPageId(pathname);
   return (
     <header className="relative z-30 flex h-[72px] items-center justify-between border-b border-white/[.07] bg-[#070a11]/85 px-4 backdrop-blur-xl sm:px-7">
       <VisionLogo />
-      <nav className="hidden items-center gap-2 lg:flex" aria-label="Vision Studio pages">
-        {PAGES.map((p) => (
-          <Link
-            key={p.id}
-            href={p.href}
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${
-              page === p.id
-                ? "border border-orange-500/30 bg-orange-500/10 text-orange-300"
-                : "text-white/52 hover:text-white"
-            }`}
-          >
-            <span className="text-[10px] text-white/32">{p.number}</span>
-            {p.label}
-          </Link>
-        ))}
+      <nav className="hidden items-center gap-1 lg:flex" aria-label="ShelfTrace reviewer navigation">
+        {REVIEWER_NAV.map((p) => {
+          const active = pathname === p.href || (p.href === "/vision/keynote" && pathname.startsWith("/vision/keynote"));
+          return (
+            <Link
+              key={p.href}
+              href={p.href}
+              className={`rounded-full px-4 py-2 text-sm transition ${
+                active
+                  ? "border border-orange-500/30 bg-orange-500/10 text-orange-300"
+                  : "text-white/55 hover:text-white"
+              }`}
+            >
+              {p.label}
+            </Link>
+          );
+        })}
       </nav>
       <div className="flex items-center gap-3">
         <Pill tone="purple">Concept Vision</Pill>
-        <Link
-          href="/operations"
-          className="hidden rounded-xl border border-white/10 bg-white/[.04] px-4 py-2 text-xs text-white/70 transition hover:text-white md:block"
-        >
-          Open Working Platform
-        </Link>
       </div>
     </header>
   );
 }
 
+/**
+ * ProgressNavigation kept as a function for back-compat but renders nothing.
+ * The simplified reviewer nav lives entirely in the header.
+ */
 export function ProgressNavigation() {
-  const pathname = usePathname();
-  const page = currentPageId(pathname);
-  return (
-    <nav
-      aria-label="Vision Studio progress"
-      className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-[#090d15]/88 p-2 shadow-2xl backdrop-blur-xl sm:bottom-7"
-    >
-      {PAGES.map((p, index) => (
-        <Link
-          key={p.id}
-          href={p.href}
-          className={`flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-medium transition ${
-            page === p.id
-              ? "bg-orange-500 text-white shadow-[0_0_20px_rgba(249,115,22,.3)]"
-              : "text-white/45 hover:text-white"
-          }`}
-        >
-          <span>{index + 1}</span>
-          <span className="hidden sm:inline">{p.label}</span>
-        </Link>
-      ))}
-    </nav>
-  );
+  return null;
 }
 
 export function VisionFooter() {
