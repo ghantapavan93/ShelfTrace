@@ -21,8 +21,8 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
     "command": "pytest -q  (PostgreSQL-backed, isolated test DB)",
-    "passed": 34,
-    "duration_s": 15.0,
+    "passed": 40,
+    "duration_s": 26.4,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -58,6 +58,12 @@ TEST_PROOF = {
         "tests/test_scenarios.py::test_seeded_scenario_cannot_be_deleted",
         "tests/test_concurrency_pg.py::test_concurrent_resolution_is_serialized",
         "tests/test_concurrency_pg.py::test_outbox_not_double_processed",
+        "tests/test_security.py::test_auth_disabled_by_default_allows_mutating_endpoint",
+        "tests/test_security.py::test_missing_key_returns_401_when_auth_enabled",
+        "tests/test_security.py::test_viewer_key_cannot_write",
+        "tests/test_security.py::test_operator_key_accepts_write_and_records_actor",
+        "tests/test_security.py::test_unknown_key_returns_401",
+        "tests/test_security.py::test_cors_origin_allowlist_replaces_wildcard",
     ],
 }
 

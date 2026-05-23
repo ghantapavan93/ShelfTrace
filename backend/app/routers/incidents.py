@@ -12,6 +12,7 @@ from app.schemas import (
     IncidentView,
     StoreTaskView,
 )
+from app.security import Identity, require_operator
 from app.services import queries, recovery
 
 router = APIRouter(prefix="/api/v1", tags=["incidents"])
@@ -70,35 +71,52 @@ def get_incident_audit(incident_id: str, db: Session = Depends(get_db)):
     ]
 
 
-def _recover(fn, db, incident_id):
+def _recover(fn, db, incident_id, actor: str):
     try:
-        return fn(db, incident_id)
+        return fn(db, incident_id, actor=actor)
     except recovery.RecoveryError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 
 
 @router.post("/incidents/{incident_id}/retry", response_model=IncidentView)
-def retry(incident_id: str, db: Session = Depends(get_db)):
-    incident = _recover(recovery.retry_incident, db, incident_id)
+def retry(
+    incident_id: str,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
+    incident = _recover(recovery.retry_incident, db, incident_id, identity.actor)
     return queries.incident_view(db, incident)
 
 
 @router.post("/incidents/{incident_id}/rollback", response_model=IncidentView)
-def rollback(incident_id: str, db: Session = Depends(get_db)):
-    incident = _recover(recovery.rollback_incident, db, incident_id)
+def rollback(
+    incident_id: str,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
+    incident = _recover(recovery.rollback_incident, db, incident_id, identity.actor)
     return queries.incident_view(db, incident)
 
 
 @router.post("/incidents/{incident_id}/resolve", response_model=IncidentView)
-def resolve(incident_id: str, db: Session = Depends(get_db)):
-    incident = _recover(recovery.resolve_incident, db, incident_id)
+def resolve(
+    incident_id: str,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
+    incident = _recover(recovery.resolve_incident, db, incident_id, identity.actor)
     return queries.incident_view(db, incident)
 
 
 @router.post("/incidents/{incident_id}/store-task", response_model=StoreTaskView)
-def store_task(incident_id: str, instruction: str | None = Body(default=None, embed=True), db: Session = Depends(get_db)):
+def store_task(
+    incident_id: str,
+    instruction: str | None = Body(default=None, embed=True),
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     try:
-        task = recovery.create_store_task(db, incident_id, instruction)
+        task = recovery.create_store_task(db, incident_id, instruction, actor=identity.actor)
     except recovery.RecoveryError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     return StoreTaskView(

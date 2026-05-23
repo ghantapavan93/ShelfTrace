@@ -13,6 +13,7 @@ from app.schemas import (
     CertificationReport,
     ConnectorProfileView,
 )
+from app.security import Identity, require_operator
 from app.services import certification
 
 router = APIRouter(prefix="/api/v1/certification", tags=["certification"])
@@ -74,7 +75,10 @@ def _get_run_or_404(db: Session, run_id: str) -> CertificationRun:
 
 
 @router.post("/demo/reset", response_model=CertificationReport)
-def reset(db: Session = Depends(get_db)):
+def reset(
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     if not settings.demo_mode:
         raise HTTPException(status_code=403, detail="Demo mode disabled")
     run = certification.reset_demo(db)
@@ -82,7 +86,10 @@ def reset(db: Session = Depends(get_db)):
 
 
 @router.post("/runs", response_model=CertificationReport, status_code=201)
-def create_run(db: Session = Depends(get_db)):
+def create_run(
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     run = certification.create_run(db, execute_now=True)
     return _build_report(db, run)
 
@@ -106,12 +113,20 @@ def get_report(run_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/runs/{run_id}/execute", response_model=CertificationReport)
-def execute(run_id: str, db: Session = Depends(get_db)):
+def execute(
+    run_id: str,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     run = certification.execute_run(db, _get_run_or_404(db, run_id))
     return _build_report(db, run)
 
 
 @router.post("/runs/{run_id}/rerun-failed-checks", response_model=CertificationReport)
-def rerun_failed(run_id: str, db: Session = Depends(get_db)):
+def rerun_failed(
+    run_id: str,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     run = certification.rerun_failed_checks(db, _get_run_or_404(db, run_id))
     return _build_report(db, run)

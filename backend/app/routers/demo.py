@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.schemas import BatchSummary
+from app.security import Identity, require_operator
 from app.seed import seed_live
 from app.services import queries
 
@@ -13,7 +14,10 @@ router = APIRouter(prefix="/api/v1/demo", tags=["demo"])
 
 
 @router.post("/reset", response_model=BatchSummary)
-def reset(db: Session = Depends(get_db)):
+def reset(
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     """Reset ONLY the live-rollout demo to its blocked state (certification untouched)."""
     if not settings.demo_mode:
         raise HTTPException(status_code=403, detail="Demo mode disabled")

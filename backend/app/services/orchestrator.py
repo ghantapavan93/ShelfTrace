@@ -114,7 +114,7 @@ class ExpansionError(Exception):
     """Raised when a batch is not eligible to expand."""
 
 
-def expand_batch(db: Session, batch: PriceBatch) -> PriceBatch:
+def expand_batch(db: Session, batch: PriceBatch, actor: str = "operator") -> PriceBatch:
     """Expand a verified batch to its remaining (expansion) stores.
 
     Only allowed once every canary action is verified. Expansion-store deliveries
@@ -141,9 +141,9 @@ def expand_batch(db: Session, batch: PriceBatch) -> PriceBatch:
         db,
         batch_id=batch.id,
         event="Expansion authorized",
-        detail=f"Operator expanded the batch to {len(exp_ids)} remaining store(s): "
+        detail=f"{actor} expanded the batch to {len(exp_ids)} remaining store(s): "
         f"{', '.join(sorted(exp_ids))}.",
-        actor="operator",
+        actor=actor,
     )
 
     for action in exp_actions:

@@ -44,7 +44,7 @@ def _delivery_for(db: Session, action_id: str, channel: Channel) -> ChannelDeliv
     )
 
 
-def retry_incident(db: Session, incident_id: str) -> Incident:
+def retry_incident(db: Session, incident_id: str, actor: str = "operator") -> Incident:
     incident = _lock_incident(db, incident_id)
     if incident.status in TERMINAL:
         raise RecoveryError(f"Incident already {incident.status.value}; cannot retry.")
@@ -59,9 +59,9 @@ def retry_incident(db: Session, incident_id: str) -> Incident:
         action_id=action.id,
         batch_id=action.batch_id,
         event=f"{channel.value.upper()} retry requested",
-        detail=f"Operator retried the {channel.value.upper()} update for "
+        detail=f"{actor} retried the {channel.value.upper()} update for "
         f"{action.product_name} at Store {action.store_id}.",
-        actor="operator",
+        actor=actor,
     )
 
     delivery = _delivery_for(db, action.id, channel)
@@ -84,7 +84,7 @@ def retry_incident(db: Session, incident_id: str) -> Incident:
     return incident
 
 
-def rollback_incident(db: Session, incident_id: str) -> Incident:
+def rollback_incident(db: Session, incident_id: str, actor: str = "operator") -> Incident:
     incident = _lock_incident(db, incident_id)
     if incident.status in TERMINAL:
         raise RecoveryError(f"Incident already {incident.status.value}; cannot roll back.")
@@ -107,14 +107,16 @@ def rollback_incident(db: Session, incident_id: str) -> Incident:
         event="Shelf label rolled back",
         detail=f"Shelf label for {action.product_name} at Store {action.store_id} temporarily "
         f"restored to ${action.prior_price:.2f} to match checkout while the mismatch is resolved.",
-        actor="operator",
+        actor=actor,
     )
     db.commit()
     db.refresh(incident)
     return incident
 
 
-def create_store_task(db: Session, incident_id: str, instruction: str | None = None) -> StoreTask:
+def create_store_task(
+    db: Session, incident_id: str, instruction: str | None = None, actor: str = "operator"
+) -> StoreTask:
     incident = _lock_incident(db, incident_id)
     action = db.get(PriceAction, incident.action_id)
     text = instruction or (
@@ -135,14 +137,14 @@ def create_store_task(db: Session, incident_id: str, instruction: str | None = N
         batch_id=action.batch_id,
         event="Store verification task created",
         detail=text,
-        actor="operator",
+        actor=actor,
     )
     db.commit()
     db.refresh(task)
     return task
 
 
-def resolve_incident(db: Session, incident_id: str) -> Incident:
+def resolve_incident(db: Session, incident_id: str, actor: str = "operator") -> Incident:
     incident = _lock_incident(db, incident_id)
     if incident.status in TERMINAL:
         raise RecoveryError(f"Incident already {incident.status.value}; nothing to resolve.")
@@ -168,7 +170,7 @@ def resolve_incident(db: Session, incident_id: str) -> Incident:
         batch_id=action.batch_id,
         event="Incident resolved by operator",
         detail=f"{action.product_name} at Store {action.store_id} verified across all channels.",
-        actor="operator",
+        actor=actor,
     )
     db.commit()
     db.refresh(incident)

@@ -12,6 +12,7 @@ from app.schemas import (
     ScenarioIn,
     ScenarioView,
 )
+from app.security import Identity, require_operator
 from app.services import scenarios
 
 router = APIRouter(prefix="/api/v1/scenarios", tags=["scenarios"])
@@ -54,7 +55,11 @@ def _get_or_404(db: Session, config_id: str) -> TestRunConfig:
 
 
 @router.post("", response_model=ScenarioView, status_code=201)
-def create_scenario(payload: ScenarioIn, db: Session = Depends(get_db)):
+def create_scenario(
+    payload: ScenarioIn,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     try:
         return _view(scenarios.create_config(db, payload))
     except scenarios.ScenarioValidationError as exc:
@@ -74,27 +79,45 @@ def get_scenario(config_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{config_id}/execute", response_model=ScenarioExecuteResult)
-def execute_scenario(config_id: str, mode: str | None = None, db: Session = Depends(get_db)):
+def execute_scenario(
+    config_id: str,
+    mode: str | None = None,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     config = _get_or_404(db, config_id)
     run_mode = mode or config.run_mode.value
     return scenarios.execute(db, config, run_mode)
 
 
 @router.post("/{config_id}/reset", response_model=ScenarioExecuteResult)
-def reset_scenario(config_id: str, mode: str | None = None, db: Session = Depends(get_db)):
+def reset_scenario(
+    config_id: str,
+    mode: str | None = None,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     config = _get_or_404(db, config_id)
     run_mode = mode or config.run_mode.value
     return scenarios.execute(db, config, run_mode)
 
 
 @router.post("/{config_id}/clone", response_model=ScenarioView)
-def clone_scenario(config_id: str, db: Session = Depends(get_db)):
+def clone_scenario(
+    config_id: str,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     config = _get_or_404(db, config_id)
     return _view(scenarios.clone_config(db, config))
 
 
 @router.delete("/{config_id}", status_code=204)
-def delete_scenario(config_id: str, db: Session = Depends(get_db)):
+def delete_scenario(
+    config_id: str,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     config = _get_or_404(db, config_id)
     try:
         scenarios.delete_config(db, config)

@@ -144,7 +144,7 @@ function AuditCard({ complete = false }: { complete?: boolean }) {
         <p className="text-[10px] font-semibold tracking-[.22em] text-orange-300">
           AUDIT-TRUE RECOVERY
         </p>
-        <Pill tone="green">34 tests</Pill>
+        <Pill tone="green">40 tests</Pill>
       </div>
       <div className="mt-5 space-y-4">
         {recovery.slice(0, count).map((entry, index) => (
