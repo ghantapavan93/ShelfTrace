@@ -8,11 +8,13 @@ import {
   AnimatePresence,
   motion,
   useInView,
+  useMotionValue,
   useReducedMotion,
   useScroll,
   useSpring,
   useTransform,
 } from "framer-motion";
+import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -189,8 +191,11 @@ function ChapterRail() {
                 className="flex items-center gap-3"
                 aria-current={isActive ? "true" : undefined}
               >
-                <span
-                  className={`block h-[10px] w-[10px] rounded-full border transition ${
+                <motion.span
+                  initial={false}
+                  animate={{ scale: isActive ? 1.15 : 1 }}
+                  transition={SPRING.gentle}
+                  className={`block h-[10px] w-[10px] rounded-full border transition-colors duration-150 ${
                     isActive
                       ? "border-orange-300 bg-orange-400 shadow-[0_0_10px_rgba(249,115,22,.6)]"
                       : i < active
@@ -198,13 +203,22 @@ function ChapterRail() {
                         : "border-white/30 bg-transparent group-hover:border-white/55"
                   }`}
                 />
-                <span
-                  className={`pointer-events-none absolute left-7 whitespace-nowrap rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[10px] uppercase tracking-[.2em] backdrop-blur transition-opacity ${
-                    isActive ? "text-orange-200 opacity-100" : "text-white/60 opacity-0 group-hover:opacity-100"
+                {/* Tooltip — origin-aware enter/exit, exit always faster than enter. */}
+                <motion.span
+                  initial={false}
+                  animate={{
+                    opacity: isActive ? 1 : 0,
+                    x: isActive ? 0 : -4,
+                    pointerEvents: isActive ? "auto" : "none",
+                  }}
+                  whileHover={{ opacity: 1, x: 0 }}
+                  transition={isActive ? PRESET.tooltipIn : PRESET.tooltipOut}
+                  className={`pointer-events-none absolute left-7 origin-left whitespace-nowrap rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[10px] uppercase tracking-[.2em] backdrop-blur ${
+                    isActive ? "text-orange-200" : "text-white/60"
                   }`}
                 >
                   {String(i + 1).padStart(2, "0")} · {c.label}
-                </span>
+                </motion.span>
               </a>
             </li>
           );
@@ -243,8 +257,8 @@ function ChapterMarker({ n, label }: { n: string; label: string }) {
 
 function CursorSpotlight({ children, color = "rgba(249,115,22,.18)" }: { children: React.ReactNode; color?: string }) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const sx = useSpring(50, { stiffness: 80, damping: 18 });
-  const sy = useSpring(50, { stiffness: 80, damping: 18 });
+  const sx = useSpring(50, SPRING.gentle as any);
+  const sy = useSpring(50, SPRING.gentle as any);
   const reduced = useReducedMotion();
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (reduced) return;
@@ -268,13 +282,69 @@ function RevealHeading({ children, className }: { children: React.ReactNode; cla
   const reduced = useReducedMotion();
   return (
     <motion.h1
-      initial={reduced ? false : { opacity: 0, y: 26 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 1.05, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+      initial={reduced ? false : MOTION_VARIANTS.fadeUpLarge.initial}
+      animate={MOTION_VARIANTS.fadeUpLarge.animate}
+      transition={{ ...PRESET.heroEntrance, delay: 0.15 }}
       className={className}
     >
       {children}
     </motion.h1>
+  );
+}
+
+/* ─────────────────────────────── magnetic buttons ────────────────────────── */
+/* Polished CTA primitives:                                                   *
+ *  • scale-down on press (active:scale-[0.97]) — Linear/Vercel cue           *
+ *  • subtle 1px translate on hover via group utility                         *
+ *  • three tones: primary (white pill on dark), ghost (bordered), quiet      *
+ * Uses CSS transitions only — no JS overhead per button.                     */
+
+type CtaVariant = "primary" | "ghost" | "quiet";
+
+const CTA_CLASSES: Record<CtaVariant, string> = {
+  primary:
+    "group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#040608] " +
+    "transition-all duration-200 ease-out hover:bg-orange-50 hover:-translate-y-[1px] " +
+    "active:scale-[0.97] active:translate-y-0 shadow-[0_2px_0_rgba(0,0,0,.05)]",
+  ghost:
+    "group inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[.04] px-6 py-3.5 " +
+    "text-sm font-medium text-white backdrop-blur transition-all duration-200 ease-out hover:bg-white/[.10] " +
+    "hover:-translate-y-[1px] active:scale-[0.97] active:translate-y-0",
+  quiet:
+    "group inline-flex items-center gap-2 rounded-full border border-white/15 bg-transparent px-5 py-3 text-sm " +
+    "font-medium text-white/75 transition-all duration-200 ease-out hover:text-white hover:bg-white/[.04] " +
+    "active:scale-[0.97]",
+};
+
+function MagneticButton({
+  onClick,
+  children,
+  variant = "primary",
+}: {
+  onClick?: () => void;
+  children: React.ReactNode;
+  variant?: CtaVariant;
+}) {
+  return (
+    <button onClick={onClick} className={CTA_CLASSES[variant]}>
+      {children}
+    </button>
+  );
+}
+
+function MagneticLink({
+  href,
+  children,
+  variant = "ghost",
+}: {
+  href: string;
+  children: React.ReactNode;
+  variant?: CtaVariant;
+}) {
+  return (
+    <Link href={href} className={CTA_CLASSES[variant]}>
+      {children}
+    </Link>
   );
 }
 
@@ -638,6 +708,7 @@ function Hero({ onScanner }: { onScanner: () => void }) {
   const photoScale = useTransform(scrollYProgress, [0, 1], [reduced ? 1 : 1.08, reduced ? 1 : 1.26]);
   const photoY = useTransform(scrollYProgress, [0, 1], ["0%", "14%"]);
   const photoBlur = useTransform(scrollYProgress, [0, 1], ["0px", "6px"]);
+  const photoFilter = useTransform(photoBlur, (v) => `blur(${v})`);
   const overlayA = useTransform(scrollYProgress, [0, 1], [0.62, 0.92]);
   const contentY = useTransform(scrollYProgress, [0, 1], ["0%", "-6%"]);
 
@@ -647,7 +718,7 @@ function Hero({ onScanner }: { onScanner: () => void }) {
       <div className="absolute inset-0 bg-[#04070b]" />
       {/* layer 1: photo with Ken-Burns + parallax + scroll-blur */}
       <motion.div
-        style={{ scale: photoScale, y: photoY, filter: useTransform(photoBlur, (v) => `blur(${v})`) as any }}
+        style={{ scale: photoScale, y: photoY, filter: photoFilter as any }}
         className="absolute inset-0"
       >
         <CinePhoto src={PHOTOS.aisle} alt="Grocery aisle, early light" />
@@ -692,29 +763,21 @@ function Hero({ onScanner }: { onScanner: () => void }) {
           checkout systems and ecommerce channels.
         </motion.p>
         <motion.div
-          initial={reduced ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, delay: 0.65 }}
+          initial={reduced ? false : MOTION_VARIANTS.fadeUp.initial}
+          animate={MOTION_VARIANTS.fadeUp.animate}
+          transition={{ ...PRESET.fadeUp, delay: 0.65 }}
           className="mt-10 flex flex-wrap items-center gap-3"
         >
-          <button
-            onClick={onScanner}
-            className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#040608] transition hover:bg-orange-50"
-          >
-            Watch the price move <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-          </button>
-          <Link
-            href="/operations"
-            className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[.04] px-6 py-3.5 text-sm font-medium text-white backdrop-blur transition hover:bg-white/10"
-          >
-            Open Working Platform <ArrowUpRight className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/engineering"
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-transparent px-5 py-3 text-sm font-medium text-white/75 hover:text-white"
-          >
-            View Engineering Proof <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
+          <MagneticButton onClick={onScanner} variant="primary">
+            Watch the price move
+            <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+          </MagneticButton>
+          <MagneticLink href="/operations" variant="ghost">
+            Open Working Platform <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </MagneticLink>
+          <MagneticLink href="/engineering" variant="quiet">
+            View Engineering Proof <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </MagneticLink>
         </motion.div>
         {!reduced && (
           <motion.div
@@ -1256,14 +1319,45 @@ function ExecutionProofRail() {
 /* ─────────────────────────────── 5. Before / After recovery ──────────────── */
 
 function BeforeAfter() {
-  const [pos, setPos] = useState(50);
+  /* Spring-smoothed scrubber position: the raw pointer value feeds a spring,
+   * the spring value drives the clip-path. On pointer release the spring
+   * settles naturally — that's the "vaul" feel. Keyboard left/right also
+   * works for a11y. */
+  const reduced = useReducedMotion();
+  const [target, setTarget] = useState(50);
+  const smoothed = useSpring(target, SPRING.bouncy as any);
+  const [posDisplay, setPosDisplay] = useState(50);
+  useEffect(() => {
+    if (reduced) {
+      setPosDisplay(target);
+      return;
+    }
+    const unsub = smoothed.on("change", (v) => setPosDisplay(v));
+    return () => unsub();
+  }, [smoothed, reduced, target]);
+
   const dragging = useRef(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const onMove = (clientX: number) => {
+  const updateFromClient = (clientX: number) => {
     const r = wrapRef.current?.getBoundingClientRect();
     if (!r) return;
     const x = ((clientX - r.left) / r.width) * 100;
-    setPos(Math.max(2, Math.min(98, x)));
+    setTarget(Math.max(2, Math.min(98, x)));
+  };
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "ArrowLeft") {
+      setTarget((p) => Math.max(2, p - 4));
+      e.preventDefault();
+    } else if (e.key === "ArrowRight") {
+      setTarget((p) => Math.min(98, p + 4));
+      e.preventDefault();
+    } else if (e.key === "Home") {
+      setTarget(2);
+      e.preventDefault();
+    } else if (e.key === "End") {
+      setTarget(98);
+      e.preventDefault();
+    }
   };
 
   const beforeRows = [
@@ -1295,12 +1389,19 @@ function BeforeAfter() {
         </div>
         <div
           ref={wrapRef}
-          className="relative mt-12 aspect-[16/7] cursor-ew-resize overflow-hidden rounded-3xl border border-white/10 select-none"
-          onPointerMove={(e) => dragging.current && onMove(e.clientX)}
+          tabIndex={0}
+          role="slider"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(posDisplay)}
+          aria-label="Reveal before / after recovery"
+          className="relative mt-12 aspect-[16/7] cursor-ew-resize overflow-hidden rounded-3xl border border-white/10 select-none outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60"
+          onKeyDown={onKey}
+          onPointerMove={(e) => dragging.current && updateFromClient(e.clientX)}
           onPointerDown={(e) => {
             dragging.current = true;
             (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-            onMove(e.clientX);
+            updateFromClient(e.clientX);
           }}
           onPointerUp={(e) => {
             dragging.current = false;
@@ -1312,13 +1413,17 @@ function BeforeAfter() {
           </div>
           <div
             className="absolute inset-0 bg-gradient-to-br from-rose-950/40 via-[#140a0d] to-[#06090f]"
-            style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+            style={{ clipPath: `inset(0 ${100 - posDisplay}% 0 0)` }}
           >
             <RecoveryPanel rows={beforeRows} eyebrow="BEFORE · mismatch open" tone="err" />
           </div>
-          <div className="pointer-events-none absolute inset-y-0 z-10" style={{ left: `${pos}%` }}>
+          <div className="pointer-events-none absolute inset-y-0 z-10" style={{ left: `${posDisplay}%` }}>
             <div className="-translate-x-1/2 h-full w-px bg-white/80" />
-            <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-white/15 text-white backdrop-blur shadow-2xl">
+            <div
+              className={`absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-white/15 text-white backdrop-blur shadow-2xl transition-transform duration-200 ${
+                dragging.current ? "scale-110" : "scale-100"
+              }`}
+            >
               <svg viewBox="0 0 20 20" className="h-4 w-4 fill-current">
                 <path d="M2 10 L7 5 L7 15 Z" />
                 <path d="M18 10 L13 15 L13 5 Z" />
@@ -1448,70 +1553,105 @@ function ManagerTablet() {
                 + PostgreSQL + Redis service in this repo. Every CTA lands in code you can read.
               </p>
             </div>
-            <motion.div
-              initial={reduced ? false : { opacity: 0, y: 24, rotateX: 8 }}
-              whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              style={{ transformStyle: "preserve-3d", perspective: 1200 }}
-              className="relative mx-auto w-full max-w-[540px]"
-            >
-              <div className="relative aspect-[3/4] rounded-[36px] border border-white/10 bg-gradient-to-br from-[#1a1f2c] to-[#0a0d14] p-3 shadow-[0_40px_120px_-30px_rgba(244,63,94,.4)]">
-                <div className="absolute left-1/2 top-2 h-1 w-12 -translate-x-1/2 rounded-full bg-white/20" />
-                <div className="absolute inset-x-3 bottom-3 top-6 overflow-hidden rounded-[28px] border border-white/[.06] bg-[#06090f]">
-                  <div className="flex items-center justify-between px-5 py-3 text-[10px] uppercase tracking-[.22em] text-white/45">
-                    <span className="flex items-center gap-1.5">
-                      <Tablet className="h-3 w-3" /> Store · Aisle 4
-                    </span>
-                    <span className="font-mono">07:14</span>
-                  </div>
-                  <div className="mx-4 mt-2 rounded-2xl border border-rose-500/40 bg-rose-500/[.08] p-4">
-                    <div className="flex items-center gap-2 text-[10px] tracking-[.22em] text-rose-300 uppercase">
-                      <CircleAlert className="h-3.5 w-3.5" /> Critical price-integrity incident
-                    </div>
-                    <p className="mt-3 text-base font-semibold text-white">Organic Whole Milk</p>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-lg border border-white/10 bg-white/[.03] p-2.5">
-                        <p className="text-[10px] uppercase tracking-[.18em] text-white/45">Expected</p>
-                        <p className="mt-0.5 font-mono text-base text-emerald-200">$5.99</p>
-                      </div>
-                      <div className="rounded-lg border border-rose-500/30 bg-rose-500/[.06] p-2.5">
-                        <p className="text-[10px] uppercase tracking-[.18em] text-rose-300">POS returned</p>
-                        <p className="mt-0.5 font-mono text-base text-rose-200">$6.49</p>
-                      </div>
-                    </div>
-                    <p className="mt-3 text-xs text-white/55">
-                      <span className="font-medium text-amber-200">Expansion paused.</span> Awaiting
-                      checkout acknowledgement.
-                    </p>
-                  </div>
-                  <div className="mx-4 mt-4 space-y-2">
-                    {[
-                      { href: "/operations", label: "Open Live Control Plane" },
-                      { href: "/engineering", label: "Inspect Engineering Trace" },
-                      { href: "/scenarios", label: "Configure Scenario" },
-                    ].map((cta) => (
-                      <Link
-                        key={cta.href}
-                        href={cta.href}
-                        className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm text-white/85 hover:border-orange-500/40 hover:bg-orange-500/[.08] hover:text-white"
-                      >
-                        <span>{cta.label}</span>
-                        <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-                      </Link>
-                    ))}
-                  </div>
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 text-[10px] uppercase tracking-[.22em] text-white/40">
-                    <CircleDot className="h-2 w-2 animate-pulse text-emerald-400" />
-                    Audit listener · live
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+            <TabletShell />
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+/* ─────────────────────────── Manager Tablet (cursor tilt) ────────────────── */
+
+function TabletShell() {
+  const reduced = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  /* Cursor-follow tilt: both axes flow through a spring so the response feels
+   * physical, not jittery. Magnitudes are small (max ±8°) so the tilt reads
+   * as confident, not gimmicky.                                              */
+  const rxRaw = useMotionValue(0);
+  const ryRaw = useMotionValue(0);
+  const rx = useSpring(rxRaw, SPRING.gentle as any);
+  const ry = useSpring(ryRaw, SPRING.gentle as any);
+
+  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (reduced) return;
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const cx = (e.clientX - r.left) / r.width - 0.5;
+    const cy = (e.clientY - r.top) / r.height - 0.5;
+    rxRaw.set(cy * -8);
+    ryRaw.set(cx * 8);
+  };
+  const onLeave = () => {
+    rxRaw.set(0);
+    ryRaw.set(0);
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      initial={reduced ? false : { opacity: 0, y: 24, rotateX: 8 }}
+      whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.8, ease: EASE.outQuart }}
+      style={{ transformStyle: "preserve-3d", perspective: 1400, rotateX: rx, rotateY: ry }}
+      className="relative mx-auto w-full max-w-[540px] [transform-style:preserve-3d]"
+    >
+      <div className="relative aspect-[3/4] rounded-[36px] border border-white/10 bg-gradient-to-br from-[#1a1f2c] to-[#0a0d14] p-3 shadow-[0_40px_120px_-30px_rgba(244,63,94,.4)]">
+        <div className="absolute left-1/2 top-2 h-1 w-12 -translate-x-1/2 rounded-full bg-white/20" />
+        <div className="absolute inset-x-3 bottom-3 top-6 overflow-hidden rounded-[28px] border border-white/[.06] bg-[#06090f]">
+          <div className="flex items-center justify-between px-5 py-3 text-[10px] uppercase tracking-[.22em] text-white/45">
+            <span className="flex items-center gap-1.5">
+              <Tablet className="h-3 w-3" /> Store · Aisle 4
+            </span>
+            <span className="font-mono">07:14</span>
+          </div>
+          <div className="mx-4 mt-2 rounded-2xl border border-rose-500/40 bg-rose-500/[.08] p-4">
+            <div className="flex items-center gap-2 text-[10px] tracking-[.22em] text-rose-300 uppercase">
+              <CircleAlert className="h-3.5 w-3.5" /> Critical price-integrity incident
+            </div>
+            <p className="mt-3 text-base font-semibold text-white">Organic Whole Milk</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-lg border border-white/10 bg-white/[.03] p-2.5">
+                <p className="text-[10px] uppercase tracking-[.18em] text-white/45">Expected</p>
+                <p className="mt-0.5 font-mono text-base text-emerald-200">$5.99</p>
+              </div>
+              <div className="rounded-lg border border-rose-500/30 bg-rose-500/[.06] p-2.5">
+                <p className="text-[10px] uppercase tracking-[.18em] text-rose-300">POS returned</p>
+                <p className="mt-0.5 font-mono text-base text-rose-200">$6.49</p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-white/55">
+              <span className="font-medium text-amber-200">Expansion paused.</span> Awaiting
+              checkout acknowledgement.
+            </p>
+          </div>
+          <div className="mx-4 mt-4 space-y-2">
+            {[
+              { href: "/operations", label: "Open Live Control Plane" },
+              { href: "/engineering", label: "Inspect Engineering Trace" },
+              { href: "/scenarios", label: "Configure Scenario" },
+            ].map((cta) => (
+              <Link
+                key={cta.href}
+                href={cta.href}
+                className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm text-white/85 transition-all duration-200 hover:border-orange-500/40 hover:bg-orange-500/[.08] hover:text-white active:scale-[0.99]"
+              >
+                <span>{cta.label}</span>
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+              </Link>
+            ))}
+          </div>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 text-[10px] uppercase tracking-[.22em] text-white/40">
+            <CircleDot className="h-2 w-2 animate-pulse text-emerald-400" />
+            Audit listener · live
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
