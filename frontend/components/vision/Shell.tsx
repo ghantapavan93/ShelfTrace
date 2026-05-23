@@ -97,6 +97,7 @@ export function BackgroundOrbits({ variant = "orange" }: { variant?: "orange" | 
  */
 const REVIEWER_NAV: { label: string; href: string; external?: boolean }[] = [
   { label: "Keynote", href: "/vision/keynote" },
+  { label: "Showcase", href: "/vision/showcase" },
   { label: "Working Platform", href: "/operations", external: true },
   { label: "Engineering Proof", href: "/engineering", external: true },
   { label: "Vision Concepts", href: "/vision/horizon" },
