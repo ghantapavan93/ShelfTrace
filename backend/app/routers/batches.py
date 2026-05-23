@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import PriceBatch
+from app.rate_limit import limit_write
 from app.routers.common import get_batch_or_404
 from app.schemas import BatchDetail, BatchSummary, PriceBatchIn
 from app.security import Identity, require_operator
@@ -16,6 +17,7 @@ router = APIRouter(prefix="/api/v1", tags=["batches"])
 
 
 @router.post("/price-batches", response_model=BatchSummary, status_code=202)
+@limit_write()
 def create_batch(
     payload: PriceBatchIn,
     db: Session = Depends(get_db),
@@ -47,6 +49,7 @@ def get_batch_audit(external_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/batches/{external_id}/expand", response_model=BatchSummary)
+@limit_write()
 def expand_batch(
     external_id: str,
     db: Session = Depends(get_db),

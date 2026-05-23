@@ -18,13 +18,23 @@ dependencies = [
     "redis==5.0.1",
     "python-dotenv==1.0.1",
     "alembic==1.13.1",
+    "httpx==0.26.0",
+    "slowapi==0.1.9",
+    "limits==3.10.1",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest==8.0.0",
     "pytest-asyncio==0.23.5",
-    "httpx==0.26.0",
+]
+otel = [
+    "opentelemetry-api==1.23.0",
+    "opentelemetry-sdk==1.23.0",
+    "opentelemetry-instrumentation-fastapi==0.44b0",
+    "opentelemetry-instrumentation-sqlalchemy==0.44b0",
+    "opentelemetry-instrumentation-redis==0.44b0",
+    "opentelemetry-exporter-otlp==1.23.0",
 ]
 
 [tool.setuptools.packages.find]

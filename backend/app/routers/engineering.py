@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -21,8 +19,8 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
     "command": "pytest -q  (PostgreSQL-backed, isolated test DB)",
-    "passed": 40,
-    "duration_s": 26.4,
+    "passed": 47,
+    "duration_s": 24.6,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -64,6 +62,13 @@ TEST_PROOF = {
         "tests/test_security.py::test_operator_key_accepts_write_and_records_actor",
         "tests/test_security.py::test_unknown_key_returns_401",
         "tests/test_security.py::test_cors_origin_allowlist_replaces_wildcard",
+        "tests/test_observability.py::test_request_id_round_trips",
+        "tests/test_observability.py::test_json_formatter_emits_request_context",
+        "tests/test_observability.py::test_configure_logging_idempotent",
+        "tests/test_outbox_backoff.py::test_backoff_delay_grows_exponentially",
+        "tests/test_outbox_backoff.py::test_failed_event_schedules_retry_then_dead_letters",
+        "tests/test_outbox_backoff.py::test_dead_letter_alert_logs_structured_error",
+        "tests/test_jsonb.py::test_outbox_payload_roundtrip_as_dict",
     ],
 }
 
@@ -111,12 +116,12 @@ def engineering(
     )
     raw_receipt = None
     for r in receipts:
-        payload = json.loads(r.raw_payload_json)
+        payload = r.raw_payload_json
         if payload.get("status") == "MISMATCH":
             raw_receipt = payload
             break
     if raw_receipt is None and receipts:
-        raw_receipt = json.loads(receipts[0].raw_payload_json)
+        raw_receipt = receipts[0].raw_payload_json
 
     blocked = [a for a in batch.actions if a.decision == ActionDecision.BLOCKED]
     retrying = [a for a in batch.actions if a.decision == ActionDecision.RETRY]

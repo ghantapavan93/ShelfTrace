@@ -10,28 +10,29 @@ from sqlalchemy import select, text
 from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.db_migrate import run_migrations
+from app.logging_config import configure_logging
+from app.middleware import RequestIDMiddleware
 from app.models import ConnectorProfile, PriceBatch, RunMode
+from app.observability import setup_tracing
+from app.rate_limit import get_limiter
 from app.routers import batches, certification, demo, engineering, incidents, operations, scenarios
 from app.security import auth_enabled
 from app.seed import seed_live
 from app.services import certification as cert_service
 from app.services import scenarios as scenario_service
 
-logging.basicConfig(level=settings.log_level.upper())
+configure_logging(settings.log_level, settings.log_format)
 logger = logging.getLogger("shelftrace")
 
 
 def _provision_schema() -> None:
     """Bring the schema up to date.
 
-    Two paths:
       • USE_ALEMBIC=true  → run ``alembic upgrade head`` programmatically.
                             This is the path for real deployments — versioned,
                             reversible, auditable.
       • USE_ALEMBIC=false → fall back to ``create_all`` + the lightweight
-                            additive migrations module. This is the path for
-                            the demo and the test suite (which both expect
-                            schema to materialise from the model metadata).
+                            additive migrations module. Path for demo + tests.
     """
     if settings.use_alembic:
         try:
@@ -56,6 +57,7 @@ def _provision_schema() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _provision_schema()
+    setup_tracing(app)
     if auth_enabled():
         logger.info("API-key auth ENABLED (mutating endpoints require operator role)")
     else:
@@ -87,17 +89,31 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — explicit allowlist replaces the prior wildcard. Browsers reject the
-# combination of `*` + `allow_credentials=True`, so the previous config was both
-# a spec violation and a security gap. Allowlist defaults to localhost:3000 (the
-# Next.js dev server); override via CORS_ORIGINS env var (comma-separated).
+# Per-request ID + access log line. Outer-most so X-Request-ID covers errors too.
+app.add_middleware(RequestIDMiddleware)
+
+# CORS — explicit allowlist replaces the prior wildcard.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-API-Key", "X-Actor-Name", "Authorization"],
+    allow_headers=["Content-Type", "X-API-Key", "X-Actor-Name", "X-Request-ID", "Authorization"],
+    expose_headers=["X-Request-ID"],
 )
+
+# Rate limiter — opt-in. When enabled, attach the slowapi exception handler
+# so over-limit requests return a clean 429 instead of an opaque 500.
+_limiter = get_limiter()
+if _limiter is not None:
+    try:
+        from slowapi.errors import RateLimitExceeded
+        from slowapi import _rate_limit_exceeded_handler
+
+        app.state.limiter = _limiter
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    except ImportError:  # pragma: no cover - handled in rate_limit module
+        pass
 
 app.include_router(batches.router)
 app.include_router(operations.router)
@@ -118,8 +134,6 @@ def _check_db() -> tuple[bool, str | None]:
 
 
 def _check_redis() -> tuple[bool, str | None]:
-    """Best-effort Redis ping. Returns (ok, error). The redis package is a
-    declared dependency; if the broker is down we surface it in /health."""
     try:
         import redis  # noqa: WPS433
 
@@ -132,9 +146,7 @@ def _check_redis() -> tuple[bool, str | None]:
 
 @app.get("/health")
 def health(response: Response):
-    """Deeper than `{status: ok}` — actually probes both the DB and the broker.
-    Returns 503 if either dependency is unhealthy so reverse proxies and load
-    balancers can route around broken pods."""
+    """Deep liveness probe — DB and Redis, with structured body."""
     db_ok, db_err = _check_db()
     redis_ok, redis_err = _check_redis()
     ok = db_ok and redis_ok
@@ -145,6 +157,9 @@ def health(response: Response):
         "service": "shelftrace-control-plane",
         "demo_mode": settings.demo_mode,
         "auth_enabled": auth_enabled(),
+        "otel_enabled": settings.otel_enabled,
+        "rate_limit_enabled": settings.rate_limit_enabled,
+        "log_format": settings.log_format,
         "dependencies": {
             "database": {"ok": db_ok, "error": db_err},
             "redis": {"ok": redis_ok, "error": redis_err},

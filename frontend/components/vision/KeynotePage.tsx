@@ -39,7 +39,7 @@ import { Pill } from "./Shell";
    Cinematic polish pass: real photo backdrops (dimmed), chapter rail, chapter
    announcement cards, cursor spotlight on the aisle, ambient particles in dark
    spaces, timecode HUD during the critical moment, line-stagger headline
-   reveals. No vanity stats, no unsupported tech terms. 40 PostgreSQL-backed
+   reveals. No vanity stats, no unsupported tech terms. 47 PostgreSQL-backed
    tests, configurable scenarios, certification lab, live control plane,
    deterministic reconciliation, audit-verified recovery. CinePhoto fallback
    to gradient art if any Unsplash photo 404s.
@@ -1164,7 +1164,7 @@ const PROOF_TILES = [
   },
   {
     key: "TECHNICAL PROOF",
-    main: "40 Tests",
+    main: "47 Tests",
     sub: "PostgreSQL-backed recovery checks",
     icon: BadgeCheck,
     color: "#22c55e",
@@ -1625,7 +1625,7 @@ function NightClosing() {
                 "Configurable Scenarios",
                 "Certification + Live Rollout",
                 "Audit-Verified Recovery",
-                "40 PostgreSQL-Backed Tests",
+                "47 PostgreSQL-Backed Tests",
               ].map((chip) => (
                 <span
                   key={chip}

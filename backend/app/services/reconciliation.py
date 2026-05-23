@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -82,7 +80,7 @@ def verify_channel(db: Session, delivery: ChannelDelivery, action: PriceAction) 
         expected_price=action.approved_price,
         observed_price=observed,
         status=receipt_status,
-        raw_payload_json=json.dumps(raw),
+        raw_payload_json=dict(raw),
     )
     db.add(receipt)
     return receipt

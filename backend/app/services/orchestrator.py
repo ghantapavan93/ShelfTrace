@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import json
+import logging
+import random
+from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.adapters.base import ADAPTERS
+from app.config import settings
 from app.database import engine
 from app.ids import new_id
 from app.models import (
@@ -16,10 +19,13 @@ from app.models import (
     OutboxStatus,
     PriceAction,
     PriceBatch,
+    utcnow,
 )
-from app.models import utcnow
 from app.services import reconciliation
 from app.services.audit import record_audit
+from app.services.dead_letter import alert as dead_letter_alert
+
+logger = logging.getLogger("shelftrace.orchestrator")
 
 CHANNELS = ["pos", "esl", "ecommerce"]
 
@@ -40,20 +46,21 @@ def _publish_action(db: Session, action: PriceAction) -> None:
         db.add(delivery)
     db.flush()
 
-    # Chain a reconcile step through the outbox.
+    # Chain a reconcile step through the outbox. Dict payload — SQLAlchemy
+    # writes JSONB on Postgres and JSON on SQLite (see models.JSONColumn).
     db.add(
         OutboxEvent(
             id=new_id("evt"),
             event_type="RECONCILE_REQUESTED",
             aggregate_id=action.id,
-            payload_json=json.dumps({"action_id": action.id, "batch_id": action.batch_id}),
+            payload_json={"action_id": action.id, "batch_id": action.batch_id},
             status=OutboxStatus.PENDING,
         )
     )
 
 
 def _handle_event(db: Session, event: OutboxEvent) -> None:
-    payload = json.loads(event.payload_json)
+    payload = event.payload_json  # dict (JSON column auto-deserializes)
     action = db.get(PriceAction, payload["action_id"])
     if action is None:
         return
@@ -67,18 +74,38 @@ def _handle_event(db: Session, event: OutboxEvent) -> None:
             reconciliation.refresh_batch(db, batch)
 
 
+def _next_attempt_delay(attempts: int) -> float:
+    """Exponential backoff with jitter, clamped at outbox_retry_max_seconds.
+
+    delay = min(MAX, base * 2^(attempts-1)) + uniform_jitter[0, delay*0.3]
+
+    The jitter spreads concurrent retries so a recovering downstream doesn't
+    get re-stampeded at deterministic intervals.
+    """
+    base = max(0.1, settings.outbox_retry_base_seconds)
+    cap = max(base, settings.outbox_retry_max_seconds)
+    raw = min(cap, base * (2 ** max(0, attempts - 1)))
+    jitter = random.uniform(0, raw * 0.3)
+    return raw + jitter
+
+
 def process_outbox_once(db: Session, limit: int = 50) -> int:
-    """Process a wave of pending outbox events. Returns the number processed."""
-    # Claim pending events. On Postgres, FOR UPDATE SKIP LOCKED lets the inline
-    # drain and the standalone worker run concurrently without double-processing
-    # the same event. SQLite (tests) doesn't support it, so we skip the clause.
+    """Process a wave of pending/retrying outbox events. Returns the number processed.
+
+    Filter respects ``next_attempt_at`` so failed events back off exponentially
+    before the worker picks them up again.
+    """
+    now = utcnow()
     stmt = (
         select(OutboxEvent)
-        .where(OutboxEvent.status == OutboxStatus.PENDING)
+        .where(OutboxEvent.status.in_([OutboxStatus.PENDING, OutboxStatus.RETRYING]))
+        .where(or_(OutboxEvent.next_attempt_at.is_(None), OutboxEvent.next_attempt_at <= now))
         .order_by(OutboxEvent.created_at)
         .limit(limit)
     )
     if engine.dialect.name == "postgresql":
+        # SKIP LOCKED lets the inline drain and the standalone worker run
+        # concurrently without double-processing the same event.
         stmt = stmt.with_for_update(skip_locked=True)
     events = list(db.scalars(stmt))
     if not events:
@@ -91,8 +118,28 @@ def process_outbox_once(db: Session, limit: int = 50) -> int:
             _handle_event(db, event)
             event.status = OutboxStatus.PROCESSED
             event.processed_at = utcnow()
-        except Exception as exc:  # pragma: no cover - defensive
-            event.status = OutboxStatus.RETRYING if event.attempts < 5 else OutboxStatus.DEAD_LETTER
+            event.last_error = None
+            event.next_attempt_at = None
+        except Exception as exc:
+            event.last_error = repr(exc)[:500]
+            if event.attempts >= settings.outbox_max_attempts:
+                event.status = OutboxStatus.DEAD_LETTER
+                event.next_attempt_at = None
+                dead_letter_alert(event, str(exc))
+            else:
+                event.status = OutboxStatus.RETRYING
+                delay = _next_attempt_delay(event.attempts)
+                event.next_attempt_at = utcnow() + timedelta(seconds=delay)
+                logger.warning(
+                    "outbox.retry_scheduled",
+                    extra={
+                        "event_id": event.id,
+                        "event_type": event.event_type,
+                        "attempts": event.attempts,
+                        "next_attempt_in_seconds": round(delay, 2),
+                        "error": event.last_error,
+                    },
+                )
             record_audit(
                 db,
                 event="Outbox processing error",
@@ -152,7 +199,7 @@ def expand_batch(db: Session, batch: PriceBatch, actor: str = "operator") -> Pri
                 id=new_id("evt"),
                 event_type="EXPANSION_PUBLISH_REQUESTED",
                 aggregate_id=action.id,
-                payload_json=json.dumps({"action_id": action.id, "batch_id": batch.id}),
+                payload_json={"action_id": action.id, "batch_id": batch.id},
                 status=OutboxStatus.PENDING,
             )
         )

@@ -8,8 +8,6 @@ pipeline produced (receipts, incidents, retries, audit, idempotency, locking).
 """
 from __future__ import annotations
 
-import json
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -233,7 +231,7 @@ def _add_check(db, run, check_type, scenario, status, evidence):
             check_type=check_type,
             scenario_name=scenario,
             status=status,
-            evidence_json=json.dumps(evidence),
+            evidence_json=dict(evidence),
         )
     )
 

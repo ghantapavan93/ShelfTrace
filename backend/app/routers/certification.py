@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -43,7 +41,7 @@ def _build_report(db: Session, run: CertificationRun) -> CertificationReport:
             check_type=c.check_type.value,
             scenario_name=c.scenario_name,
             status=c.status.value,
-            evidence=json.loads(c.evidence_json),
+            evidence=c.evidence_json if isinstance(c.evidence_json, dict) else dict(c.evidence_json),
             created_at=c.created_at,
         )
         for c in checks

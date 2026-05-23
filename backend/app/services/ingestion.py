@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -108,7 +106,7 @@ def ingest_batch(db: Session, payload: PriceBatchIn) -> IngestionResult:
                 id=new_id("evt"),
                 event_type="CANARY_PUBLISH_REQUESTED",
                 aggregate_id=action.id,
-                payload_json=json.dumps({"action_id": action.id, "batch_id": batch.id}),
+                payload_json={"action_id": action.id, "batch_id": batch.id},
                 status=OutboxStatus.PENDING,
             )
         )

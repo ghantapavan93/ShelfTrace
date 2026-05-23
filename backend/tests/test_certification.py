@@ -45,9 +45,10 @@ def test_certification_records_egg_pos_failure(db):
     run = certification.reset_demo(db)
     check = _checks_by_type(run)[CheckType.PRICE_AGREEMENT]
     assert check.status == CheckStatus.FAILED
-    import json
 
-    evidence = json.loads(check.evidence_json)
+    # evidence_json is JSONB on Postgres / JSON on SQLite — SQLAlchemy returns
+    # a native dict either way, so no manual deserialization is needed.
+    evidence = check.evidence_json
     assert evidence["observed_price"] == 4.49
     assert evidence["approved_price"] == 4.19
 

@@ -2,7 +2,7 @@
 
 Design constraints:
 
-  • The 34 existing tests don't set auth headers. The demo and frontend don't
+  • The existing tests don't set auth headers. The demo and frontend don't
     either. So when ``settings.api_keys_json`` is empty (the default), auth
     is *bypassed* and every dependency resolves to the historical default
     identity (``Identity(role="operator", actor="operator")``). This preserves
@@ -21,6 +21,21 @@ Design constraints:
 
   • ``X-Actor-Name`` is optional and only honored for operators (lets a
     single shared operator key represent multiple humans in the demo).
+
+CSRF
+----
+This API is intentionally CSRF-safe-by-construction when API keys are
+configured: every mutating endpoint requires the custom ``X-API-Key``
+header, which browsers cannot set on cross-origin requests without a CORS
+preflight (the simple-request rules forbid custom headers). Combined with
+the explicit CORS allowlist in ``main.py``, a malicious site cannot trick
+an authenticated browser into POSTing as an operator. No CSRF token is
+required, and we deliberately do not accept API keys via cookies or query
+strings — only the header.
+
+When ``API_KEYS_JSON`` is empty (the demo default), the API runs open and
+is only safe for local / trusted-network use. The startup log warns about
+this explicitly.
 
 Roles:
   • operator — may perform any write (ingest, expand, retry/rollback/resolve,

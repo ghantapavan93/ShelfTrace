@@ -4,6 +4,7 @@ import enum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Enum,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -21,6 +23,12 @@ from app.database import Base
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# JSON column type: JSONB on Postgres (indexable, validated, smaller),
+# generic JSON elsewhere (SQLite stores as TEXT but SQLAlchemy handles the
+# (de)serialization so callers always work with native dicts).
+JSONColumn = JSON().with_variant(JSONB(), "postgresql")
 
 
 # ---------------------------------------------------------------------------
@@ -220,10 +228,16 @@ class OutboxEvent(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     event_type: Mapped[str] = mapped_column(String, index=True)
     aggregate_id: Mapped[str] = mapped_column(String, index=True)
-    payload_json: Mapped[str] = mapped_column(Text)
+    # Stored as JSONB on Postgres (indexable, validated). SQLAlchemy handles
+    # (de)serialization so callers always work with native dicts.
+    payload_json: Mapped[dict] = mapped_column(JSONColumn)
     status: Mapped[OutboxStatus] = mapped_column(Enum(OutboxStatus), default=OutboxStatus.PENDING, index=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
-    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When set, the outbox worker skips this event until utcnow() >= next_attempt_at.
+    # Drives exponential backoff with jitter on retry (see services.orchestrator).
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    # Latest error from a failed attempt, surfaced in dead-letter alerts.
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -255,7 +269,7 @@ class ExecutionReceipt(Base):
     expected_price: Mapped[float] = mapped_column(Float)
     observed_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[ReceiptStatus] = mapped_column(Enum(ReceiptStatus))
-    raw_payload_json: Mapped[str] = mapped_column(Text)  # source payload preserved
+    raw_payload_json: Mapped[dict] = mapped_column(JSONColumn)  # source payload preserved (JSONB on PG)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     delivery: Mapped[ChannelDelivery] = relationship(back_populates="receipt")
@@ -348,7 +362,7 @@ class CertificationCheck(Base):
     check_type: Mapped[CheckType] = mapped_column(Enum(CheckType))
     scenario_name: Mapped[str] = mapped_column(String)
     status: Mapped[CheckStatus] = mapped_column(Enum(CheckStatus))
-    evidence_json: Mapped[str] = mapped_column(Text)  # JSON evidence derived from real records
+    evidence_json: Mapped[dict] = mapped_column(JSONColumn)  # JSONB-backed evidence (PG); dict in code
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     run: Mapped[CertificationRun] = relationship(back_populates="checks")

@@ -1,18 +1,33 @@
 """Application settings.
 
-Read from environment (or a .env file). Three new production-readiness knobs:
+Read from environment (or a .env file). Knobs grouped by concern.
 
-  • cors_origins      — comma-separated allowlist replacing the prior wildcard.
-                        Default: http://localhost:3000 (the Next.js dev server).
-  • api_keys_json     — JSON map of API key → {role, actor}. When empty (the
-                        default), the API runs unauthenticated — preserves the
-                        demo + the 34 existing tests. When set, every mutating
-                        endpoint requires X-API-Key with role=operator and
-                        records the resolved actor in the audit trail.
-  • use_alembic       — when true, run `alembic upgrade head` on startup
-                        instead of SQLAlchemy `create_all()`. Default false
-                        (keeps the demo and tests on the existing schema-sync
-                        path); enable for real deployments.
+Security:
+  • cors_origins              — comma-separated allowlist replacing wildcard.
+  • api_keys_json             — JSON map of key → {role, actor}; empty disables.
+
+Migrations:
+  • use_alembic               — true → `alembic upgrade head`; false → create_all
+                                + db_migrate fallback (default; demo+tests).
+
+Observability:
+  • log_format                — "json" (structured) or "text" (human-readable).
+  • otel_enabled              — opt-in OpenTelemetry. When true the OTLP exporter
+                                ships traces to otel_endpoint.
+  • otel_endpoint             — OTLP HTTP endpoint (default: localhost collector).
+  • otel_service_name         — service identifier in traces.
+
+Reliability:
+  • dead_letter_webhook_url   — optional Slack-compatible webhook posted when
+                                an outbox event lands in DEAD_LETTER.
+  • outbox_retry_base_seconds — base for exponential backoff (default 1s).
+  • outbox_retry_max_seconds  — cap for backoff (default 60s).
+  • outbox_max_attempts       — attempts before dead-letter (default 5).
+
+Rate limiting:
+  • rate_limit_enabled        — opt-in. Limits applied to mutating endpoints.
+  • rate_limit_default        — default policy, e.g. "60/minute".
+  • rate_limit_redis_url      — distributed limiter backend (defaults to redis_url).
 """
 from __future__ import annotations
 
@@ -29,10 +44,27 @@ class Settings(BaseSettings):
 
     # Security
     cors_origins: str = "http://localhost:3000"
-    api_keys_json: str = ""  # e.g. '{"op-key-1":{"role":"operator","actor":"Avery Davis"}}'
+    api_keys_json: str = ""
 
     # Migrations
     use_alembic: bool = False
+
+    # Observability
+    log_format: str = "text"  # "json" in prod, "text" locally for readability
+    otel_enabled: bool = False
+    otel_endpoint: str = "http://localhost:4318"
+    otel_service_name: str = "shelftrace-control-plane"
+
+    # Reliability
+    dead_letter_webhook_url: str = ""
+    outbox_retry_base_seconds: float = 1.0
+    outbox_retry_max_seconds: float = 60.0
+    outbox_max_attempts: int = 5
+
+    # Rate limiting
+    rate_limit_enabled: bool = False
+    rate_limit_default: str = "60/minute"
+    rate_limit_write: str = "20/minute"
 
     # Rollout policy
     canary_store_count: int = 2
