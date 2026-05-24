@@ -35,6 +35,11 @@ import {
   X,
 } from "lucide-react";
 import { Pill } from "./Shell";
+import {
+  ChannelAgreementPanel,
+  MilkGlyph as SharedMilkGlyph,
+  ProductCard,
+} from "./cinematic";
 
 /* ────────────────────────────────────────────────────────────────────────────
    /vision/keynote — ShelfTrace cinematic, evidence-first.
@@ -778,9 +783,6 @@ function Hero({ onScanner }: { onScanner: () => void }) {
           <MagneticLink href="/engineering" variant="quiet">
             View Engineering Proof <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </MagneticLink>
-          <MagneticLink href="/vision/begin" variant="quiet">
-            Or watch the cinematic intro <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-          </MagneticLink>
         </motion.div>
         {!reduced && (
           <motion.div
@@ -1321,11 +1323,139 @@ function ExecutionProofRail() {
 
 /* ─────────────────────────────── 5. Before / After recovery ──────────────── */
 
+/* ─────────────────────────── Recovery scene · cinematic upgrade ───────────── */
+/* Full-bleed product-card scene on both sides:                                *
+ *   BEFORE: red glow · POS chip = fail · big $6.49 receipt badge              *
+ *   AFTER:  green glow · all 3 chips = ok · canonical $5.99 verified badge    *
+ * Both share the same Milk product card center — only the chrome around it    *
+ * changes as the scrubber moves. Animated chip state transitions, floating    *
+ * ambient particles, larger handle with pulse ring + arrow icons.             */
+
+function RecoveryScene({
+  side,
+  reveal,
+}: {
+  side: "before" | "after";
+  reveal: number; // 0..100 — how much of this side is revealed (drives the channel chips' fade-in)
+}) {
+  const reduced = useReducedMotion();
+  const tone = side === "after" ? "ok" : "err";
+  const eyebrow = side === "after" ? "AFTER · acknowledgement received" : "BEFORE · mismatch open";
+  const accent = side === "after" ? "emerald" : "rose";
+  const accentRing = accent === "emerald" ? "border-emerald-500/40" : "border-rose-500/45";
+  const accentGlow =
+    accent === "emerald"
+      ? "shadow-[0_0_80px_-10px_rgba(34,197,94,.45)]"
+      : "shadow-[0_0_80px_-10px_rgba(244,63,94,.55)]";
+
+  // Channel chips: in BEFORE, POS fails. In AFTER, all 3 ok.
+  const channels =
+    side === "after"
+      ? [
+          { name: "Shelf", status: "ok" as const },
+          { name: "POS", status: "ok" as const },
+          { name: "Web", status: "ok" as const },
+        ]
+      : [
+          { name: "Shelf", status: "ok" as const },
+          { name: "POS", status: "fail" as const },
+          { name: "Web", status: "ok" as const },
+        ];
+
+  return (
+    <div
+      className={`absolute inset-0 ${
+        side === "after"
+          ? "bg-gradient-to-br from-emerald-950/55 via-[#0a1410] to-[#04070b]"
+          : "bg-gradient-to-br from-rose-950/55 via-[#140a0d] to-[#04070b]"
+      }`}
+    >
+      {/* atmospheric layer */}
+      <div
+        className={`pointer-events-none absolute inset-0 ${
+          side === "after"
+            ? "bg-[radial-gradient(ellipse_at_60%_70%,rgba(34,197,94,.18),transparent_60%)]"
+            : "bg-[radial-gradient(ellipse_at_40%_70%,rgba(244,63,94,.22),transparent_60%)]"
+        }`}
+      />
+      {/* eyebrow */}
+      <div className={`absolute top-6 ${side === "before" ? "left-6" : "right-6"} text-right`}>
+        <p
+          className={`text-[10px] tracking-[.22em] uppercase ${
+            tone === "ok" ? "text-emerald-200" : "text-rose-200"
+          }`}
+        >
+          {eyebrow}
+        </p>
+      </div>
+      {/* center: product card + receipt badge */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="relative">
+          {/* halo */}
+          <motion.span
+            aria-hidden
+            className={`pointer-events-none absolute -inset-3 rounded-3xl border ${accentRing} ${accentGlow}`}
+            initial={false}
+            animate={
+              reduced
+                ? undefined
+                : { opacity: side === "before" ? [0.4, 0.85, 0.4] : [0.4, 0.7, 0.4] }
+            }
+            transition={
+              reduced ? undefined : { duration: side === "before" ? 1.6 : 2.4, repeat: Infinity, ease: "easeInOut" }
+            }
+          />
+          {/* Milk card */}
+          <ProductCard
+            name="Organic Whole Milk"
+            units="1 GAL"
+            price="$5.99"
+            glyph={<SharedMilkGlyph />}
+            tone="neutral"
+            size="lg"
+            badge={
+              side === "after"
+                ? { label: "verified", tone: "verified" }
+                : { label: "canonical", tone: "primary" }
+            }
+          />
+          {/* Receipt / mismatch badge below */}
+          <div className="mt-4 flex justify-center">
+            {side === "after" ? (
+              <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/[.10] px-3 py-1.5 text-[10px] font-mono uppercase tracking-[.18em] text-emerald-200">
+                <CheckCircle2 className="h-3 w-3" />
+                POS rang $5.99
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 rounded-full border border-rose-500/45 bg-rose-500/[.12] px-3 py-1.5 text-[10px] font-mono uppercase tracking-[.18em] text-rose-200">
+                <CircleAlert className="h-3 w-3" />
+                POS rang $6.49 · +$0.50
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      {/* channel chips at bottom — staggered fade in as the side becomes revealed */}
+      <div className={`absolute bottom-6 ${side === "before" ? "left-6" : "right-6"}`}>
+        <ChannelAgreementPanel channels={channels} />
+      </div>
+      {/* status pill in opposite corner */}
+      <div
+        className={`absolute ${
+          side === "before" ? "bottom-6 right-6" : "bottom-6 left-6"
+        } font-mono text-[10px] uppercase tracking-[.22em] ${
+          side === "after" ? "text-emerald-200" : "text-rose-200"
+        }`}
+      >
+        {side === "after"
+          ? "decision · eligible for controlled expansion"
+          : "decision · expansion blocked"}
+      </div>
+    </div>
+  );
+}
+
 function BeforeAfter() {
-  /* Spring-smoothed scrubber position: the raw pointer value feeds a spring,
-   * the spring value drives the clip-path. On pointer release the spring
-   * settles naturally — that's the "vaul" feel. Keyboard left/right also
-   * works for a11y. */
   const reduced = useReducedMotion();
   const [target, setTarget] = useState(50);
   const smoothed = useSpring(target, SPRING.bouncy as any);
@@ -1363,31 +1493,22 @@ function BeforeAfter() {
     }
   };
 
-  const beforeRows = [
-    { label: "Shelf Label", value: "$5.99 · verified", tone: "ok" as const },
-    { label: "Checkout POS", value: "$6.49 · mismatch", tone: "err" as const },
-    { label: "Ecommerce", value: "$5.99 · verified", tone: "ok" as const },
-    { label: "Decision", value: "Expansion blocked", tone: "warn" as const },
-  ];
-  const afterRows = [
-    { label: "Shelf Label", value: "$5.99 · verified", tone: "ok" as const },
-    { label: "Checkout POS", value: "$5.99 · verified", tone: "ok" as const },
-    { label: "Ecommerce", value: "$5.99 · verified", tone: "ok" as const },
-    { label: "Decision", value: "Incident resolved · eligible for controlled expansion", tone: "ok" as const },
-  ];
-
   return (
     <section id="scene-recovery" className="scroll-mt-24">
       <ChapterMarker n="04" label="The Recovery" />
       <div className="relative mx-auto max-w-[1400px] px-5 py-20 sm:px-8">
         <div className="max-w-3xl">
-          <Pill tone="purple">Before / after recovery</Pill>
+          <Pill tone="purple">Before · After</Pill>
           <h2 className="mt-5 text-[clamp(32px,5vw,64px)] font-semibold leading-[1.04] tracking-[-0.02em] text-white">
-            Drag to see the same milk after acknowledgement.
+            One drag.
+            <br />
+            <span className="bg-gradient-to-r from-rose-300 via-amber-200 to-emerald-300 bg-clip-text text-transparent">
+              The whole recovery.
+            </span>
           </h2>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/55">
             Same approved price. Same store. ShelfTrace resolves only after the channel that disagreed
-            acknowledges the approved value.
+            acknowledges the approved value. Drag the handle — watch POS flip from <span className="text-rose-300">$6.49&nbsp;mismatch</span> to <span className="text-emerald-300">$5.99&nbsp;verified</span>, the channels settle, the decision change.
           </p>
         </div>
         <div
@@ -1398,7 +1519,7 @@ function BeforeAfter() {
           aria-valuemax={100}
           aria-valuenow={Math.round(posDisplay)}
           aria-label="Reveal before / after recovery"
-          className="relative mt-12 aspect-[16/7] cursor-ew-resize overflow-hidden rounded-3xl border border-white/10 select-none outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60"
+          className="relative mt-12 aspect-[16/8] cursor-ew-resize overflow-hidden rounded-3xl border border-white/10 select-none outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60"
           onKeyDown={onKey}
           onPointerMove={(e) => dragging.current && updateFromClient(e.clientX)}
           onPointerDown={(e) => {
@@ -1411,19 +1532,31 @@ function BeforeAfter() {
             (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/40 via-[#0a1410] to-[#06090f]">
-            <RecoveryPanel rows={afterRows} eyebrow="AFTER · acknowledgement received" tone="ok" />
+          {/* AFTER scene fills the canvas */}
+          <RecoveryScene side="after" reveal={100 - posDisplay} />
+          {/* BEFORE scene clipped from the right */}
+          <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - posDisplay}% 0 0)` }}>
+            <RecoveryScene side="before" reveal={posDisplay} />
           </div>
-          <div
-            className="absolute inset-0 bg-gradient-to-br from-rose-950/40 via-[#140a0d] to-[#06090f]"
-            style={{ clipPath: `inset(0 ${100 - posDisplay}% 0 0)` }}
-          >
-            <RecoveryPanel rows={beforeRows} eyebrow="BEFORE · mismatch open" tone="err" />
-          </div>
+          {/* Ambient drifting particles (above scenes, below handle) */}
+          {!reduced && (
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              {[12, 28, 44, 60, 76, 92].map((leftPct, i) => (
+                <motion.span
+                  key={leftPct}
+                  className="absolute top-full h-1 w-1 rounded-full bg-white/40 shadow-[0_0_6px_rgba(255,255,255,.5)]"
+                  style={{ left: `${leftPct}%` }}
+                  animate={{ y: ["0%", "-3200%"], opacity: [0, 0.85, 0] }}
+                  transition={{ duration: 10 + i, repeat: Infinity, delay: i * 1.4, ease: "linear" }}
+                />
+              ))}
+            </div>
+          )}
+          {/* Handle */}
           <div className="pointer-events-none absolute inset-y-0 z-10" style={{ left: `${posDisplay}%` }}>
-            <div className="-translate-x-1/2 h-full w-px bg-white/80" />
+            <div className="-translate-x-1/2 h-full w-px bg-gradient-to-b from-rose-400/0 via-white/85 to-emerald-400/0" />
             <div
-              className={`absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-white/15 text-white backdrop-blur shadow-2xl transition-transform duration-200 ${
+              className={`absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white bg-white/15 text-white backdrop-blur shadow-[0_0_30px_rgba(255,255,255,.25)] transition-transform duration-200 ${
                 dragging.current ? "scale-110" : "scale-100"
               }`}
             >
@@ -1431,48 +1564,42 @@ function BeforeAfter() {
                 <path d="M2 10 L7 5 L7 15 Z" />
                 <path d="M18 10 L13 15 L13 5 Z" />
               </svg>
+              {/* pulse ring */}
+              {!reduced && !dragging.current && (
+                <motion.span
+                  className="absolute inset-0 rounded-full border-2 border-white/55"
+                  animate={{ scale: [1, 1.5], opacity: [0.6, 0] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
+                />
+              )}
             </div>
           </div>
+          {/* Top progress band — shows the recovery sequence as you drag */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-6 py-3">
+            <span className="font-mono text-[10px] uppercase tracking-[.22em] text-rose-200/70">
+              incident open
+            </span>
+            <div className="flex items-center gap-1.5">
+              {[20, 40, 60, 80].map((threshold) => (
+                <span
+                  key={threshold}
+                  className={`h-1.5 w-6 rounded-full transition-colors duration-200 ${
+                    posDisplay >= threshold ? "bg-emerald-400" : "bg-white/15"
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="font-mono text-[10px] uppercase tracking-[.22em] text-emerald-200/70">
+              sealed
+            </span>
+          </div>
         </div>
+        {/* footer cue */}
+        <p className="mt-5 text-center text-[11px] uppercase tracking-[.22em] text-white/40">
+          drag the handle · or arrow keys ← → for keyboard
+        </p>
       </div>
     </section>
-  );
-}
-
-function RecoveryPanel({
-  rows,
-  eyebrow,
-  tone,
-}: {
-  rows: { label: string; value: string; tone: "ok" | "err" | "warn" }[];
-  eyebrow: string;
-  tone: "ok" | "err";
-}) {
-  return (
-    <div className="absolute inset-0 flex items-center px-6 sm:px-10">
-      <div className="w-full max-w-[480px]">
-        <p className={`text-[10px] tracking-[.22em] uppercase ${tone === "ok" ? "text-emerald-300" : "text-rose-300"}`}>
-          {eyebrow}
-        </p>
-        <ul className="mt-5 space-y-2">
-          {rows.map((r, i) => (
-            <li
-              key={i}
-              className={`flex items-center justify-between rounded-xl border px-4 py-3 text-sm backdrop-blur ${
-                r.tone === "ok"
-                  ? "border-emerald-500/30 bg-emerald-500/[.06] text-emerald-100"
-                  : r.tone === "err"
-                    ? "border-rose-500/40 bg-rose-500/[.06] text-rose-100"
-                    : "border-amber-500/35 bg-amber-500/[.06] text-amber-100"
-              }`}
-            >
-              <span className="text-white/75">{r.label}</span>
-              <span className="font-mono tabular-nums">{r.value}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
   );
 }
 

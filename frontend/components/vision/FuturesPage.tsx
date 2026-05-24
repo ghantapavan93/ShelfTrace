@@ -39,6 +39,7 @@ import {
   CinePhoto,
   EggsGlyph,
   FilmGrain,
+  InViewBurst,
   MagneticButton,
   MagneticLink,
   MilkGlyph,
@@ -48,6 +49,7 @@ import {
   ProductCard,
   Stage,
   StrawberryGlyph,
+  Tilt3DCard,
   YogurtGlyph,
 } from "./cinematic";
 import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
@@ -769,6 +771,24 @@ const FUTURES: Future[] = [
   },
 ];
 
+/* Map a Future.accent to a particle-burst colour. */
+function accentToParticle(accent: Future["accent"]): string {
+  switch (accent) {
+    case "violet":
+      return "rgba(167,139,250,.8)";
+    case "emerald":
+      return "rgba(34,197,94,.8)";
+    case "sky":
+      return "rgba(96,165,250,.8)";
+    case "rose":
+      return "rgba(244,63,94,.8)";
+    case "amber":
+      return "rgba(245,158,11,.8)";
+    default:
+      return "rgba(251,146,60,.8)";
+  }
+}
+
 function StoryRow({ future, index }: { future: Future; index: number }) {
   const Icon = future.icon;
   const flip = index % 2 === 1;
@@ -813,15 +833,21 @@ function StoryRow({ future, index }: { future: Future; index: number }) {
           </div>
         </motion.div>
 
-        {/* Visual column */}
+        {/* Visual column — wrapped with Tilt3DCard so it tilts to your cursor +
+            InViewBurst spits particles when the row enters viewport */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.8, delay: 0.1, ease: EASE.outQuart }}
-          className={`min-w-0 ${flip ? "lg:order-1" : "lg:order-2"}`}
+          className={`relative min-w-0 ${flip ? "lg:order-1" : "lg:order-2"}`}
         >
-          {future.visual}
+          <Tilt3DCard max={5}>
+            <div className="relative">
+              <InViewBurst color={accentToParticle(future.accent)} />
+              {future.visual}
+            </div>
+          </Tilt3DCard>
         </motion.div>
       </div>
       {/* connecting vertical line */}

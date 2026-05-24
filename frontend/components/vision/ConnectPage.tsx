@@ -33,10 +33,12 @@ import {
   ChapterMarker,
   CinePhoto,
   FilmGrain,
+  InViewBurst,
   MagneticButton,
   MagneticLink,
   Particles,
   PHOTOS,
+  Tilt3DCard,
 } from "./cinematic";
 import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
 import { api } from "@/lib/api";
@@ -473,23 +475,37 @@ function IntegrationPaths() {
           {paths.map((p, i) => {
             const Icon = p.icon;
             return (
-              <motion.article
+              <motion.div
                 key={p.title}
                 initial={{ opacity: 0, y: 22 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-100px" }}
                 transition={{ duration: 0.65, delay: i * 0.08, ease: EASE.outQuart }}
-                whileHover={{ y: -4 }}
-                className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[.04] to-transparent p-7"
               >
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[.04] text-violet-200">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <p className="mt-5 text-xl font-semibold text-white">{p.title}</p>
-                <p className="mt-1 text-[11px] uppercase tracking-[.22em] text-violet-300/80">{p.sub}</p>
-                <p className="mt-4 text-sm leading-relaxed text-white/55">{p.body}</p>
-                <div className="mt-5">{p.mockup}</div>
-              </motion.article>
+                <Tilt3DCard className="h-full">
+                  <article className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[.04] to-transparent p-7 transition-shadow duration-300 hover:shadow-[0_30px_80px_-30px_rgba(167,139,250,.4)]">
+                    {/* one-shot particle burst when entering view */}
+                    <InViewBurst
+                      color={
+                        i === 0
+                          ? "rgba(34,197,94,.7)"
+                          : i === 1
+                            ? "rgba(167,139,250,.7)"
+                            : "rgba(96,165,250,.7)"
+                      }
+                    />
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[.04] text-violet-200">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <p className="mt-5 text-xl font-semibold text-white">{p.title}</p>
+                    <p className="mt-1 text-[11px] uppercase tracking-[.22em] text-violet-300/80">
+                      {p.sub}
+                    </p>
+                    <p className="mt-4 text-sm leading-relaxed text-white/55">{p.body}</p>
+                    <div className="mt-5">{p.mockup}</div>
+                  </article>
+                </Tilt3DCard>
+              </motion.div>
             );
           })}
         </div>

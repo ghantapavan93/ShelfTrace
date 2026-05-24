@@ -13,9 +13,17 @@
  */
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useInView,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+} from "framer-motion";
 import {
   Bell,
   CheckCircle2,
@@ -34,6 +42,128 @@ import {
   X,
 } from "lucide-react";
 import { EASE, SPRING } from "@/lib/motion";
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Tilt3DCard — mouse-follow 3D tilt for any child container.
+   ════════════════════════════════════════════════════════════════════════════
+   Max ±7° on both axes, springs for smooth tracking, mobile-safe (only on
+   pointer:fine devices). Honors prefers-reduced-motion. Wrap any Stage /
+   card / mockup with this to get a premium parallax feel on hover.            */
+
+export function Tilt3DCard({
+  children,
+  max = 7,
+  className = "",
+}: {
+  children: ReactNode;
+  max?: number;
+  className?: string;
+}) {
+  const reduced = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rx = useSpring(useTransform(y, (v) => -v * max), { stiffness: 200, damping: 22 });
+  const ry = useSpring(useTransform(x, (v) => v * max), { stiffness: 200, damping: 22 });
+
+  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (reduced) return;
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    x.set((e.clientX - r.left) / r.width - 0.5);
+    y.set((e.clientY - r.top) / r.height - 0.5);
+  };
+  const onLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <div
+      ref={ref}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      style={{ perspective: 1200 }}
+      className={className}
+    >
+      <motion.div
+        style={{
+          rotateX: rx,
+          rotateY: ry,
+          transformStyle: "preserve-3d",
+        }}
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   InViewBurst — one-shot particle explosion when container enters viewport.
+   ════════════════════════════════════════════════════════════════════════════
+   Cheap (10 particles, single CSS animation). Cinema feel without cost.       */
+
+export function InViewBurst({
+  color = "rgba(251,146,60,.8)",
+  count = 10,
+}: {
+  color?: string;
+  count?: number;
+}) {
+  const reduced = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-30% 0px -30% 0px" });
+  const dots = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => ({
+        angle: (i / count) * Math.PI * 2 + Math.random() * 0.6,
+        distance: 80 + Math.random() * 60,
+        delay: Math.random() * 0.1,
+        size: 2 + Math.random() * 2.5,
+      })),
+    [count],
+  );
+  return (
+    <div ref={ref} aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      <AnimatePresence>
+        {inView && !reduced && (
+          <>
+            {dots.map((d, i) => (
+              <motion.span
+                key={i}
+                className="absolute left-1/2 top-1/2 rounded-full"
+                style={{
+                  width: d.size,
+                  height: d.size,
+                  background: color,
+                  boxShadow: `0 0 ${d.size * 4}px ${color}`,
+                }}
+                initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                animate={{
+                  x: Math.cos(d.angle) * d.distance,
+                  y: Math.sin(d.angle) * d.distance,
+                  opacity: 0,
+                  scale: 0.4,
+                }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.9, delay: d.delay, ease: [0.16, 1, 0.3, 1] }}
+              />
+            ))}
+            {/* center flash */}
+            <motion.span
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{ width: 28, height: 28, background: color, filter: "blur(8px)" }}
+              initial={{ opacity: 0.7, scale: 0.4 }}
+              animate={{ opacity: 0, scale: 3 }}
+              transition={{ duration: 0.65, ease: "easeOut" }}
+            />
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 /* ─────────────────────────────── film grain ──────────────────────────────── */
 
