@@ -1156,7 +1156,7 @@ function ScannerShowstopper({ playRef }: { playRef: React.RefObject<HTMLDivEleme
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7 }}
                   >
-                    <h3 id="scene-decision" className="text-[clamp(28px,4vw,52px)] font-semibold leading-[1.05] tracking-[-0.02em] text-white">
+                    <h3 className="text-[clamp(28px,4vw,52px)] font-semibold leading-[1.05] tracking-[-0.02em] text-white">
                       The recommendation was approved.
                       <br />
                       <span className="bg-gradient-to-r from-rose-300 to-orange-300 bg-clip-text text-transparent">
@@ -1241,6 +1241,140 @@ const PROOF_TILES = [
   },
 ];
 
+/* ─────────────────────────── Mini-mockups (one per proof tile) ───────────── */
+
+function ApprovedMini({ lit }: { lit: boolean }) {
+  return (
+    <div className="relative h-[78px] overflow-hidden rounded-xl border border-orange-500/30 bg-[#0e1320]/95 px-3 py-2">
+      <div className="flex items-center gap-2">
+        <div className="h-[60px] w-[40px]">
+          <SharedMilkGlyph />
+        </div>
+        <div className="flex-1">
+          <p className="text-[9px] uppercase tracking-[.22em] text-orange-300">approved</p>
+          <p className="font-mono text-base font-bold tabular-nums text-white">$5.99</p>
+          <p className="text-[9px] text-white/45">memorial-day · DAL</p>
+        </div>
+        {lit && (
+          <motion.span
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={SPRING.bouncy}
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/[.12] text-orange-300"
+          >
+            <CheckCircle2 className="h-3 w-3" />
+          </motion.span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CheckoutMini({ lit }: { lit: boolean }) {
+  return (
+    <div className="relative h-[78px] overflow-hidden rounded-xl border border-rose-500/40 bg-[#1a0a0e]/95 px-3 py-2">
+      <div className="flex items-center gap-3">
+        <ScanLine className="h-5 w-5 text-rose-300" />
+        <div className="flex-1">
+          <p className="text-[9px] uppercase tracking-[.22em] text-rose-300">POS reading</p>
+          <div className="flex items-baseline gap-2">
+            <span className="font-mono text-[10px] text-white/35 line-through">$5.99</span>
+            <motion.span
+              animate={lit ? { scale: [1, 1.08, 1] } : undefined}
+              transition={lit ? { duration: 1.6, repeat: Infinity, ease: "easeInOut" } : undefined}
+              className="font-mono text-base font-bold tabular-nums text-rose-200"
+            >
+              $6.49
+            </motion.span>
+          </div>
+          <p className="text-[9px] text-rose-200/80">drift detected</p>
+        </div>
+        {lit && (
+          <span className="rounded-full border border-rose-500/40 bg-rose-500/[.10] px-2 py-0.5 text-[9px] font-mono uppercase tracking-[.18em] text-rose-200">
+            +$0.50
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SafetyMini({ lit }: { lit: boolean }) {
+  const reduced = useReducedMotion();
+  return (
+    <div className="relative h-[78px] overflow-hidden rounded-xl border border-violet-500/35 bg-[#0d0a1a]/95 px-3 py-2">
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <ShieldCheck className="h-6 w-6 text-violet-300" />
+          {lit && !reduced && (
+            <motion.span
+              className="absolute inset-0 rounded-full border-2 border-violet-400/55"
+              animate={{ scale: [1, 1.8], opacity: [0.7, 0] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
+            />
+          )}
+        </div>
+        <div className="flex-1">
+          <p className="text-[9px] uppercase tracking-[.22em] text-violet-300">expansion gate</p>
+          <p className="mt-0.5 font-mono text-[11px] font-bold uppercase tracking-[.18em] text-violet-100">
+            held · stores 317 / 401
+          </p>
+          <p className="text-[9px] text-white/45">awaiting ack</p>
+        </div>
+        {lit && (
+          <span className="rotate-[-8deg] rounded-md border-2 border-violet-400 bg-violet-500/[.15] px-1.5 py-0.5 font-mono text-[9px] font-extrabold tracking-[.18em] text-violet-100">
+            BLOCKED
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProofMini({ lit }: { lit: boolean }) {
+  const reduced = useReducedMotion();
+  // Render a 47-dot grid (9 cols × ~6 rows) that fills emerald sequentially.
+  return (
+    <div className="relative h-[78px] overflow-hidden rounded-xl border border-emerald-500/35 bg-[#0a1410]/95 px-3 py-2">
+      <div className="flex items-center gap-3">
+        <BadgeCheck className="h-5 w-5 text-emerald-300" />
+        <div className="flex-1">
+          <p className="text-[9px] uppercase tracking-[.22em] text-emerald-300">
+            pytest · postgres
+          </p>
+          <div className="mt-1 grid grid-cols-[repeat(24,1fr)] gap-[2px]">
+            {Array.from({ length: 47 }).map((_, i) => (
+              <motion.span
+                key={i}
+                initial={{ opacity: 0.18 }}
+                animate={lit ? { opacity: [0.18, 1, 0.85] } : undefined}
+                transition={
+                  lit && !reduced
+                    ? { duration: 0.5, delay: 0.5 + i * 0.025, times: [0, 0.6, 1] }
+                    : undefined
+                }
+                className="block h-[6px] rounded-[1px] bg-emerald-400/85"
+              />
+            ))}
+          </div>
+        </div>
+        {lit && (
+          <span className="font-mono text-[9px] uppercase tracking-[.18em] text-emerald-300">
+            47 / 47
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const MINI_MOCKUPS: Array<({ lit }: { lit: boolean }) => JSX.Element> = [
+  ApprovedMini,
+  CheckoutMini,
+  SafetyMini,
+  ProofMini,
+];
+
 function ExecutionProofRail() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-150px" });
@@ -1257,7 +1391,7 @@ function ExecutionProofRail() {
   }, [inView, reduced]);
 
   return (
-    <section ref={ref}>
+    <section ref={ref} id="scene-decision" className="scroll-mt-24">
       <ChapterMarker n="03" label="The Decision" />
       <div className="relative mx-auto max-w-[1400px] px-5 py-20 sm:px-8 sm:py-24">
         <div className="max-w-3xl">
@@ -1272,10 +1406,27 @@ function ExecutionProofRail() {
         </div>
 
         <div className="relative mt-12">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Connector — animated signal flowing through all 4 tiles. */}
+          <div className="pointer-events-none absolute inset-x-6 top-[42%] hidden h-px lg:block">
+            <div className="relative h-full">
+              <div className="absolute inset-0 bg-gradient-to-r from-orange-500/30 via-rose-500/30 via-violet-500/30 to-emerald-500/30" />
+              {/* Flowing pulse — fires after all tiles lit */}
+              {!reduced && stage >= 4 && (
+                <motion.div
+                  className="absolute top-1/2 -translate-y-1/2 h-1.5 w-12 rounded-full bg-white"
+                  style={{ boxShadow: "0 0 18px rgba(255,255,255,.7)" }}
+                  animate={{ left: ["-8%", "108%"] }}
+                  transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="relative grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {PROOF_TILES.map((t, i) => {
               const lit = stage > i;
               const Icon = t.icon;
+              const Mini = MINI_MOCKUPS[i];
               return (
                 <motion.div
                   key={t.key}
@@ -1287,7 +1438,9 @@ function ExecutionProofRail() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] tracking-[.22em] text-white/45 uppercase">{t.key}</span>
+                    <span className="font-mono text-[10px] tracking-[.22em] text-white/45 uppercase">
+                      {t.key}
+                    </span>
                     <span
                       className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[.04]"
                       style={{ color: lit ? t.color : "#475569" }}
@@ -1299,6 +1452,30 @@ function ExecutionProofRail() {
                     {t.main}
                   </div>
                   <p className="mt-2 text-sm text-white/55">{t.sub}</p>
+
+                  {/* Mini-mockup — appears once tile is lit */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: lit ? 1 : 0.35, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="mt-5"
+                  >
+                    <Mini lit={lit} />
+                  </motion.div>
+
+                  {/* Arrow jump to next tile — only between, not after the last */}
+                  {i < PROOF_TILES.length - 1 && lit && !reduced && (
+                    <motion.span
+                      className="pointer-events-none absolute right-[-14px] top-[58px] hidden h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-[#04070b] text-white/55 lg:flex z-10"
+                      initial={{ opacity: 0, scale: 0.6, x: -8 }}
+                      animate={{ opacity: 1, scale: 1, x: 0 }}
+                      transition={{ duration: 0.4, delay: 0.6, ease: EASE.outQuart }}
+                    >
+                      <ArrowRight className="h-3 w-3" />
+                    </motion.span>
+                  )}
+
+                  {/* Side pulse dot — keep the original tile cue */}
                   {lit && !reduced && (
                     <motion.span
                       className="absolute -right-1 top-1/2 h-2 w-2 rounded-full"
@@ -1311,9 +1488,6 @@ function ExecutionProofRail() {
                 </motion.div>
               );
             })}
-          </div>
-          <div className="pointer-events-none absolute inset-x-6 top-1/2 hidden h-px lg:block">
-            <div className="h-full bg-gradient-to-r from-orange-500/30 via-rose-500/30 via-violet-500/30 to-emerald-500/30" />
           </div>
         </div>
       </div>
