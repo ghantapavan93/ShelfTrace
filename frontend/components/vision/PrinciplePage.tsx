@@ -39,6 +39,7 @@ import {
   Stage,
 } from "./cinematic";
 import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
+import { BlurTextAnimation } from "@/components/text/BlurTextAnimation";
 
 /* ────────────────────────────────────────────────────────────────────────────
    /vision/principle — "It guides. It does not act alone."
@@ -99,9 +100,9 @@ function Hero({ onScroll }: { onScroll: () => void }) {
           transition={{ duration: 0.9, delay: 0.5 }}
           className="mt-7 max-w-2xl text-lg leading-relaxed text-white/70"
         >
-          ShelfTrace is a control system for approved retail price execution. It evaluates risk,
-          highlights problems, remembers policy and supports approvals — but humans keep the final
-          action. A safety layer that does not interfere with normal operation, until it has to.
+          <BlurTextAnimation
+            text="ShelfTrace is a control system for approved retail price execution. It evaluates risk, highlights problems, remembers policy and supports approvals — but humans keep the final action. A safety layer that does not interfere with normal operation, until it has to."
+          />
         </motion.p>
         <motion.div
           initial={reduced ? false : MOTION_VARIANTS.fadeUp.initial}

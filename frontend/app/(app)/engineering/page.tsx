@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { timeOf } from "@/lib/format";
 import { EligibilityPanel } from "@/components/EligibilityPanel";
+import { BlurTextAnimation } from "@/components/text/BlurTextAnimation";
 import type { EngineeringTrace } from "@/lib/types";
 
 function Json({ value }: { value: unknown }) {
@@ -67,7 +68,9 @@ export default function EngineeringPage() {
             </span>
           )}
         </div>
-        <p className="text-sm leading-relaxed text-slate-300">{data.shared_engine_statement}</p>
+        <p className="text-sm leading-relaxed text-slate-300">
+          <BlurTextAnimation text={data.shared_engine_statement} />
+        </p>
       </div>
 
       {/* Connector behavior profiles applied for this run */}

@@ -40,6 +40,11 @@ import {
   MilkGlyph as SharedMilkGlyph,
   ProductCard,
 } from "./cinematic";
+import { MorphingText } from "@/components/text/MorphingText";
+import {
+  VaporizeTextCycle,
+  VaporizeTag,
+} from "@/components/text/VaporizeTextCycle";
 
 /* ────────────────────────────────────────────────────────────────────────────
    /vision/keynote — ShelfTrace cinematic, evidence-first.
@@ -752,7 +757,39 @@ function Hero({ onScanner }: { onScanner: () => void }) {
           <Pill tone="orange">Keynote · cinematic vision</Pill>
           <Pill tone="neutral">Independent execution-reliability prototype</Pill>
         </motion.div>
-        <RevealHeading className="mt-8 max-w-[22ch] text-[clamp(48px,8vw,128px)] font-semibold leading-[0.94] tracking-[-0.03em] text-white">
+
+        {/* Vaporizing thesis verbs — cycles through the conceptual chain
+            ShelfTrace is built around. Sits between the pills and the H1
+            as a moving "tag line" treatment. Canvas + RAF, paused when
+            scrolled out of view, disabled under reduced-motion. */}
+        <motion.div
+          initial={reduced ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, delay: 0.2 }}
+          className="mt-6 h-[88px] w-full max-w-[640px] sm:h-[108px]"
+        >
+          <VaporizeTextCycle
+            texts={["Approved.", "Executed.", "Verified.", "Eligible."]}
+            font={{
+              fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+              fontSize: "64px",
+              fontWeight: 700,
+            }}
+            color="rgb(254, 215, 170)"
+            spread={4}
+            density={6}
+            animation={{
+              vaporizeDuration: 1.8,
+              fadeInDuration: 0.9,
+              waitDuration: 0.9,
+            }}
+            direction="left-to-right"
+            alignment="left"
+            tag={VaporizeTag.H2}
+          />
+        </motion.div>
+
+        <RevealHeading className="mt-3 max-w-[22ch] text-[clamp(48px,8vw,128px)] font-semibold leading-[0.94] tracking-[-0.03em] text-white">
           A price is not real until{" "}
           <span className="bg-gradient-to-r from-orange-300 via-orange-400 to-rose-400 bg-clip-text text-transparent">
             every surface agrees.
@@ -2282,6 +2319,25 @@ function NightClosing() {
               Every execution tested. Every mismatch traceable. Every recovery preserved for the next
               rollout.
             </p>
+
+            {/* What endures past the rollout — gooey morph between the four
+                reliability pillars. Calm and ambient, fits the "night" mood. */}
+            <div className="mt-8 max-w-xl">
+              <div className="text-[10px] uppercase tracking-[.22em] text-emerald-300/80">
+                What endures
+              </div>
+              <div className="relative mt-2 h-14 sm:h-16">
+                <MorphingText
+                  texts={[
+                    "Reconciled.",
+                    "Contained.",
+                    "Recovered.",
+                    "Verified.",
+                  ]}
+                  className="!h-14 !max-w-none !text-left !text-[30pt] sm:!h-16 sm:!text-[38pt] lg:!text-[44pt] text-emerald-200"
+                />
+              </div>
+            </div>
             <div className="mt-8 flex flex-wrap gap-2">
               {[
                 "Configurable Scenarios",
