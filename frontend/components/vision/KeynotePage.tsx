@@ -1513,11 +1513,13 @@ function RecoveryScene({
   const reduced = useReducedMotion();
   const isAfter = side === "after";
 
-  // The full operations console per side. Each side composites:
-  //   • Top bar:  eyebrow + incident id + timestamp
-  //   • Center:   3-channel cards (Shelf / POS / Web) with real prices
-  //   • Right:    big Milk product card with halo + receipt badge
-  //   • Bottom:   audit-timeline strip showing recovery progression
+  // BOTH scenes use IDENTICAL absolute positions for every element. The clip
+  // path is therefore a clean reveal: each element on the canvas appears in
+  // both scenes at the same coordinates, so dragging the handle splits each
+  // element visually (left = BEFORE state, right = AFTER state). The POS
+  // card sits dead-centre and is the main "drama" element; the milk card sits
+  // centred below for the halo state transition.
+
   const eyebrow = isAfter ? "AFTER · acknowledgement received" : "BEFORE · mismatch open";
   const incidentId = "INC-2147";
   const timestamp = isAfter ? "T+03.78s" : "T+02.30s";
@@ -1537,11 +1539,11 @@ function RecoveryScene({
   const timeline = [
     { t: "T+0.0", label: "approve", state: "done" as const },
     { t: "T+1.2", label: "dispatch", state: "done" as const },
-    { t: "T+2.1", label: "ack", state: isAfter ? "done" : "active" as const },
-    { t: "T+2.3", label: "drift", state: isAfter ? "done" : "active" as const },
-    { t: "T+3.0", label: "retry", state: isAfter ? "done" : "pending" as const },
-    { t: "T+3.5", label: "verify", state: isAfter ? "done" : "pending" as const },
-    { t: "T+3.8", label: "seal", state: isAfter ? "done" : "pending" as const },
+    { t: "T+2.1", label: "ack", state: isAfter ? ("done" as const) : ("active" as const) },
+    { t: "T+2.3", label: "drift", state: isAfter ? ("done" as const) : ("active" as const) },
+    { t: "T+3.0", label: "retry", state: isAfter ? ("done" as const) : ("pending" as const) },
+    { t: "T+3.5", label: "verify", state: isAfter ? ("done" as const) : ("pending" as const) },
+    { t: "T+3.8", label: "seal", state: isAfter ? ("done" as const) : ("pending" as const) },
   ];
 
   return (
@@ -1552,7 +1554,7 @@ function RecoveryScene({
           : "bg-gradient-to-br from-rose-950/60 via-[#140a0d] to-[#04070b]"
       }`}
     >
-      {/* subtle grid backplate so the canvas never reads as empty */}
+      {/* grid backplate so the canvas never reads as empty */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[.4]"
         style={{
@@ -1561,16 +1563,16 @@ function RecoveryScene({
           backgroundSize: "48px 48px",
         }}
       />
-      {/* atmospheric tint */}
+      {/* tonal radial — same position both scenes so it gradient-splits at the handle */}
       <div
         className={`pointer-events-none absolute inset-0 ${
           isAfter
-            ? "bg-[radial-gradient(ellipse_at_60%_50%,rgba(34,197,94,.22),transparent_65%)]"
-            : "bg-[radial-gradient(ellipse_at_40%_50%,rgba(244,63,94,.26),transparent_65%)]"
+            ? "bg-[radial-gradient(ellipse_at_50%_55%,rgba(34,197,94,.22),transparent_65%)]"
+            : "bg-[radial-gradient(ellipse_at_50%_55%,rgba(244,63,94,.26),transparent_65%)]"
         }`}
       />
 
-      {/* TOP BAR — eyebrow + incident id + timestamp */}
+      {/* TOP BAR — eyebrow LEFT, incident+timestamp RIGHT */}
       <div className="absolute inset-x-6 top-5 flex items-center justify-between">
         <span
           className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] uppercase tracking-[.22em] backdrop-blur ${
@@ -1589,37 +1591,34 @@ function RecoveryScene({
         </span>
       </div>
 
-      {/* MAIN GRID — left: 3 channel cards · right: big product card */}
-      <div className="absolute inset-x-6 top-20 bottom-20 grid grid-cols-[1.1fr_1fr] gap-6 items-center">
-        {/* LEFT: channel grid */}
-        <div className="grid grid-cols-1 gap-3">
-          {channels.map((c) => (
-            <motion.div
+      {/* CHANNELS — horizontal row spanning the width. POS sits dead-centre so it
+          splits cleanly at handle=50%. Both scenes use the same 3-col grid + gap. */}
+      <div className="absolute inset-x-8 top-[22%] grid grid-cols-3 gap-6">
+        {channels.map((c, i) => {
+          const isPos = i === 1;
+          return (
+            <div
               key={c.name}
-              initial={false}
-              whileHover={reduced ? undefined : { x: 2 }}
-              className={`relative rounded-2xl border bg-[#0e1320]/95 backdrop-blur p-4 transition-colors ${
-                c.status === "ok"
-                  ? "border-emerald-500/35"
-                  : "border-rose-500/50"
-              }`}
+              className={`relative rounded-2xl border bg-[#0e1320]/95 backdrop-blur p-4 ${
+                c.status === "ok" ? "border-emerald-500/35" : "border-rose-500/55"
+              } ${isPos ? "ring-2 ring-offset-2 ring-offset-[#04070b] " + (c.status === "ok" ? "ring-emerald-500/40" : "ring-rose-500/60") : ""}`}
             >
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-[10px] uppercase tracking-[.22em] text-white/60">
+                <span className="flex items-center gap-2 text-[10px] uppercase tracking-[.22em] text-white/65">
                   {c.status === "ok" ? (
                     <CheckCircle2 className="h-3 w-3 text-emerald-300" />
                   ) : (
                     <CircleAlert className="h-3 w-3 text-rose-300" />
                   )}
-                  {c.name}
+                  {c.name} channel
                 </span>
-                <span className="font-mono text-[9px] uppercase tracking-[.2em] text-white/40">
-                  channel
+                <span className="font-mono text-[9px] uppercase tracking-[.18em] text-white/35">
+                  {isPos ? "register" : "feed"}
                 </span>
               </div>
-              <div className="mt-3 flex items-baseline justify-between">
+              <div className="mt-3 flex items-baseline justify-between gap-2">
                 <span
-                  className={`font-mono text-xl font-bold tabular-nums ${
+                  className={`font-mono text-2xl font-bold tabular-nums ${
                     c.status === "ok" ? "text-emerald-200" : "text-rose-200"
                   }`}
                 >
@@ -1639,73 +1638,72 @@ function RecoveryScene({
               {c.status === "fail" && !reduced && (
                 <motion.span
                   aria-hidden
-                  className="pointer-events-none absolute inset-0 rounded-2xl border-2 border-rose-500/50"
-                  animate={{ opacity: [0.35, 1, 0.35] }}
-                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="pointer-events-none absolute inset-0 rounded-2xl border-2 border-rose-500/55"
+                  animate={{ opacity: [0.4, 1, 0.4] }}
+                  transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
                 />
               )}
-            </motion.div>
-          ))}
-        </div>
-
-        {/* RIGHT: big product card with halo + canonical / receipt info */}
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <motion.span
-              aria-hidden
-              className={`pointer-events-none absolute -inset-3 rounded-3xl border ${
-                isAfter ? "border-emerald-500/40" : "border-rose-500/50"
-              } ${
-                isAfter
-                  ? "shadow-[0_0_80px_-8px_rgba(34,197,94,.5)]"
-                  : "shadow-[0_0_80px_-8px_rgba(244,63,94,.6)]"
-              }`}
-              initial={false}
-              animate={
-                reduced
-                  ? undefined
-                  : { opacity: isAfter ? [0.4, 0.7, 0.4] : [0.4, 0.95, 0.4] }
-              }
-              transition={
-                reduced
-                  ? undefined
-                  : { duration: isAfter ? 2.6 : 1.4, repeat: Infinity, ease: "easeInOut" }
-              }
-            />
-            <ProductCard
-              name="Organic Whole Milk"
-              units="1 GAL"
-              price="$5.99"
-              glyph={<SharedMilkGlyph />}
-              tone="neutral"
-              size="lg"
-              badge={
-                isAfter
-                  ? { label: "approved · verified", tone: "verified" }
-                  : { label: "approved · canonical", tone: "primary" }
-              }
-            />
-          </div>
-          {/* receipt badge */}
-          {isAfter ? (
-            <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/[.10] px-3 py-1.5 text-[10px] font-mono uppercase tracking-[.18em] text-emerald-200 backdrop-blur">
-              <CheckCircle2 className="h-3 w-3" />
-              POS acknowledged $5.99
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 rounded-full border border-rose-500/45 bg-rose-500/[.12] px-3 py-1.5 text-[10px] font-mono uppercase tracking-[.18em] text-rose-200 backdrop-blur">
-              <CircleAlert className="h-3 w-3" />
-              POS rang $6.49 · +$0.50
-            </span>
-          )}
-        </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* BOTTOM: audit timeline strip + decision pill */}
+      {/* MILK CARD — centred horizontally + vertically. Splits at handle=50%. */}
+      <div className="absolute top-[58%] left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
+        <div className="relative">
+          <motion.span
+            aria-hidden
+            className={`pointer-events-none absolute -inset-3 rounded-3xl border ${
+              isAfter ? "border-emerald-500/40" : "border-rose-500/55"
+            } ${
+              isAfter
+                ? "shadow-[0_0_80px_-8px_rgba(34,197,94,.55)]"
+                : "shadow-[0_0_80px_-8px_rgba(244,63,94,.65)]"
+            }`}
+            initial={false}
+            animate={
+              reduced
+                ? undefined
+                : { opacity: isAfter ? [0.4, 0.75, 0.4] : [0.4, 1, 0.4] }
+            }
+            transition={
+              reduced
+                ? undefined
+                : { duration: isAfter ? 2.6 : 1.4, repeat: Infinity, ease: "easeInOut" }
+            }
+          />
+          <ProductCard
+            name="Organic Whole Milk"
+            units="1 GAL"
+            price="$5.99"
+            glyph={<SharedMilkGlyph />}
+            tone="neutral"
+            size="lg"
+            badge={
+              isAfter
+                ? { label: "approved · verified", tone: "verified" }
+                : { label: "approved · canonical", tone: "primary" }
+            }
+          />
+        </div>
+        {isAfter ? (
+          <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/[.10] px-3 py-1.5 text-[10px] font-mono uppercase tracking-[.18em] text-emerald-200 backdrop-blur">
+            <CheckCircle2 className="h-3 w-3" />
+            POS acknowledged $5.99
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5 rounded-full border border-rose-500/45 bg-rose-500/[.12] px-3 py-1.5 text-[10px] font-mono uppercase tracking-[.18em] text-rose-200 backdrop-blur">
+            <CircleAlert className="h-3 w-3" />
+            POS rang $6.49 · +$0.50
+          </span>
+        )}
+      </div>
+
+      {/* AUDIT TIMELINE — full-width bottom strip + decision pill */}
       <div className="absolute inset-x-6 bottom-5 flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/55 px-4 py-2.5 backdrop-blur">
         <span className="text-[10px] uppercase tracking-[.22em] text-white/50">audit</span>
         <div className="flex flex-1 items-center gap-1">
-          {timeline.map((t, i) => (
+          {timeline.map((t) => (
             <div key={t.t} className="flex flex-1 flex-col items-center gap-1">
               <span
                 className={`h-1.5 w-full rounded-full transition-colors ${
