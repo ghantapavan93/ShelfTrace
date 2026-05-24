@@ -1,0 +1,103 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Render Blueprint — ShelfTrace Control Plane (free-tier demo)
+#
+# Spins up 3 services from one blueprint:
+#   • shelftrace-api   — FastAPI web service (free, cold-starts after 15min idle)
+#   • shelftrace-db    — Managed Postgres (free, expires after 90 days)
+#   • shelftrace-redis — Managed Redis    (free, expires after 30 days)
+#
+# Not deployed here (intentional, free-tier limits):
+#   • Background outbox worker — Render has no free worker tier. The API
+#     already drains the outbox inline on POST /price-batches (see
+#     backend/app/routers/batches.py), so the demo is fully functional
+#     without a separate worker process. If you upgrade to paid, add a
+#     `type: worker` entry pointing at `python -m app.worker`.
+#
+# After applying this blueprint:
+#   1. Render auto-generates DATABASE_URL and REDIS_URL via fromDatabase /
+#      fromService refs below.
+#   2. Set CORS_ORIGINS in Render UI once the Vercel frontend URL is known.
+#   3. (Optional) Set API_KEYS_JSON if you want write-protection on the
+#      reviewer link.
+# ─────────────────────────────────────────────────────────────────────────────
+
+databases:
+  - name: shelftrace-db
+    plan: free
+    databaseName: shelftrace_db
+    user: shelftrace
+    postgresMajorVersion: 16
+
+services:
+  # ─── Redis ───────────────────────────────────────────────────────────────
+  - type: redis
+    name: shelftrace-redis
+    plan: free
+    ipAllowList: []   # Render-internal only
+    maxmemoryPolicy: allkeys-lru
+
+  # ─── FastAPI Web Service ─────────────────────────────────────────────────
+  - type: web
+    name: shelftrace-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    # Override the Dockerfile CMD so uvicorn listens on Render's injected
+    # $PORT (usually 10000) instead of the hardcoded 8000 used locally.
+    # Local docker-compose stays unaffected — that path still uses CMD.
+    dockerCommand: sh -c "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      # Wire Postgres + Redis from the resources above
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shelftrace-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: shelftrace-redis
+          property: connectionString
+
+      # Demo behavior — auto-seeds Memorial Day / Dallas Zone 2 batch + cert
+      - key: DEMO_MODE
+        value: "true"
+
+      # Migrations — Alembic on first boot, then idempotent on redeploys
+      - key: USE_ALEMBIC
+        value: "true"
+
+      # Observability — JSON logs for Render's log explorer
+      - key: LOG_FORMAT
+        value: json
+      - key: LOG_LEVEL
+        value: info
+
+      # CORS — REPLACE this default once Vercel domain is provisioned.
+      # Comma-separated, no spaces. Include both the production domain and
+      # any preview-branch deploys you want to allow.
+      - key: CORS_ORIGINS
+        value: "https://shelftrace.vercel.app,http://localhost:3000"
+
+      # Optional auth — leave empty for fully open read+write demo, or set
+      # to '{"viewer-key-here":{"role":"viewer","actor":"Reviewer"}}'
+      # to require Authorization: Bearer viewer-key-here on writes.
+      - key: API_KEYS_JSON
+        value: ""
+
+      # Reliability tuning — defaults are fine for demo; surfaced for clarity
+      - key: OUTBOX_MAX_ATTEMPTS
+        value: "5"
+      - key: OUTBOX_RETRY_BASE_SECONDS
+        value: "1.0"
+      - key: OUTBOX_RETRY_MAX_SECONDS
+        value: "60.0"
+
+      # Off by default — flip on if you wire an OTLP collector
+      - key: OTEL_ENABLED
+        value: "false"
+      - key: RATE_LIMIT_ENABLED
+        value: "false"
