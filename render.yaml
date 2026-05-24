@@ -1,21 +1,24 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Render Blueprint — ShelfTrace Control Plane (free-tier demo)
 #
-# Spins up 3 services from one blueprint:
+# Spins up 2 services from one blueprint:
 #   • shelftrace-api   — FastAPI web service (free, cold-starts after 15min idle)
 #   • shelftrace-db    — Managed Postgres (free, expires after 90 days)
-#   • shelftrace-redis — Managed Redis    (free, expires after 30 days)
 #
 # Not deployed here (intentional, free-tier limits):
 #   • Background outbox worker — Render has no free worker tier. The API
-#     already drains the outbox inline on POST /price-batches (see
+#     drains the outbox inline on POST /price-batches (see
 #     backend/app/routers/batches.py), so the demo is fully functional
-#     without a separate worker process. If you upgrade to paid, add a
-#     `type: worker` entry pointing at `python -m app.worker`.
+#     without a separate worker process.
+#   • Redis — Render free tier allows only 1 Key Value instance per account.
+#     ShelfTrace only uses Redis for (a) the standalone worker (not
+#     deployed) and (b) rate limiting (off by default). REDIS_ENABLED=false
+#     tells /health to skip the Redis probe so the service stays healthy
+#     without one. To run with Redis, upgrade Redis to a paid plan and
+#     flip REDIS_ENABLED back to true.
 #
 # After applying this blueprint:
-#   1. Render auto-generates DATABASE_URL and REDIS_URL via fromDatabase /
-#      fromService refs below.
+#   1. Render auto-generates DATABASE_URL via fromDatabase ref below.
 #   2. Set CORS_ORIGINS in Render UI once the Vercel frontend URL is known.
 #   3. (Optional) Set API_KEYS_JSON if you want write-protection on the
 #      reviewer link.
@@ -29,13 +32,6 @@ databases:
     postgresMajorVersion: 16
 
 services:
-  # ─── Redis ───────────────────────────────────────────────────────────────
-  - type: redis
-    name: shelftrace-redis
-    plan: free
-    ipAllowList: []   # Render-internal only
-    maxmemoryPolicy: allkeys-lru
-
   # ─── FastAPI Web Service ─────────────────────────────────────────────────
   - type: web
     name: shelftrace-api
@@ -51,16 +47,16 @@ services:
     # Local docker-compose stays unaffected — that path still uses CMD.
     dockerCommand: sh -c "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
-      # Wire Postgres + Redis from the resources above
+      # Wire Postgres from the database above
       - key: DATABASE_URL
         fromDatabase:
           name: shelftrace-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: shelftrace-redis
-          property: connectionString
+
+      # Tell /health to skip the Redis liveness probe. The outbox drains
+      # inline on POST, so Redis isn't required at runtime for the demo.
+      - key: REDIS_ENABLED
+        value: "false"
 
       # Demo behavior — auto-seeds Memorial Day / Dallas Zone 2 batch + cert
       - key: DEMO_MODE

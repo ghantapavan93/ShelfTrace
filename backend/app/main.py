@@ -146,10 +146,22 @@ def _check_redis() -> tuple[bool, str | None]:
 
 @app.get("/health")
 def health(response: Response):
-    """Deep liveness probe — DB and Redis, with structured body."""
+    """Deep liveness probe — DB always required, Redis only when REDIS_ENABLED.
+
+    Free-tier hosts often skip Redis (the API drains the outbox inline). In
+    that case the probe reports redis as "disabled" rather than failing, so
+    the container stays healthy and the platform doesn't restart it.
+    """
     db_ok, db_err = _check_db()
-    redis_ok, redis_err = _check_redis()
-    ok = db_ok and redis_ok
+
+    if settings.redis_enabled:
+        redis_ok, redis_err = _check_redis()
+        redis_view: dict[str, object] = {"ok": redis_ok, "error": redis_err}
+        ok = db_ok and redis_ok
+    else:
+        redis_view = {"ok": True, "status": "disabled"}
+        ok = db_ok
+
     if not ok:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return {
@@ -162,7 +174,7 @@ def health(response: Response):
         "log_format": settings.log_format,
         "dependencies": {
             "database": {"ok": db_ok, "error": db_err},
-            "redis": {"ok": redis_ok, "error": redis_err},
+            "redis": redis_view,
         },
     }
 

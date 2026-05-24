@@ -39,6 +39,10 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg2://shelftrace:shelftrace@localhost:5432/shelftrace_db"
     redis_url: str = "redis://localhost:6379/0"
+    # Skip the Redis liveness probe and any optional Redis features when false.
+    # Useful for free-tier hosts that don't include a managed Redis. The API
+    # drains the outbox inline on POST, so Redis is not required at runtime.
+    redis_enabled: bool = True
     demo_mode: bool = True
     log_level: str = "info"
 
