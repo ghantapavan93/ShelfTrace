@@ -2,23 +2,18 @@
 
 import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import type { ElementType } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
-  BadgeCheck,
   Brain,
   Compass,
   Eye,
   Footprints,
   Gauge,
-  Hand,
   HandHelping,
   History,
-  Lock,
-  PencilLine,
-  ShieldCheck,
   ShieldQuestion,
-  SignpostBig,
   Slash,
   TrendingDown,
   TriangleAlert,
@@ -26,21 +21,32 @@ import {
 } from "lucide-react";
 import { Pill } from "./Shell";
 import {
+  Annotation,
+  AuditLogStream,
+  ChannelAgreementPanel,
   ChapterMarker,
   CinePhoto,
   FilmGrain,
+  LanePipe,
   MagneticButton,
   MagneticLink,
+  MilkGlyph,
+  OperatorActionRow,
+  OperatorDashboard,
   Particles,
   PHOTOS,
+  ProductCard,
+  Stage,
 } from "./cinematic";
 import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
 
 /* ────────────────────────────────────────────────────────────────────────────
    /vision/principle — "It guides. It does not act alone."
-   The positioning page. Frames ShelfTrace as a control system + safety layer
-   for approved pricing decisions, not an autonomous agent. Humans keep the
-   final approval — every claim verifiable against the working repo.
+   BetterBasket-style numbered story rows for "the six things it does" —
+   each row gets a rich animated product/UI mockup on alternating sides.
+   Fast-lane / Slow-lane becomes one animated 2-pipe diagram.
+   Human-control safeguards become one operator-dashboard mockup.
+   Hero · Seatbelt · Risks · Closing unchanged.
    ──────────────────────────────────────────────────────────────────────────── */
 
 /* ─────────────────────────────── 1. HERO ─────────────────────────────────── */
@@ -118,85 +124,356 @@ function Hero({ onScroll }: { onScroll: () => void }) {
   );
 }
 
-/* ─────────────────────────────── 2. SIX THINGS IT DOES ──────────────────── */
+/* ─────────────────────────────── 6 rich visual mockups ─────────────────── */
 
-const SIX_THINGS = [
+/* 01 — Guides decisions: product card + 3-channel agreement panel */
+function GuidesVisual() {
+  return (
+    <Stage accent="sky">
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-4">
+        <ProductCard
+          name="Organic Whole Milk"
+          units="1 GAL"
+          price="$5.99"
+          glyph={<MilkGlyph />}
+          tone="primary"
+          size="lg"
+          badge={{ label: "canonical", tone: "primary" }}
+        />
+        <ChannelAgreementPanel
+          channels={[
+            { name: "POS", status: "fail" },
+            { name: "ESL", status: "ok" },
+            { name: "WEB", status: "ok" },
+          ]}
+        />
+      </div>
+      <Annotation className="top-6 left-6" delay={0.5} bob={false}>
+        <span className="rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] uppercase tracking-[.22em] text-white/60 backdrop-blur">
+          operator sees full context
+        </span>
+      </Annotation>
+      <Annotation className="bottom-6 right-6" delay={0.7}>
+        <span className="rounded-full border border-rose-500/40 bg-rose-500/[.10] px-3 py-1 text-[10px] uppercase tracking-[.22em] text-rose-200 backdrop-blur">
+          POS disagrees · review
+        </span>
+      </Annotation>
+    </Stage>
+  );
+}
+
+/* 02 — Evaluates risk: canary in front, expansion behind a gate */
+function EvaluatesVisual() {
+  const reduced = useReducedMotion();
+  const canary = ["Store 214", "Store 302"];
+  const expansion = ["Store 317", "Store 401"];
+  return (
+    <Stage accent="orange">
+      <div className="absolute inset-0 flex flex-col justify-center px-8">
+        <div className="mb-4 flex items-center justify-between text-[10px] uppercase tracking-[.22em]">
+          <span className="text-orange-200">canary corridor · first</span>
+          <span className="text-white/45">expansion · after verified</span>
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+          {/* canary stores */}
+          <div className="space-y-3">
+            {canary.map((s, i) => (
+              <motion.div
+                key={s}
+                initial={{ opacity: 0, x: -10 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 + i * 0.1, ease: EASE.outQuart }}
+                className="rounded-xl border border-orange-500/40 bg-orange-500/[.06] px-4 py-3 backdrop-blur"
+              >
+                <p className="text-[10px] uppercase tracking-[.22em] text-orange-300">canary</p>
+                <p className="mt-1 text-sm font-semibold text-white">{s}</p>
+                <p className="mt-1 font-mono text-[10px] text-emerald-300">verified ✓</p>
+              </motion.div>
+            ))}
+          </div>
+          {/* the gate */}
+          <div className="relative flex h-[160px] flex-col items-center justify-center">
+            <motion.div
+              animate={reduced ? undefined : { scaleY: [1, 1.05, 1], opacity: [0.7, 1, 0.7] }}
+              transition={reduced ? undefined : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+              className="h-full w-[3px] bg-gradient-to-b from-orange-400/0 via-orange-400 to-orange-400/0 shadow-[0_0_18px_rgba(251,146,60,.6)]"
+            />
+            <span className="absolute top-1/2 -translate-y-1/2 rounded-full border border-orange-500/50 bg-[#04070b] px-3 py-1 text-[9px] uppercase tracking-[.22em] text-orange-200">
+              gate
+            </span>
+          </div>
+          {/* expansion (waiting) */}
+          <div className="space-y-3">
+            {expansion.map((s, i) => (
+              <motion.div
+                key={s}
+                initial={{ opacity: 0, x: 10 }}
+                whileInView={{ opacity: 0.55, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.3 + i * 0.1, ease: EASE.outQuart }}
+                className="rounded-xl border border-white/8 bg-white/[.02] px-4 py-3"
+              >
+                <p className="text-[10px] uppercase tracking-[.22em] text-white/45">expansion</p>
+                <p className="mt-1 text-sm font-semibold text-white/70">{s}</p>
+                <p className="mt-1 font-mono text-[10px] text-amber-300/80">waiting · held</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Stage>
+  );
+}
+
+/* 03 — Remembers policy: rolling audit log */
+function RemembersVisual() {
+  return (
+    <Stage accent="orange">
+      <div className="absolute inset-x-8 top-1/2 -translate-y-1/2">
+        <AuditLogStream
+          rows={[
+            { t: "T+02.30", event: "incident.open · INC-2147 · drift +$0.50", tone: "err", actor: "system" },
+            { t: "T+02.34", event: "containment.hold · downstream paused", tone: "warn", actor: "system" },
+            { t: "T+02.71", event: "twin.replay · safe-to-live=true", tone: "ok", actor: "system" },
+            { t: "T+02.78", event: "live.retry · pos.ack ok · aligned", tone: "ok", actor: "system" },
+            { t: "T+02.84", event: "audit.seal · ack < resolve · sealed", tone: "ok", actor: "Avery Davis" },
+            { t: "T+02.91", event: "attribution.release · verified-only", tone: "ok", actor: "system" },
+          ]}
+        />
+      </div>
+      <Annotation className="bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap" delay={0.6} bob={false}>
+        <span className="rounded-full border border-white/10 bg-black/55 px-3 py-1 text-[10px] uppercase tracking-[.22em] text-white/65 backdrop-blur">
+          every action · microsecond-stamped · ack precedes resolve · always
+        </span>
+      </Annotation>
+    </Stage>
+  );
+}
+
+/* 04 — Highlights problems: incident card with mismatch */
+function HighlightsVisual() {
+  const reduced = useReducedMotion();
+  return (
+    <Stage accent="rose">
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        <motion.div
+          initial={{ opacity: 0, x: 40 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ ...SPRING.bouncy, delay: 0.2 }}
+          className="relative w-[340px] rounded-2xl border border-rose-500/50 bg-[#1a0a0e]/95 p-5 backdrop-blur shadow-[0_30px_60px_-20px_rgba(244,63,94,.55)]"
+        >
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[.22em] text-rose-300">
+              <TriangleAlert className="h-3.5 w-3.5" /> critical incident
+            </span>
+            <span className="font-mono text-[10px] text-rose-300/80">INC-2147</span>
+          </div>
+          <p className="mt-3 text-base font-semibold text-white">Organic Whole Milk · Aisle 4</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/[.06] p-2.5">
+              <p className="text-[10px] uppercase tracking-[.18em] text-emerald-200">canonical</p>
+              <p className="mt-0.5 font-mono text-base text-emerald-100">$5.99</p>
+            </div>
+            <div className="rounded-lg border border-rose-500/40 bg-rose-500/[.10] p-2.5">
+              <p className="text-[10px] uppercase tracking-[.18em] text-rose-200">POS rang</p>
+              <p className="mt-0.5 font-mono text-base text-rose-100">$6.49</p>
+            </div>
+          </div>
+          <p className="mt-3 text-[11px] text-white/55">
+            <span className="font-medium text-amber-200">Drift +$0.50.</span> Downstream rollout paused
+            pending acknowledgement.
+          </p>
+          {!reduced && (
+            <motion.span
+              aria-hidden
+              className="pointer-events-none absolute -inset-0.5 rounded-2xl border-2 border-rose-500/50"
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+            />
+          )}
+        </motion.div>
+      </div>
+      <Annotation className="top-6 right-6" delay={0.7} bob={false}>
+        <span className="rounded-full border border-rose-500/30 bg-rose-500/[.10] px-3 py-1 text-[10px] uppercase tracking-[.22em] text-rose-200 backdrop-blur">
+          surfaced in seconds · not the weekly recon
+        </span>
+      </Annotation>
+    </Stage>
+  );
+}
+
+/* 05 — Supports approvals: 3 operator action buttons */
+function SupportsVisual() {
+  return (
+    <Stage accent="emerald">
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px]">
+        <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[.22em] text-white/55">
+          <span>operator actions · INC-2147</span>
+          <span className="font-mono text-emerald-300">awaiting</span>
+        </div>
+        <OperatorActionRow highlighted={2} />
+        <p className="mt-4 text-[11px] text-white/55">
+          Resolution requires acknowledgement. The engine will refuse if the channel still disagrees.
+        </p>
+      </div>
+    </Stage>
+  );
+}
+
+/* 06 — Humans stay in control: dashboard mockup primitive */
+function HumansVisual() {
+  return <OperatorDashboard />;
+}
+
+/* ─────────────────────────────── story row layout ──────────────────────── */
+
+type Thing = {
+  icon: ElementType;
+  title: string;
+  body: string;
+  bullets: string[];
+  visual: React.ReactNode;
+};
+
+const SIX_THINGS: Thing[] = [
   {
     icon: Compass,
     title: "Guides decisions",
-    body: "Shows the canonical price, the channels in agreement, and the channel that disagreed — so the operator decides with full context, not in the dark.",
+    body: "Surfaces the canonical price, which channels agree, and which channel disagreed — so the operator decides with full context, not in the dark.",
+    bullets: [
+      "Canonical price + 3-channel agreement signal",
+      "Disagreeing channel pulses, not buried in a log",
+      "Drilldown to source receipt in one click",
+    ],
+    visual: <GuidesVisual />,
   },
   {
     icon: ShieldQuestion,
     title: "Evaluates risk",
     body: "Every approved price flows through the same engine: canary stores first, every channel reconciled, expansion gated on verified state.",
+    bullets: [
+      "Canary corridor before any wider rollout",
+      "Gate physically blocks expansion until canary verified",
+      "No path around it — the schema enforces ordering",
+    ],
+    visual: <EvaluatesVisual />,
   },
   {
     icon: History,
     title: "Remembers policy decisions",
-    body: "Every retry, acknowledgement, reconciliation and resolution lands in an immutable audit trail with preserved causal ordering.",
+    body: "Every retry, acknowledgement, reconciliation and resolution lands in an immutable audit trail with preserved causal ordering — ack always precedes resolve.",
+    bullets: [
+      "Microsecond-stamped event ordering",
+      "Tamper-evident · the legal record",
+      "Operator name attached to every manual action",
+    ],
+    visual: <RemembersVisual />,
   },
   {
     icon: TriangleAlert,
     title: "Highlights problems",
-    body: "A POS that returned the wrong price opens a critical incident the moment it's observed — before a shopper rings it twice.",
+    body: "A POS that returns the wrong price opens a critical incident the moment it's observed — before a shopper rings it twice.",
+    bullets: [
+      "Reconciliation runs on every ack, not on a schedule",
+      "Incidents typed by severity (critical · urgent · warning)",
+      "Containment fires before downstream stores see the drift",
+    ],
+    visual: <HighlightsVisual />,
   },
   {
     icon: HandHelping,
     title: "Supports approvals",
     body: "Operators retry, roll back, resolve, or escalate to a store task. The system enforces the rule that resolution requires acknowledgement.",
+    bullets: [
+      "Four operator paths · all reversible until sealed",
+      "Engine refuses to close on a stale view",
+      "Two operators on the same incident are serialised by row lock",
+    ],
+    visual: <SupportsVisual />,
   },
   {
     icon: UserCheck,
     title: "Humans stay in control",
     body: "Expansion to the rest of the zone is never automatic when shopper-facing prices disagree. The operator presses Expand. Always.",
+    bullets: [
+      "Final approval gates every mutating endpoint",
+      "API-key role required for write operations",
+      "Audit row captures who pressed the button",
+    ],
+    visual: <HumansVisual />,
   },
 ];
 
-function SixThings({ anchorRef }: { anchorRef: React.RefObject<HTMLDivElement> }) {
+function ThingRow({ thing, index }: { thing: Thing; index: number }) {
+  const Icon = thing.icon;
+  const flip = index % 2 === 1;
   return (
-    <section ref={anchorRef} className="scroll-mt-12">
-      <ChapterMarker n="01" label="What it actually does" />
-      <div className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-28">
+    <section className="relative">
+      <div className="relative mx-auto grid max-w-[1400px] gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[1fr_1.3fr] lg:items-center">
+        <div className="absolute left-4 top-16 hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#04070b] font-mono text-[11px] font-semibold text-white/55 sm:flex">
+          {String(index + 1).padStart(2, "0")}
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 26 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-120px" }}
+          transition={{ duration: 0.7, ease: EASE.outQuart }}
+          className={`min-w-0 ${flip ? "lg:order-2" : "lg:order-1"}`}
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[.04] text-sky-300">
+              <Icon className="h-4 w-4" />
+            </span>
+            <span className="text-[10px] uppercase tracking-[.22em] text-sky-300/80">six things · #{index + 1}</span>
+          </div>
+          <h3 className="mt-5 text-[clamp(26px,3.5vw,46px)] font-semibold leading-[1.05] tracking-[-0.02em] text-white">
+            {thing.title}
+          </h3>
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-white/65">{thing.body}</p>
+          <ul className="mt-6 space-y-2.5">
+            {thing.bullets.map((b, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-white/70">
+                <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-sky-300" />
+                {b}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.8, delay: 0.1, ease: EASE.outQuart }}
+          className={`min-w-0 ${flip ? "lg:order-1" : "lg:order-2"}`}
+        >
+          {thing.visual}
+        </motion.div>
+      </div>
+      <div className="absolute left-[33px] top-0 h-full w-px bg-gradient-to-b from-transparent via-white/8 to-transparent hidden sm:block" />
+    </section>
+  );
+}
+
+function SixThingsStory({ anchorRef }: { anchorRef: React.RefObject<HTMLDivElement> }) {
+  return (
+    <div ref={anchorRef} className="scroll-mt-12">
+      <ChapterMarker n="01" label="The six things it does" />
+      <div className="mx-auto max-w-[1400px] px-5 pt-6 sm:px-8">
         <div className="max-w-3xl">
-          <Pill tone="orange">Six things, every time</Pill>
-          <h2 className="mt-5 text-[clamp(32px,5vw,64px)] font-semibold leading-[1.04] tracking-[-0.02em] text-white">
+          <Pill tone="orange">Each row maps to working code</Pill>
+          <h2 className="mt-5 text-[clamp(30px,4.5vw,60px)] font-semibold leading-[1.05] tracking-[-0.02em] text-white">
             A control system, not a decision-maker.
           </h2>
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/55">
-            Each row maps to working code in the repo. None of these are aspirational — they're
-            what the 47-test engine already does, every batch.
-          </p>
-        </div>
-        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {SIX_THINGS.map((t, i) => {
-            const Icon = t.icon;
-            return (
-              <motion.div
-                key={t.title}
-                initial={{ opacity: 0, y: 22 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-80px" }}
-                transition={{ duration: 0.65, delay: i * 0.06, ease: EASE.outQuart }}
-                whileHover={{ y: -3 }}
-                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[.04] to-transparent p-6"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[.04] text-sky-300 transition-colors duration-300 group-hover:text-orange-300">
-                    <Icon className="h-4.5 w-4.5" size={18} />
-                  </span>
-                  <span className="font-mono text-[10px] tracking-[.22em] text-white/30 uppercase">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                </div>
-                <p className="mt-5 text-lg font-semibold leading-snug text-white">{t.title}</p>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">{t.body}</p>
-              </motion.div>
-            );
-          })}
         </div>
       </div>
-    </section>
+      {SIX_THINGS.map((t, i) => (
+        <ThingRow key={t.title} thing={t} index={i} />
+      ))}
+    </div>
   );
 }
 
@@ -212,7 +489,6 @@ function SeatbeltMoment() {
   return (
     <section ref={ref} className="relative isolate overflow-hidden border-y border-white/[.06]">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_30%,rgba(34,197,94,.06),transparent_55%),linear-gradient(180deg,#06090f,#04070b)]" />
-      {/* the "seatbelt" line — abstract, just a tilted accent */}
       <motion.div
         style={{ y: beltY, opacity: beltOpacity }}
         className="pointer-events-none absolute -right-32 top-1/2 h-[140%] w-[2px] -translate-y-1/2 rotate-[18deg] bg-gradient-to-b from-transparent via-orange-400/55 to-transparent shadow-[0_0_60px_rgba(251,146,60,.3)]"
@@ -242,7 +518,7 @@ function SeatbeltMoment() {
   );
 }
 
-/* ─────────────────────────────── 4. WHAT ONE BAD DECISION COSTS ─────────── */
+/* ─────────────────────────────── 4. RISKS LIST ─────────────────────────── */
 
 const RISKS = [
   { icon: TrendingDown, label: "Shoppers charged the wrong price at checkout" },
@@ -279,6 +555,7 @@ function RisksItPrevents() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.5, delay: i * 0.04, ease: EASE.outQuart }}
+                whileHover={{ y: -2 }}
                 className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.025] p-4 transition-colors duration-200 hover:border-rose-500/30 hover:bg-rose-500/[.04]"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[.04] text-rose-300">
@@ -294,7 +571,7 @@ function RisksItPrevents() {
   );
 }
 
-/* ─────────────────────────── 5. FAST LANE / SLOW LANE ───────────────────── */
+/* ─────────────────────────── 5. FAST LANE / SLOW LANE ─────────────────── */
 
 function FastLaneSlowLane() {
   return (
@@ -307,100 +584,19 @@ function FastLaneSlowLane() {
             Safe decisions move fast. Risky ones surface to a human.
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/55">
-            ShelfTrace doesn't add friction to normal operation. The same engine runs both paths.
+            ShelfTrace doesn't add friction to normal operation. The same engine runs both paths —
+            visualised below as two pipes, one flowing freely, one stopped at the human-review gate.
           </p>
         </div>
-        <div className="mt-12 grid gap-5 lg:grid-cols-2">
-          {/* Fast lane */}
-          <motion.div
-            initial={{ opacity: 0, y: 22 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.65, ease: EASE.outQuart }}
-            className="relative overflow-hidden rounded-3xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[.06] to-transparent p-7"
-          >
-            <div className="flex items-center justify-between">
-              <Pill tone="green">Fast lane · default</Pill>
-              <span className="text-[10px] tracking-[.22em] text-emerald-300/80 uppercase">
-                automatic
-              </span>
-            </div>
-            <h3 className="mt-5 text-2xl font-semibold leading-snug text-white">
-              All channels agree.
-              <br /> Eligible to expand.
-            </h3>
-            <ol className="mt-6 space-y-3 text-sm text-white/65">
-              {[
-                "Approved price commits to outbox in one PostgreSQL transaction",
-                "Workers dispatch to shelf · POS · ecommerce under SKIP LOCKED",
-                "Acknowledgements reconcile against canonical",
-                "All channels verified → status: ready_for_expansion",
-                "Operator presses Expand · audit trail sealed",
-              ].map((line, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-500/35 bg-emerald-500/[.08] text-[10px] font-semibold text-emerald-200">
-                    {i + 1}
-                  </span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ol>
-          </motion.div>
-          {/* Slow lane */}
-          <motion.div
-            initial={{ opacity: 0, y: 22 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.65, delay: 0.1, ease: EASE.outQuart }}
-            className="relative overflow-hidden rounded-3xl border border-rose-500/25 bg-gradient-to-br from-rose-500/[.06] to-transparent p-7"
-          >
-            <div className="flex items-center justify-between">
-              <Pill tone="red">Slow lane · escalates</Pill>
-              <span className="text-[10px] tracking-[.22em] text-rose-300/80 uppercase">
-                operator review
-              </span>
-            </div>
-            <h3 className="mt-5 text-2xl font-semibold leading-snug text-white">
-              Channels disagree.
-              <br /> Expansion blocked.
-            </h3>
-            <ol className="mt-6 space-y-3 text-sm text-white/65">
-              {[
-                "POS reports a different price than the canonical $5.99",
-                "Reconciliation detects the gap · critical incident opens",
-                "Containment fires · downstream rollout paused · attribution held",
-                "Operator inspects, retries the failing channel, or rolls back",
-                "Resolution requires acknowledgement · then the lane reopens",
-              ].map((line, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-rose-500/35 bg-rose-500/[.08] text-[10px] font-semibold text-rose-200">
-                    {i + 1}
-                  </span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ol>
-          </motion.div>
+        <div className="mt-12">
+          <LanePipe />
         </div>
-        <p className="mt-6 max-w-3xl text-center mx-auto text-sm text-white/45">
-          Most rollouts run the fast lane end-to-end. The slow lane only opens when a shopper-facing
-          channel disagrees. That's the only friction by design.
-        </p>
       </div>
     </section>
   );
 }
 
-/* ─────────────────────────── 6. HUMAN CONTROL SAFEGUARDS ───────────────── */
-
-const HUMAN_CONTROLS = [
-  { icon: Hand, label: "Final approval to expand · always" },
-  { icon: PencilLine, label: "Policy edits and overrides" },
-  { icon: Lock, label: "Role-based access (operator / viewer)" },
-  { icon: BadgeCheck, label: "Audit trail · who approved what, when" },
-  { icon: SignpostBig, label: "Manual retry · rollback · escalate" },
-  { icon: ShieldCheck, label: "Auth-required mutating endpoints" },
-];
+/* ─────────────────────────── 6. HUMAN CONTROL ──────────────────────────── */
 
 function HumanControl() {
   return (
@@ -431,27 +627,14 @@ function HumanControl() {
               </MagneticLink>
             </div>
           </div>
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {HUMAN_CONTROLS.map((h, i) => {
-              const Icon = h.icon;
-              return (
-                <motion.li
-                  key={h.label}
-                  initial={{ opacity: 0, y: 18 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-80px" }}
-                  transition={{ duration: 0.5, delay: i * 0.05, ease: EASE.outQuart }}
-                  whileHover={{ scale: 1.02 }}
-                  className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.025] p-4"
-                >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-500/30 bg-violet-500/[.08] text-violet-200">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="text-sm text-white/80">{h.label}</span>
-                </motion.li>
-              );
-            })}
-          </ul>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: EASE.outQuart }}
+          >
+            <OperatorDashboard />
+          </motion.div>
         </div>
       </div>
     </section>
@@ -520,7 +703,7 @@ export default function PrinciplePage() {
     <div className="relative bg-[#04070b]">
       <FilmGrain id="principle" />
       <Hero onScroll={() => sixRef.current?.scrollIntoView({ behavior: "smooth" })} />
-      <SixThings anchorRef={sixRef} />
+      <SixThingsStory anchorRef={sixRef} />
       <SeatbeltMoment />
       <RisksItPrevents />
       <FastLaneSlowLane />

@@ -123,17 +123,152 @@ function Hero({ onLive }: { onLive: () => void }) {
   );
 }
 
+/* ─────────────────────────── data-field mini mockups ────────────────────── */
+/* Tiny illustrative previews — one per data shape. Inline SVG, no chrome. */
+
+function MiniProductCatalog() {
+  return (
+    <svg viewBox="0 0 160 60" className="h-full w-full">
+      {[6, 58, 110].map((x, i) => (
+        <g key={x}>
+          <rect x={x} y="6" width="44" height="48" rx="3" fill="#0e1320" stroke={i === 1 ? "#fb923c" : "#1e293b"} strokeWidth="0.6" />
+          <rect x={x + 6} y="12" width="32" height="18" rx="1.5" fill="rgba(255,255,255,.05)" />
+          <text x={x + 22} y="42" fontSize="6" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-monospace, monospace">
+            ${[5.99, 4.19, 6.79][i]}
+          </text>
+          <text x={x + 22} y="49" fontSize="3.5" textAnchor="middle" fill="rgba(255,255,255,.45)" fontFamily="ui-sans-serif, system-ui">
+            {["MILK", "EGGS", "OJ"][i]}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function MiniApprovedActions() {
+  return (
+    <svg viewBox="0 0 160 60" className="h-full w-full">
+      <text x="14" y="22" fontSize="11" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace" textDecoration="line-through">$5.49</text>
+      <line x1="56" y1="20" x2="100" y2="20" stroke="#fb923c" strokeWidth="1.4" />
+      <polygon points="100,20 94,16 94,24" fill="#fb923c" />
+      <text x="108" y="22" fontSize="13" fontWeight="700" fill="#fb923c" fontFamily="ui-monospace, monospace">$5.99</text>
+      <rect x="14" y="36" width="132" height="14" rx="2" fill="#0e1320" stroke="#22c55e" strokeWidth="0.5" />
+      <text x="20" y="46" fontSize="7" fill="#86efac" fontFamily="ui-monospace, monospace">approved · memorial-day · zone DAL</text>
+    </svg>
+  );
+}
+
+function MiniMarginBar() {
+  return (
+    <svg viewBox="0 0 160 60" className="h-full w-full">
+      <text x="10" y="14" fontSize="7" fill="rgba(255,255,255,.55)" fontFamily="ui-monospace, monospace">COST</text>
+      <text x="106" y="14" fontSize="7" fill="rgba(255,255,255,.55)" fontFamily="ui-monospace, monospace">PRICE</text>
+      <rect x="10" y="20" width="140" height="14" rx="3" fill="#0e1320" stroke="#1e293b" strokeWidth="0.5" />
+      <rect x="10" y="20" width="84" height="14" rx="3" fill="rgba(244,63,94,.25)" />
+      <rect x="94" y="20" width="56" height="14" rx="3" fill="rgba(34,197,94,.45)" />
+      <text x="50" y="29" fontSize="7" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-monospace, monospace">$3.59</text>
+      <text x="122" y="29" fontSize="7" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-monospace, monospace">+$2.40</text>
+      <text x="10" y="46" fontSize="6.5" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace">margin 40% · target 38%</text>
+    </svg>
+  );
+}
+
+function MiniInventory() {
+  const dots = Array.from({ length: 12 });
+  return (
+    <svg viewBox="0 0 160 60" className="h-full w-full">
+      {dots.map((_, i) => {
+        const filled = i < 4;
+        return (
+          <rect
+            key={i}
+            x={10 + i * 12}
+            y="22"
+            width="10"
+            height="22"
+            rx="2"
+            fill={filled ? "#22c55e" : "rgba(255,255,255,.06)"}
+            stroke={filled ? "#16a34a" : "#1e293b"}
+            strokeWidth="0.4"
+          />
+        );
+      })}
+      <text x="10" y="14" fontSize="7" fill="rgba(255,255,255,.55)" fontFamily="ui-monospace, monospace">ON HAND</text>
+      <text x="150" y="14" fontSize="7" textAnchor="end" fill="#fda4af" fontFamily="ui-monospace, monospace">4 / 12 · low</text>
+    </svg>
+  );
+}
+
+function MiniCompetitor() {
+  return (
+    <svg viewBox="0 0 160 60" className="h-full w-full">
+      <rect x="6" y="10" width="64" height="40" rx="3" fill="#0e1320" stroke="#22c55e" strokeWidth="0.6" />
+      <text x="38" y="22" fontSize="6.5" textAnchor="middle" fill="#86efac" fontFamily="ui-monospace, monospace">OURS</text>
+      <text x="38" y="38" fontSize="12" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-monospace, monospace">$5.99</text>
+      <rect x="90" y="10" width="64" height="40" rx="3" fill="#0e1320" stroke="#f43f5e" strokeWidth="0.6" />
+      <text x="122" y="22" fontSize="6.5" textAnchor="middle" fill="#fda4af" fontFamily="ui-monospace, monospace">THEIRS</text>
+      <text x="122" y="38" fontSize="12" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-monospace, monospace">$5.49</text>
+      <text x="80" y="56" fontSize="6.5" textAnchor="middle" fill="#fda4af" fontFamily="ui-monospace, monospace">gap −$0.50</text>
+    </svg>
+  );
+}
+
+function MiniSubstitution() {
+  return (
+    <svg viewBox="0 0 160 60" className="h-full w-full">
+      <rect x="10" y="14" width="52" height="32" rx="3" fill="#0e1320" stroke="#94a3b8" strokeWidth="0.5" />
+      <text x="36" y="28" fontSize="7" textAnchor="middle" fill="#fff" fontFamily="ui-sans-serif, system-ui">Brand A</text>
+      <text x="36" y="40" fontSize="6" textAnchor="middle" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace">out</text>
+      <line x1="70" y1="30" x2="92" y2="30" stroke="#a78bfa" strokeWidth="1.4" strokeDasharray="3 2" />
+      <polygon points="92,30 86,26 86,34" fill="#a78bfa" />
+      <rect x="98" y="14" width="52" height="32" rx="3" fill="#0e1320" stroke="#a78bfa" strokeWidth="0.5" />
+      <text x="124" y="28" fontSize="7" textAnchor="middle" fill="#fff" fontFamily="ui-sans-serif, system-ui">Brand B</text>
+      <text x="124" y="40" fontSize="6" textAnchor="middle" fill="#c4b5fd" fontFamily="ui-monospace, monospace">substitute</text>
+    </svg>
+  );
+}
+
+function MiniPromotional() {
+  return (
+    <svg viewBox="0 0 160 60" className="h-full w-full">
+      <rect x="10" y="10" width="140" height="40" rx="3" fill="#0e1320" stroke="#fb923c" strokeWidth="0.6" />
+      <rect x="10" y="10" width="140" height="10" rx="3" fill="rgba(251,146,60,.18)" />
+      <text x="14" y="18" fontSize="6" fill="#fdba74" fontFamily="ui-monospace, monospace">MEMORIAL DAY · MAY 27</text>
+      <text x="14" y="32" fontSize="8" fill="#fff" fontFamily="ui-sans-serif, system-ui">Markdown · 4 SKUs · zone DAL</text>
+      <text x="14" y="43" fontSize="6" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace">deadline · 6 PM</text>
+    </svg>
+  );
+}
+
+function MiniApprovalPolicy() {
+  return (
+    <svg viewBox="0 0 160 60" className="h-full w-full">
+      <circle cx="32" cy="30" r="14" fill="rgba(167,139,250,.18)" stroke="#a78bfa" strokeWidth="0.6" />
+      <text x="32" y="33" fontSize="8" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-sans-serif, system-ui">AD</text>
+      <text x="56" y="26" fontSize="8" fill="#fff" fontFamily="ui-sans-serif, system-ui">Avery Davis</text>
+      <text x="56" y="36" fontSize="6.5" fill="rgba(255,255,255,.55)" fontFamily="ui-monospace, monospace">operator · zones DAL/AUS</text>
+      <rect x="56" y="42" width="42" height="10" rx="2" fill="rgba(34,197,94,.18)" stroke="#22c55e" strokeWidth="0.4" />
+      <text x="77" y="49" fontSize="5.5" textAnchor="middle" fill="#86efac" fontFamily="ui-monospace, monospace">may expand</text>
+    </svg>
+  );
+}
+
 /* ─────────────────────────── 2. DATA THE SYSTEM NEEDS ────────────────────── */
 
-const DATA_FIELDS = [
-  { icon: Package, label: "Product catalog", body: "SKU · name · category · brand · KVI flag" },
-  { icon: TrendingUp, label: "Approved price actions", body: "Approved price · prior price · reason · effective window" },
-  { icon: Tag, label: "Cost & margin context", body: "Unit cost · margin target · projected impact" },
-  { icon: Boxes, label: "Inventory snapshot", body: "On-hand units · replenishment timing · perishable flag" },
-  { icon: ScanLine, label: "Competitor reference", body: "Recent observed prices · trusted-source attribution" },
-  { icon: GitBranch, label: "Substitution map", body: "Acceptable alternates when inventory or supply slips" },
-  { icon: Sparkles, label: "Promotional context", body: "Event · markdown deadline · bundle membership" },
-  { icon: ShieldCheck, label: "Approval policy", body: "Who can expand · which zones · which categories" },
+const DATA_FIELDS: {
+  icon: any;
+  label: string;
+  body: string;
+  mockup: React.ReactNode;
+}[] = [
+  { icon: Package, label: "Product catalog", body: "SKU · name · category · brand · KVI flag", mockup: <MiniProductCatalog /> },
+  { icon: TrendingUp, label: "Approved price actions", body: "Approved price · prior price · reason · effective window", mockup: <MiniApprovedActions /> },
+  { icon: Tag, label: "Cost & margin context", body: "Unit cost · margin target · projected impact", mockup: <MiniMarginBar /> },
+  { icon: Boxes, label: "Inventory snapshot", body: "On-hand units · replenishment timing · perishable flag", mockup: <MiniInventory /> },
+  { icon: ScanLine, label: "Competitor reference", body: "Recent observed prices · trusted-source attribution", mockup: <MiniCompetitor /> },
+  { icon: GitBranch, label: "Substitution map", body: "Acceptable alternates when inventory or supply slips", mockup: <MiniSubstitution /> },
+  { icon: Sparkles, label: "Promotional context", body: "Event · markdown deadline · bundle membership", mockup: <MiniPromotional /> },
+  { icon: ShieldCheck, label: "Approval policy", body: "Who can expand · which zones · which categories", mockup: <MiniApprovalPolicy /> },
 ];
 
 function DataFields() {
@@ -175,6 +310,10 @@ function DataFields() {
                 </div>
                 <p className="mt-4 text-sm font-semibold text-white">{f.label}</p>
                 <p className="mt-1 text-xs leading-relaxed text-white/55">{f.body}</p>
+                {/* mini-mockup — shows the shape of the data, not just words */}
+                <div className="mt-4 h-[70px] overflow-hidden rounded-xl border border-white/[.06] bg-black/30 p-2">
+                  {f.mockup}
+                </div>
               </motion.div>
             );
           })}
@@ -186,28 +325,138 @@ function DataFields() {
 
 /* ─────────────────────────── 3. THREE INTEGRATION PATHS ─────────────────── */
 
+/* ─────────────────────── integration-path mockups ──────────────────────── */
+
+function CsvFileMockup() {
+  return (
+    <div className="overflow-hidden rounded-lg border border-white/10 bg-[#04070b]">
+      <div className="flex items-center justify-between border-b border-white/[.06] px-3 py-1.5">
+        <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[.22em] text-emerald-300">
+          <FileUp className="h-3 w-3" /> actions.csv
+        </span>
+        <span className="font-mono text-[10px] text-white/35">1,247 rows</span>
+      </div>
+      <table className="w-full font-mono text-[10px] text-white/65">
+        <thead className="text-white/35">
+          <tr>
+            <th className="px-2 py-1 text-left">sku</th>
+            <th className="px-2 py-1 text-right">approved</th>
+            <th className="px-2 py-1 text-left">zone</th>
+            <th className="px-2 py-1 text-left">deadline</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            ["mk-001", "$5.99", "DAL", "—"],
+            ["egg-12", "$4.19", "DAL", "—"],
+            ["str-1lb", "$2.99", "DAL", "6 PM"],
+            ["oj-64", "$6.79", "AUS", "—"],
+          ].map((row, i) => (
+            <tr key={i} className={i % 2 ? "bg-white/[.02]" : ""}>
+              {row.map((c, j) => (
+                <td key={j} className={`px-2 py-1 ${j === 1 ? "text-right text-emerald-200" : ""}`}>{c}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function RestApiMockup() {
+  return (
+    <div className="overflow-hidden rounded-lg border border-white/10 bg-[#04070b]">
+      <div className="flex items-center justify-between border-b border-white/[.06] px-3 py-1.5">
+        <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[.22em] text-violet-300">
+          <Terminal className="h-3 w-3" /> request
+        </span>
+        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/[.08] px-2 py-0.5 text-[9px] font-mono text-emerald-200">
+          202
+        </span>
+      </div>
+      <pre className="overflow-x-auto px-3 py-2 font-mono text-[10px] leading-relaxed">
+        <span className="text-violet-300">POST</span>{" "}
+        <span className="text-white/75">/api/v1/price-batches</span>{"\n"}
+        <span className="text-white/45">Content-Type:</span>{" "}
+        <span className="text-emerald-200">application/json</span>{"\n"}
+        <span className="text-white/45">X-API-Key:</span>{" "}
+        <span className="text-orange-200">op-key-…</span>{"\n"}
+        {"\n"}
+        <span className="text-white/65">{`{ "idempotency_key": "md-`}</span>
+        <span className="text-orange-200">…</span>
+        <span className="text-white/65">{`", "external_id": "MD-DAL-02", … }`}</span>
+      </pre>
+    </div>
+  );
+}
+
+function DbConnectorMockup() {
+  return (
+    <div className="overflow-hidden rounded-lg border border-white/10 bg-[#04070b] p-3">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[.22em] text-sky-300">
+          <Database className="h-3 w-3" /> source-of-truth
+        </span>
+        <span className="font-mono text-[10px] text-white/35">read-only</span>
+      </div>
+      <svg viewBox="0 0 240 90" className="mt-2 h-[90px] w-full">
+        <rect x="6" y="14" width="80" height="60" rx="4" fill="#0e1320" stroke="#60a5fa" strokeWidth="0.6" />
+        <text x="46" y="28" fontSize="7" textAnchor="middle" fill="#bfdbfe" fontFamily="ui-monospace, monospace">
+          prices
+        </text>
+        <line x1="14" y1="34" x2="78" y2="34" stroke="rgba(255,255,255,.1)" />
+        {[42, 50, 58, 66].map((y, i) => (
+          <g key={y}>
+            <rect x="14" y={y - 2} width="40" height="4" rx="1" fill="rgba(255,255,255,.08)" />
+            <rect x="58" y={y - 2} width="18" height="4" rx="1" fill={i === 1 ? "#22c55e" : "rgba(34,197,94,.4)"} />
+          </g>
+        ))}
+        <line x1="86" y1="44" x2="148" y2="44" stroke="#60a5fa" strokeWidth="1" strokeDasharray="3 3" />
+        <polygon points="148,44 142,40 142,48" fill="#60a5fa" />
+        <rect x="150" y="22" width="84" height="44" rx="6" fill="#0e1320" stroke="#fb923c" strokeWidth="0.8" />
+        <text x="192" y="40" fontSize="7" textAnchor="middle" fill="#fdba74" fontFamily="ui-monospace, monospace">
+          ShelfTrace
+        </text>
+        <text x="192" y="52" fontSize="6" textAnchor="middle" fill="rgba(255,255,255,.55)" fontFamily="ui-monospace, monospace">
+          engine
+        </text>
+        <text x="192" y="78" fontSize="6" textAnchor="middle" fill="#86efac" fontFamily="ui-monospace, monospace">
+          audit-logged
+        </text>
+      </svg>
+    </div>
+  );
+}
+
 function IntegrationPaths() {
-  const paths = [
+  const paths: {
+    icon: any;
+    title: string;
+    sub: string;
+    body: string;
+    mockup: React.ReactNode;
+  }[] = [
     {
       icon: FileUp,
       title: "CSV upload",
       sub: "Fastest path · zero infra",
       body: "Drop a CSV of approved price actions. The engine validates, batches by zone, and runs the same canary-first execution.",
-      sample: "actions.csv · 1,247 rows · 4 zones",
+      mockup: <CsvFileMockup />,
     },
     {
       icon: Cloud,
       title: "REST API ingestion",
       sub: "POST /api/v1/price-batches · idempotent",
       body: "Same endpoint the demo uses. Idempotency key required; same key always maps to the same workflow.",
-      sample: "POST · 202 Accepted · batch_id returned",
+      mockup: <RestApiMockup />,
     },
     {
       icon: Database,
       title: "Direct database connector",
       sub: "Production · approved access",
       body: "Secure connector reads approved actions from a retailer's source-of-truth on a schedule, replays through the engine.",
-      sample: "Read-only · scoped credentials · audit-logged",
+      mockup: <DbConnectorMockup />,
     },
   ];
   return (
@@ -239,9 +488,7 @@ function IntegrationPaths() {
                 <p className="mt-5 text-xl font-semibold text-white">{p.title}</p>
                 <p className="mt-1 text-[11px] uppercase tracking-[.22em] text-violet-300/80">{p.sub}</p>
                 <p className="mt-4 text-sm leading-relaxed text-white/55">{p.body}</p>
-                <div className="mt-5 rounded-xl border border-white/8 bg-black/35 px-3 py-2 font-mono text-[11px] text-emerald-300/85">
-                  {p.sample}
-                </div>
+                <div className="mt-5">{p.mockup}</div>
               </motion.article>
             );
           })}
@@ -363,13 +610,21 @@ function LiveDemoSection({ liveRef }: { liveRef: React.RefObject<HTMLDivElement>
               {outcome ? (
                 <motion.div
                   key="result"
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial="hidden"
+                  animate="visible"
                   exit={{ opacity: 0, y: -8 }}
-                  transition={PRESET.fadeUp}
+                  variants={{
+                    hidden: {},
+                    visible: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
+                  }}
                   className="mt-5 space-y-4"
                 >
-                  <div className="flex items-center justify-between rounded-2xl border border-orange-500/30 bg-orange-500/[.06] p-4">
+                  {/* Step 1 — batch header */}
+                  <motion.div
+                    variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+                    transition={PRESET.fadeUp}
+                    className="flex items-center justify-between rounded-2xl border border-orange-500/30 bg-orange-500/[.06] p-4"
+                  >
                     <div>
                       <p className="text-[10px] uppercase tracking-[.22em] text-orange-300">batch</p>
                       <p className="mt-1 font-mono text-sm text-white">{outcome.external_id ?? "—"}</p>
@@ -386,27 +641,55 @@ function LiveDemoSection({ liveRef }: { liveRef: React.RefObject<HTMLDivElement>
                     >
                       {outcome.status ?? "unknown"}
                     </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <Stat label="total actions" value={String(outcome.total_actions)} />
-                    <Stat label="verified" value={String(outcome.verified_actions)} tone="green" />
-                    <Stat label="retrying" value={String(outcome.retry_actions)} tone="amber" />
-                    <Stat label="blocked" value={String(outcome.blocked_actions)} tone="red" />
-                  </div>
-                  <Link
-                    href="/operations"
-                    className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm text-white/75 hover:border-orange-500/40 hover:bg-orange-500/[.06] hover:text-white"
+                  </motion.div>
+                  {/* Step 2 — counts (themselves staggered) */}
+                  <motion.div
+                    variants={{
+                      hidden: {},
+                      visible: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+                    }}
+                    className="grid grid-cols-2 gap-3 sm:grid-cols-4"
                   >
-                    Inspect the rollout in the working control plane
-                    <ChevronRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                  </Link>
-                  <Link
-                    href="/engineering"
-                    className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm text-white/75 hover:border-orange-500/40 hover:bg-orange-500/[.06] hover:text-white"
+                    {[
+                      { label: "total actions", value: outcome.total_actions, tone: undefined as undefined | "green" | "amber" | "red" },
+                      { label: "verified", value: outcome.verified_actions, tone: "green" as const },
+                      { label: "retrying", value: outcome.retry_actions, tone: "amber" as const },
+                      { label: "blocked", value: outcome.blocked_actions, tone: "red" as const },
+                    ].map((s) => (
+                      <motion.div
+                        key={s.label}
+                        variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+                        transition={{ duration: 0.3, ease: EASE.outQuart }}
+                      >
+                        <Stat label={s.label} value={String(s.value)} tone={s.tone} />
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                  {/* Step 3 — deep-link CTAs */}
+                  <motion.div
+                    variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+                    transition={PRESET.fadeUp}
                   >
-                    See the full outbox + audit trail
-                    <ChevronRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                  </Link>
+                    <Link
+                      href="/operations"
+                      className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm text-white/75 hover:border-orange-500/40 hover:bg-orange-500/[.06] hover:text-white"
+                    >
+                      Inspect the rollout in the working control plane
+                      <ChevronRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    </Link>
+                  </motion.div>
+                  <motion.div
+                    variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+                    transition={PRESET.fadeUp}
+                  >
+                    <Link
+                      href="/engineering"
+                      className="group flex items-center justify-between rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm text-white/75 hover:border-orange-500/40 hover:bg-orange-500/[.06] hover:text-white"
+                    >
+                      See the full outbox + audit trail
+                      <ChevronRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    </Link>
+                  </motion.div>
                 </motion.div>
               ) : (
                 <motion.div

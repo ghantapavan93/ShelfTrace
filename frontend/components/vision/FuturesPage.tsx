@@ -32,13 +32,23 @@ import {
 } from "lucide-react";
 import { Pill } from "./Shell";
 import {
+  Annotation,
+  BreadGlyph,
+  ButterGlyph,
   ChapterMarker,
   CinePhoto,
+  EggsGlyph,
   FilmGrain,
   MagneticButton,
   MagneticLink,
+  MilkGlyph,
+  OJGlyph,
   Particles,
   PHOTOS,
+  ProductCard,
+  Stage,
+  StrawberryGlyph,
+  YogurtGlyph,
 } from "./cinematic";
 import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
 
@@ -125,281 +135,6 @@ function Hero({ onScroll }: { onScroll: () => void }) {
   );
 }
 
-/* ─────────────────────────────── product card primitive ──────────────────── */
-/* BetterBasket-style product card chrome. Reused across every future mockup. */
-
-type Tone = "neutral" | "verified" | "warn" | "danger" | "primary" | "review";
-const TONE_RING: Record<Tone, string> = {
-  neutral: "border-white/12",
-  verified: "border-emerald-500/40",
-  warn: "border-amber-500/40",
-  danger: "border-rose-500/40",
-  primary: "border-orange-500/40",
-  review: "border-violet-500/40",
-};
-const TONE_GLOW: Record<Tone, string> = {
-  neutral: "shadow-[0_18px_40px_-24px_rgba(255,255,255,0.04)]",
-  verified: "shadow-[0_18px_40px_-20px_rgba(34,197,94,0.4)]",
-  warn: "shadow-[0_18px_40px_-20px_rgba(245,158,11,0.4)]",
-  danger: "shadow-[0_18px_40px_-20px_rgba(244,63,94,0.5)]",
-  primary: "shadow-[0_18px_40px_-20px_rgba(251,146,60,0.45)]",
-  review: "shadow-[0_18px_40px_-20px_rgba(167,139,250,0.45)]",
-};
-
-/* Sleek product card: name, glyph, price, units, badge. */
-function ProductCard({
-  name,
-  units,
-  price,
-  oldPrice,
-  glyph,
-  badge,
-  tone = "neutral",
-  size = "md",
-}: {
-  name: string;
-  units?: string;
-  price: string;
-  oldPrice?: string;
-  glyph: ReactGlyph;
-  badge?: { label: string; tone: "verified" | "warn" | "danger" | "review" | "primary" };
-  tone?: Tone;
-  size?: "sm" | "md" | "lg";
-}) {
-  const cardWidth = size === "sm" ? "w-[126px]" : size === "lg" ? "w-[200px]" : "w-[164px]";
-  const padding = size === "sm" ? "p-3" : "p-4";
-  return (
-    <div
-      className={`relative ${cardWidth} ${padding} rounded-2xl border ${TONE_RING[tone]} bg-[#0e1320]/95 backdrop-blur-sm ${TONE_GLOW[tone]}`}
-    >
-      <div className="relative flex h-[68px] items-end justify-center overflow-hidden rounded-xl bg-gradient-to-b from-white/[.05] to-transparent">
-        {glyph}
-      </div>
-      <div className="mt-3 flex items-baseline justify-between gap-1">
-        {oldPrice && (
-          <span className="font-mono text-[10px] text-white/35 line-through">{oldPrice}</span>
-        )}
-        <span className="ml-auto font-mono text-lg font-semibold tabular-nums text-white">
-          {price}
-        </span>
-      </div>
-      <p className="mt-1 text-[11px] font-medium text-white/85 truncate">{name}</p>
-      {units && <p className="text-[10px] text-white/40">{units}</p>}
-      {badge && (
-        <div className="mt-2 flex">
-          <span
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[.14em] ${
-              badge.tone === "verified"
-                ? "border-emerald-500/35 bg-emerald-500/[.10] text-emerald-200"
-                : badge.tone === "warn"
-                  ? "border-amber-500/35 bg-amber-500/[.10] text-amber-200"
-                  : badge.tone === "danger"
-                    ? "border-rose-500/35 bg-rose-500/[.10] text-rose-200"
-                    : badge.tone === "review"
-                      ? "border-violet-500/35 bg-violet-500/[.10] text-violet-200"
-                      : "border-orange-500/35 bg-orange-500/[.10] text-orange-200"
-            }`}
-          >
-            {badge.label}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─────────────────────────────── product glyphs ──────────────────────────── */
-/* Compact SVG illustrations — fit into ProductCard's image area.             */
-
-type ReactGlyph = React.ReactNode;
-
-function MilkGlyph() {
-  return (
-    <svg viewBox="0 0 40 60" className="h-[60px] w-auto">
-      <rect x="14" y="4" width="12" height="14" rx="1.5" fill="#f8fafc" stroke="#94a3b8" strokeWidth="0.5" />
-      <rect x="12" y="2" width="16" height="4" rx="1" fill="#dc2626" />
-      <rect x="6" y="18" width="28" height="38" rx="3" fill="#f8fafc" stroke="#94a3b8" strokeWidth="0.6" />
-      <rect x="9" y="28" width="22" height="20" fill="#fff" stroke="#e2e8f0" strokeWidth="0.3" />
-      <text x="20" y="38" fontSize="4.5" fontWeight="700" textAnchor="middle" fill="#0f172a" fontFamily="ui-sans-serif, system-ui">
-        WHOLE MILK
-      </text>
-      <text x="20" y="44" fontSize="3.5" textAnchor="middle" fill="#64748b" fontFamily="ui-sans-serif, system-ui">
-        1 GAL
-      </text>
-    </svg>
-  );
-}
-
-function EggsGlyph() {
-  return (
-    <svg viewBox="0 0 60 38" className="h-[60px] w-auto">
-      <path d="M3 18 Q6 14 10 14 L50 14 Q54 14 57 18 L57 32 Q54 35 50 35 L10 35 Q6 35 3 32 Z" fill="#78350f" stroke="#451a03" strokeWidth="0.4" />
-      <path d="M3 18 L57 18" stroke="#451a03" strokeWidth="0.3" />
-      {[10, 20, 30, 40, 50].map((x) => (
-        <g key={x}>
-          <ellipse cx={x} cy="22" rx="3.8" ry="2.5" fill="#fef3c7" stroke="#fcd34d" strokeWidth="0.3" />
-          <ellipse cx={x - 1} cy="21" rx="1" ry="0.6" fill="#fffbeb" />
-        </g>
-      ))}
-      <text x="30" y="32" fontSize="2.8" fontWeight="700" textAnchor="middle" fill="#fffbeb" fontFamily="ui-sans-serif, system-ui">
-        CAGE-FREE
-      </text>
-    </svg>
-  );
-}
-
-function StrawberryGlyph() {
-  return (
-    <svg viewBox="0 0 60 50" className="h-[60px] w-auto">
-      <path d="M4 18 L56 18 L52 44 L8 44 Z" fill="rgba(15,23,42,.85)" stroke="#475569" strokeWidth="0.4" />
-      {[14, 26, 38, 50].map((x, i) => (
-        <line key={i} x1={x} y1="18" x2={x - 1} y2="44" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
-      ))}
-      {[
-        [14, 14],
-        [26, 12],
-        [38, 14],
-        [50, 12],
-        [20, 22],
-        [32, 22],
-        [44, 22],
-      ].map(([x, y], i) => (
-        <g key={i}>
-          <path d={`M${x} ${y} L${x - 4} ${y + 4} Q${x} ${y + 9} ${x + 4} ${y + 4} Z`} fill="#dc2626" />
-          <path d={`M${x - 3} ${y} L${x} ${y - 2} L${x + 3} ${y} Z`} fill="#16a34a" />
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-function OJGlyph() {
-  return (
-    <svg viewBox="0 0 36 60" className="h-[60px] w-auto">
-      <path d="M4 10 L18 2 L32 10 L32 14 L4 14 Z" fill="#fb923c" stroke="#9a3412" strokeWidth="0.4" />
-      <rect x="4" y="14" width="28" height="42" rx="1.5" fill="#fb923c" stroke="#9a3412" strokeWidth="0.4" />
-      <rect x="7" y="22" width="22" height="26" fill="rgba(255,255,255,0.92)" stroke="#9a3412" strokeWidth="0.3" />
-      <text x="18" y="32" fontSize="4" fontWeight="700" textAnchor="middle" fill="#9a3412" fontFamily="ui-sans-serif, system-ui">
-        PREMIUM
-      </text>
-      <text x="18" y="40" fontSize="7" fontWeight="800" textAnchor="middle" fill="#ea580c" fontFamily="ui-sans-serif, system-ui">
-        OJ
-      </text>
-      <text x="18" y="46" fontSize="2.8" textAnchor="middle" fill="#9a3412" fontFamily="ui-sans-serif, system-ui">
-        NFC
-      </text>
-    </svg>
-  );
-}
-
-function BreadGlyph() {
-  return (
-    <svg viewBox="0 0 60 36" className="h-[60px] w-auto">
-      <path d="M6 22 Q6 10 18 8 Q26 4 36 8 Q50 10 54 18 Q56 26 50 30 L12 32 Q6 30 6 22 Z" fill="#fbbf24" stroke="#92400e" strokeWidth="0.4" />
-      {[14, 22, 30, 38, 46].map((x, i) => (
-        <path key={i} d={`M${x} 12 Q${x + 2} 18 ${x} 24`} stroke="#92400e" strokeWidth="0.4" fill="none" />
-      ))}
-      <text x="30" y="28" fontSize="3" fontWeight="700" textAnchor="middle" fill="#92400e" fontFamily="ui-sans-serif, system-ui">
-        FRESH BAKED
-      </text>
-    </svg>
-  );
-}
-
-function ButterGlyph() {
-  return (
-    <svg viewBox="0 0 56 36" className="h-[60px] w-auto">
-      <rect x="6" y="6" width="44" height="24" rx="2" fill="#fef3c7" stroke="#ca8a04" strokeWidth="0.5" />
-      <rect x="6" y="6" width="44" height="6" fill="#fde047" />
-      <text x="28" y="11" fontSize="3" fontWeight="800" textAnchor="middle" fill="#92400e" fontFamily="ui-sans-serif, system-ui">
-        SWEET CREAM
-      </text>
-      <text x="28" y="22" fontSize="6" fontWeight="800" textAnchor="middle" fill="#a16207" fontFamily="ui-sans-serif, system-ui">
-        BUTTER
-      </text>
-      <text x="28" y="28" fontSize="3" textAnchor="middle" fill="#92400e" fontFamily="ui-sans-serif, system-ui">
-        1 LB · UNSALTED
-      </text>
-    </svg>
-  );
-}
-
-function YogurtGlyph() {
-  return (
-    <svg viewBox="0 0 40 48" className="h-[60px] w-auto">
-      <path d="M8 8 L32 8 L30 42 L10 42 Z" fill="#f8fafc" stroke="#94a3b8" strokeWidth="0.5" />
-      <rect x="6" y="4" width="28" height="6" rx="1" fill="#dbeafe" stroke="#60a5fa" strokeWidth="0.4" />
-      <rect x="11" y="14" width="18" height="22" fill="#dbeafe" stroke="#60a5fa" strokeWidth="0.3" />
-      <text x="20" y="22" fontSize="3.5" fontWeight="700" textAnchor="middle" fill="#1e40af" fontFamily="ui-sans-serif, system-ui">
-        GREEK
-      </text>
-      <text x="20" y="28" fontSize="4.5" fontWeight="800" textAnchor="middle" fill="#1e3a8a" fontFamily="ui-sans-serif, system-ui">
-        VANILLA
-      </text>
-      <text x="20" y="34" fontSize="3" textAnchor="middle" fill="#1e40af" fontFamily="ui-sans-serif, system-ui">
-        5.3 OZ
-      </text>
-    </svg>
-  );
-}
-
-/* ─────────────────────────── floating annotation ─────────────────────────── */
-/* Reusable label/badge/pill that bobs and fades in.                          */
-
-function Annotation({
-  children,
-  className = "",
-  delay = 0,
-  bob = true,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  delay?: number;
-  bob?: boolean;
-}) {
-  const reduced = useReducedMotion();
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay, ease: EASE.outQuart }}
-      className={`absolute ${className}`}
-    >
-      <motion.div
-        animate={reduced || !bob ? undefined : { y: [-2, 2, -2] }}
-        transition={reduced || !bob ? undefined : { duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
-      >
-        {children}
-      </motion.div>
-    </motion.div>
-  );
-}
-
-/* ─────────────────────────────── 7 RICH VISUAL MOCKUPS ──────────────────── */
-
-/* Container for every visual — sets the stage size + atmospheric chrome.    */
-function Stage({ children, accent = "orange" }: { children: React.ReactNode; accent?: "orange" | "violet" | "emerald" | "sky" | "rose" | "amber" }) {
-  const tint =
-    accent === "violet"
-      ? "rgba(167,139,250,.10)"
-      : accent === "emerald"
-        ? "rgba(34,197,94,.10)"
-        : accent === "sky"
-          ? "rgba(96,165,250,.10)"
-          : accent === "rose"
-            ? "rgba(244,63,94,.10)"
-            : accent === "amber"
-              ? "rgba(245,158,11,.10)"
-              : "rgba(251,146,60,.10)";
-  return (
-    <div className="relative h-[440px] w-full overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#0a0e18] to-[#04070b]">
-      <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 100%, ${tint}, transparent 60%)` }} />
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
-      <Particles count={6} color={tint.replace("0.10", "0.5")} />
-      <div className="relative h-full w-full">{children}</div>
-    </div>
-  );
-}
 
 /* 01 — Predictive Pricing */
 function PredictiveVisual() {
