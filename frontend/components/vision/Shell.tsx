@@ -98,9 +98,12 @@ export function BackgroundOrbits({ variant = "orange" }: { variant?: "orange" | 
 const REVIEWER_NAV: { label: string; href: string; external?: boolean }[] = [
   { label: "Keynote", href: "/vision/keynote" },
   { label: "Showcase", href: "/vision/showcase" },
+  { label: "Principle", href: "/vision/principle" },
+  { label: "Connect", href: "/vision/connect" },
   { label: "Working Platform", href: "/operations", external: true },
-  { label: "Engineering Proof", href: "/engineering", external: true },
-  { label: "Vision Concepts", href: "/vision/horizon" },
+  { label: "Engineering", href: "/engineering", external: true },
+  { label: "Futures", href: "/vision/futures" },
+  { label: "Concepts", href: "/vision/horizon" },
 ];
 
 export function GlobalHeader() {
