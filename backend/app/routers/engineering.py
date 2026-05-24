@@ -19,8 +19,8 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
     "command": "pytest -q  (PostgreSQL-backed, isolated test DB)",
-    "passed": 47,
-    "duration_s": 24.6,
+    "passed": 55,
+    "duration_s": 38.7,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -69,6 +69,14 @@ TEST_PROOF = {
         "tests/test_outbox_backoff.py::test_failed_event_schedules_retry_then_dead_letters",
         "tests/test_outbox_backoff.py::test_dead_letter_alert_logs_structured_error",
         "tests/test_jsonb.py::test_outbox_payload_roundtrip_as_dict",
+        "tests/test_measurement.py::test_pos_mismatch_is_ineligible_execution_not_verified",
+        "tests/test_measurement.py::test_timeout_is_ineligible_awaiting_acknowledgement",
+        "tests/test_measurement.py::test_all_channels_verified_is_eligible",
+        "tests/test_measurement.py::test_rolled_back_action_is_excluded_recovery_incomplete",
+        "tests/test_measurement.py::test_retry_to_verified_transitions_to_eligible",
+        "tests/test_measurement.py::test_existing_rollout_decisions_unchanged_after_derivation",
+        "tests/test_measurement.py::test_existing_audit_causality_unchanged_after_derivation",
+        "tests/test_measurement.py::test_batch_helper_avoids_n_plus_one",
     ],
 }
 

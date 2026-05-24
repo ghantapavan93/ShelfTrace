@@ -46,7 +46,7 @@ import {
    Cinematic polish pass: real photo backdrops (dimmed), chapter rail, chapter
    announcement cards, cursor spotlight on the aisle, ambient particles in dark
    spaces, timecode HUD during the critical moment, line-stagger headline
-   reveals. No vanity stats, no unsupported tech terms. 47 PostgreSQL-backed
+   reveals. No vanity stats, no unsupported tech terms. 55 PostgreSQL-backed
    tests, configurable scenarios, certification lab, live control plane,
    deterministic reconciliation, audit-verified recovery. CinePhoto fallback
    to gradient art if any Unsplash photo 404s.
@@ -1232,7 +1232,7 @@ const PROOF_TILES = [
   },
   {
     key: "TECHNICAL PROOF",
-    main: "47 Tests",
+    main: "55 Tests",
     sub: "PostgreSQL-backed recovery checks",
     icon: BadgeCheck,
     color: "#22c55e",
@@ -1333,7 +1333,7 @@ function SafetyMini({ lit }: { lit: boolean }) {
 
 function ProofMini({ lit }: { lit: boolean }) {
   const reduced = useReducedMotion();
-  // Render a 47-dot grid (9 cols × ~6 rows) that fills emerald sequentially.
+  // Render a 55-dot grid (24 cols × ~3 rows) that fills emerald sequentially.
   return (
     <div className="relative h-[78px] overflow-hidden rounded-xl border border-emerald-500/35 bg-[#0a1410]/95 px-3 py-2">
       <div className="flex items-center gap-3">
@@ -1343,7 +1343,7 @@ function ProofMini({ lit }: { lit: boolean }) {
             pytest · postgres
           </p>
           <div className="mt-1 grid grid-cols-[repeat(24,1fr)] gap-[2px]">
-            {Array.from({ length: 47 }).map((_, i) => (
+            {Array.from({ length: 55 }).map((_, i) => (
               <motion.span
                 key={i}
                 initial={{ opacity: 0.18 }}
@@ -1360,7 +1360,7 @@ function ProofMini({ lit }: { lit: boolean }) {
         </div>
         {lit && (
           <span className="font-mono text-[9px] uppercase tracking-[.18em] text-emerald-300">
-            47 / 47
+            55 / 55
           </span>
         )}
       </div>
@@ -1728,13 +1728,30 @@ function RecoveryScene({
             </div>
           ))}
         </div>
-        <span
-          className={`whitespace-nowrap font-mono text-[10px] uppercase tracking-[.22em] ${
-            isAfter ? "text-emerald-200" : "text-rose-200"
-          }`}
-        >
-          {isAfter ? "expansion · eligible" : "expansion · blocked"}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span
+            className={`whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[.22em] ${
+              isAfter
+                ? "border-emerald-500/35 bg-emerald-500/[.08] text-emerald-200"
+                : "border-rose-500/40 bg-rose-500/[.08] text-rose-200"
+            }`}
+            title="Rollout decision — gates canary expansion"
+          >
+            {isAfter ? "expansion · eligible" : "expansion · blocked"}
+          </span>
+          <span
+            className={`whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[.22em] ${
+              isAfter
+                ? "border-emerald-500/35 bg-emerald-500/[.08] text-emerald-200"
+                : "border-amber-500/40 bg-amber-500/[.08] text-amber-200"
+            }`}
+            title="Execution Measurement Eligibility — gates downstream performance measurement"
+          >
+            {isAfter
+              ? "measurement · eligible"
+              : "measurement · execution not verified"}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -1940,6 +1957,39 @@ function BeforeAfter() {
         <p className="mt-5 text-center text-[11px] uppercase tracking-[.22em] text-white/40">
           drag the handle · click anywhere · arrow keys ← →
         </p>
+
+        {/* Tiny clarifying beat — two distinct decisions surface from the
+            same recovery. Rollout expansion (gates canary growth) is one;
+            Execution Measurement Eligibility (gates downstream impact
+            analysis) is the other. Derived read-only — no new tables. */}
+        <div className="mx-auto mt-8 grid max-w-3xl gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
+            <p className="text-[9px] font-semibold uppercase tracking-[.22em] text-orange-300">
+              Rollout Decision
+            </p>
+            <p className="mt-2 font-mono text-[11px] leading-relaxed text-white/75">
+              <span className="text-rose-300">expansion · blocked</span>
+              {" → "}
+              <span className="text-emerald-300">expansion · eligible</span>
+            </p>
+            <p className="mt-2 text-[11px] leading-relaxed text-white/45">
+              Gates canary growth. A blocked rollout never spreads to the rest of the zone.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
+            <p className="text-[9px] font-semibold uppercase tracking-[.22em] text-orange-300">
+              Execution Measurement Eligibility
+            </p>
+            <p className="mt-2 font-mono text-[11px] leading-relaxed text-white/75">
+              <span className="text-amber-300">execution not verified</span>
+              {" → "}
+              <span className="text-emerald-300">eligible · performance measurement</span>
+            </p>
+            <p className="mt-2 text-[11px] leading-relaxed text-white/45">
+              Distinct from rollout. Impact analysis only counts price actions whose execution actually verified.
+            </p>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -2237,7 +2287,7 @@ function NightClosing() {
                 "Configurable Scenarios",
                 "Certification + Live Rollout",
                 "Audit-Verified Recovery",
-                "47 PostgreSQL-Backed Tests",
+                "55 PostgreSQL-Backed Tests",
               ].map((chip) => (
                 <span
                   key={chip}

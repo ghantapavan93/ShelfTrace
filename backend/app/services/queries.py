@@ -21,8 +21,10 @@ from app.schemas import (
     ChannelView,
     IncidentExplanation,
     IncidentView,
+    MeasurementEligibilityView,
     OperationsOverview,
 )
+from app.services import measurement
 
 CHANNEL_ORDER = {"pos": 0, "esl": 1, "ecommerce": 2}
 
@@ -55,7 +57,17 @@ def _channels_for(action: PriceAction) -> list[ChannelView]:
     return views
 
 
-def action_view(action: PriceAction) -> ActionView:
+def action_view(
+    action: PriceAction,
+    eligibility: measurement.EligibilityResult | None = None,
+) -> ActionView:
+    """Build the read-only action view. ``eligibility`` is optional — when not
+    provided the view simply omits it (forward-compatible). Callers that loop
+    over a batch should pre-compute eligibilities via
+    :func:`measurement.derive_eligibility_for_batch` to avoid N+1 queries."""
+    eligibility_view: MeasurementEligibilityView | None = None
+    if eligibility is not None:
+        eligibility_view = MeasurementEligibilityView(**eligibility.to_dict())
     return ActionView(
         id=action.id,
         sku=action.sku,
@@ -70,6 +82,7 @@ def action_view(action: PriceAction) -> ActionView:
         projected_impact=action.projected_impact,
         decision=action.decision.value,
         channels=_channels_for(action),
+        measurement_eligibility=eligibility_view,
     )
 
 
@@ -133,7 +146,12 @@ def batch_detail(db: Session, batch: PriceBatch) -> BatchDetail:
         [a for a in batch.actions if a.store_id in canary],
         key=lambda a: (a.product_name, a.store_id),
     )
-    return BatchDetail(**summary.model_dump(), actions=[action_view(a) for a in canary_actions])
+    # Two bounded queries, then in-memory lookup per action — no N+1.
+    eligibility_map = measurement.derive_eligibility_for_batch(db, batch)
+    return BatchDetail(
+        **summary.model_dump(),
+        actions=[action_view(a, eligibility_map.get(a.id)) for a in canary_actions],
+    )
 
 
 def incident_view(db: Session, incident: Incident) -> IncidentView:
@@ -146,6 +164,8 @@ def incident_view(db: Session, incident: Incident) -> IncidentView:
             (c.observed_price for c in channels if c.channel == incident.offending_channel.value),
             None,
         )
+    # Two bounded queries (incidents + store tasks for this one action).
+    eligibility = measurement.derive_eligibility_for_action(db, action)
     return IncidentView(
         id=incident.id,
         batch_id=incident.batch_id,
@@ -165,6 +185,7 @@ def incident_view(db: Session, incident: Incident) -> IncidentView:
         created_at=incident.created_at,
         resolved_at=incident.resolved_at,
         channels=channels,
+        measurement_eligibility=MeasurementEligibilityView(**eligibility.to_dict()),
     )
 
 
@@ -266,6 +287,10 @@ def operations_overview(db: Session, batch: PriceBatch) -> OperationsOverview:
         (a for a in batch.actions if a.store_id in canary and a.decision == ActionDecision.ELIGIBLE),
         None,
     )
+    # Pre-compute eligibility once for the whole batch so the highlighted
+    # ``eligible_action`` in the overview carries its measurement-eligibility
+    # signal in O(1) lookup (no extra query per action).
+    eligibility_map = measurement.derive_eligibility_for_batch(db, batch) if eligible else {}
 
     # The progress ring scopes to the canary set until expansion is active, then
     # to the whole batch — so it always reads against the actions in flight.
@@ -287,7 +312,9 @@ def operations_overview(db: Session, batch: PriceBatch) -> OperationsOverview:
         batch=summary,
         critical_incident=incident_view(db, critical) if critical else None,
         deadline_risk=incident_view(db, deadline) if deadline else None,
-        eligible_action=action_view(eligible) if eligible else None,
+        eligible_action=(
+            action_view(eligible, eligibility_map.get(eligible.id)) if eligible else None
+        ),
         recent_activity=recent_audit(db, batch.id),
         rollout_progress=progress,
     )

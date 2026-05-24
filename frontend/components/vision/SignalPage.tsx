@@ -395,7 +395,7 @@ export default function SignalPage() {
           icon={BadgeCheck}
           title="Recovery with proof"
           copy="Resolve only after acknowledgement and reconciliation."
-          status="47 tests passed"
+          status="55 tests passed"
         />
       </div>
     </motion.section>

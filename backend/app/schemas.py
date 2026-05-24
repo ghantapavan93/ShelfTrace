@@ -48,6 +48,22 @@ class ChannelView(BaseModel):
     attempts: int
 
 
+class MeasurementEligibilityView(BaseModel):
+    """Read-only derived view of whether an action's execution is verified well
+    enough to be attributed by a downstream performance-measurement layer.
+
+    Distinct from ``ActionView.decision`` (which gates rollout expansion).
+    See :mod:`app.services.measurement` for the derivation rules and
+    precedence."""
+
+    status: str  # one of the MeasurementEligibility enum values
+    reason: str  # short machine code, e.g. POS_PRICE_MISMATCH / ALL_REQUIRED_CHANNELS_VERIFIED
+    required_channels: list[str]
+    verified_channels: list[str]
+    blocked_channel: str | None = None
+    summary: str  # one-line plain English
+
+
 class ActionView(BaseModel):
     id: str
     sku: str
@@ -62,6 +78,8 @@ class ActionView(BaseModel):
     projected_impact: str | None
     decision: str
     channels: list[ChannelView]
+    # Forward-compatible: clients that don't know about this field ignore it.
+    measurement_eligibility: MeasurementEligibilityView | None = None
 
 
 class BatchSummary(BaseModel):
@@ -109,6 +127,8 @@ class IncidentView(BaseModel):
     created_at: datetime
     resolved_at: datetime | None
     channels: list[ChannelView]
+    # Forward-compatible.
+    measurement_eligibility: MeasurementEligibilityView | None = None
 
 
 class IncidentExplanation(BaseModel):

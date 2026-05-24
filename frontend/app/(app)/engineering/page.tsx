@@ -6,6 +6,7 @@ import { ChevronRight, CheckCircle2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { timeOf } from "@/lib/format";
+import { EligibilityPanel } from "@/components/EligibilityPanel";
 import type { EngineeringTrace } from "@/lib/types";
 
 function Json({ value }: { value: unknown }) {
@@ -202,6 +203,17 @@ export default function EngineeringPage() {
           <h3 className="mb-3 text-sm font-semibold text-white">Raw Adapter Receipt</h3>
           <Json value={data.raw_receipt} />
         </div>
+
+        {/* Measurement eligibility — derived read-only, no new tables / writes.
+            Pulls the active incident's eligibility evidence from the already-
+            loaded payload (no extra request). Falls back silently when no
+            incidents are present (every action eligible / no blocked action). */}
+        {data.recent_incidents && data.recent_incidents.length > 0 && (
+          <EligibilityPanel
+            eligibility={data.recent_incidents[0].measurement_eligibility}
+            variant="engineering"
+          />
+        )}
 
         {/* Reconciliation result */}
         <div className="glass rounded-2xl p-5">

@@ -20,6 +20,7 @@ import { money } from "@/lib/format";
 import { StatusPill } from "@/components/StatusPill";
 import { ChannelPedestal, ChannelThread } from "@/components/ChannelPedestal";
 import { AuditTimeline } from "@/components/AuditTimeline";
+import { EligibilityPanel } from "@/components/EligibilityPanel";
 import type { AuditEventView, IncidentExplanation, IncidentView } from "@/lib/types";
 
 export default function IncidentPage({ params }: { params: { id: string } }) {
@@ -124,6 +125,10 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
           <span className="mono font-semibold text-white">{money(i.approved_price)}</span>
         </div>
       </motion.section>
+
+      {/* Execution Measurement Eligibility — derived read-only state.
+          Distinct from the rollout-expansion decision shown elsewhere. */}
+      <EligibilityPanel eligibility={i.measurement_eligibility} />
 
       {/* Explanation */}
       {exp.data && (

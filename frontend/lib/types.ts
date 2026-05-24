@@ -9,6 +9,27 @@ export interface ChannelView {
   attempts: number;
 }
 
+export type MeasurementEligibilityStatus =
+  | "INELIGIBLE_EXECUTION_NOT_VERIFIED"
+  | "INELIGIBLE_AWAITING_ACKNOWLEDGEMENT"
+  | "ELIGIBLE_ALL_REQUIRED_CHANNELS_VERIFIED"
+  | "EXCLUDED_RECOVERY_INCOMPLETE";
+
+/**
+ * Derived view of whether an executed price action is eligible for downstream
+ * performance measurement. Distinct from `decision`, which gates rollout
+ * expansion. Derived server-side from existing receipt + incident state — no
+ * new tables, no new write paths. See backend `services/measurement.py`.
+ */
+export interface MeasurementEligibilityView {
+  status: MeasurementEligibilityStatus;
+  reason: string;
+  required_channels: string[];
+  verified_channels: string[];
+  blocked_channel: string | null;
+  summary: string;
+}
+
 export interface ActionView {
   id: string;
   sku: string;
@@ -23,6 +44,7 @@ export interface ActionView {
   projected_impact: string | null;
   decision: Decision;
   channels: ChannelView[];
+  measurement_eligibility?: MeasurementEligibilityView | null;
 }
 
 export interface BatchSummary {
@@ -70,6 +92,7 @@ export interface IncidentView {
   created_at: string;
   resolved_at: string | null;
   channels: ChannelView[];
+  measurement_eligibility?: MeasurementEligibilityView | null;
 }
 
 export interface IncidentExplanation {

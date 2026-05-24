@@ -940,7 +940,7 @@ function ClosingCta() {
             </h3>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-white/65">
               The Working Platform is what's shipped — outbox · canary containment ·
-              audit-verified recovery · 47 PostgreSQL-backed tests. Concepts lists the four
+              audit-verified recovery · 55 PostgreSQL-backed tests. Concepts lists the four
               reliability-focused next steps. This page lists the broader product imagination.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
