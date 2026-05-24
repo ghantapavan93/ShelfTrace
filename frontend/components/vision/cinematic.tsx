@@ -231,6 +231,13 @@ export const PHOTOS = {
     "https://images.unsplash.com/photo-1601598851547-4302969d0614?w=2000&auto=format&fit=crop&q=80",
   store:
     "https://images.unsplash.com/photo-1601612625308-6e16ae8c95ac?w=2000&auto=format&fit=crop&q=80",
+  // Additional cinematic backdrops — fall back to gradient art if any 404.
+  nightAisle:
+    "https://images.unsplash.com/photo-1534723452862-4c874018d66d?w=2400&auto=format&fit=crop&q=80",
+  receipt:
+    "https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=2000&auto=format&fit=crop&q=80",
+  produce:
+    "https://images.unsplash.com/photo-1542838-something?w=2000&auto=format&fit=crop&q=80",
 };
 
 /* ════════════════════════════════════════════════════════════════════════════

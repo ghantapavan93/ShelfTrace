@@ -778,6 +778,9 @@ function Hero({ onScanner }: { onScanner: () => void }) {
           <MagneticLink href="/engineering" variant="quiet">
             View Engineering Proof <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </MagneticLink>
+          <MagneticLink href="/vision/begin" variant="quiet">
+            Or watch the cinematic intro <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </MagneticLink>
         </motion.div>
         {!reduced && (
           <motion.div
