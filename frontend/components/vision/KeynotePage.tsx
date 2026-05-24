@@ -1743,25 +1743,75 @@ function RecoveryScene({
 function BeforeAfter() {
   const reduced = useReducedMotion();
   const [target, setTarget] = useState(50);
-  const smoothed = useSpring(target, SPRING.bouncy as any);
   const [posDisplay, setPosDisplay] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Drive a spring from `target`. Subscribe to the spring's change events to
+  // smoothly update the visual `posDisplay`. Under reduced motion, the handle
+  // snaps directly to target without spring.
+  const smoothed = useSpring(50, { stiffness: 220, damping: 24 });
   useEffect(() => {
     if (reduced) {
       setPosDisplay(target);
       return;
     }
+    smoothed.set(target);
+  }, [target, smoothed, reduced]);
+  useEffect(() => {
+    if (reduced) return;
     const unsub = smoothed.on("change", (v) => setPosDisplay(v));
     return () => unsub();
-  }, [smoothed, reduced, target]);
+  }, [smoothed, reduced]);
 
-  const dragging = useRef(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+
   const updateFromClient = (clientX: number) => {
     const r = wrapRef.current?.getBoundingClientRect();
     if (!r) return;
     const x = ((clientX - r.left) / r.width) * 100;
     setTarget(Math.max(2, Math.min(98, x)));
   };
+
+  /**
+   * Robust drag: install listeners on `window` for the whole drag lifecycle.
+   * This sidesteps React pointer-event interception by overlapping absolute
+   * scene children, fires reliably across mouse/touch, and survives the
+   * pointer leaving the wrap rectangle.
+   */
+  const beginDrag = (clientX: number) => {
+    setIsDragging(true);
+    updateFromClient(clientX);
+
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      const x = "touches" in e ? e.touches[0]?.clientX : (e as MouseEvent).clientX;
+      if (typeof x === "number") {
+        updateFromClient(x);
+        // prevent the page from scrolling while dragging on touch
+        if ("touches" in e) e.preventDefault();
+      }
+    };
+    const onUp = () => {
+      setIsDragging(false);
+      window.removeEventListener("mousemove", onMove as EventListener);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove as EventListener);
+      window.removeEventListener("touchend", onUp);
+      window.removeEventListener("touchcancel", onUp);
+    };
+    window.addEventListener("mousemove", onMove as EventListener);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove as EventListener, { passive: false });
+    window.addEventListener("touchend", onUp);
+    window.addEventListener("touchcancel", onUp);
+  };
+
+  const onCanvasMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
+    beginDrag(e.clientX);
+  };
+  const onCanvasTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
+    beginDrag(e.touches[0].clientX);
+  };
+
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowLeft") {
       setTarget((p) => Math.max(2, p - 4));
@@ -1804,29 +1854,23 @@ function BeforeAfter() {
           aria-valuemax={100}
           aria-valuenow={Math.round(posDisplay)}
           aria-label="Reveal before / after recovery"
-          className="relative mt-12 aspect-[16/8] cursor-ew-resize overflow-hidden rounded-3xl border border-white/10 select-none outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60"
+          className={`relative mt-12 aspect-[16/8] overflow-hidden rounded-3xl border border-white/10 select-none outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60 ${
+            isDragging ? "cursor-grabbing" : "cursor-ew-resize"
+          }`}
           onKeyDown={onKey}
-          onPointerMove={(e) => dragging.current && updateFromClient(e.clientX)}
-          onPointerDown={(e) => {
-            dragging.current = true;
-            (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-            updateFromClient(e.clientX);
-          }}
-          onPointerUp={(e) => {
-            dragging.current = false;
-            (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
-          }}
+          onMouseDown={onCanvasMouseDown}
+          onTouchStart={onCanvasTouchStart}
         >
           {/* AFTER scene fills the canvas */}
           <RecoveryScene side="after" />
           {/* BEFORE scene clipped from the right */}
           <div
-            className="absolute inset-0"
+            className="pointer-events-none absolute inset-0"
             style={{ clipPath: `inset(0 ${100 - posDisplay}% 0 0)` }}
           >
             <RecoveryScene side="before" />
           </div>
-          {/* Ambient drifting particles (above scenes, below handle) */}
+          {/* Ambient drifting particles */}
           {!reduced && (
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
               {[12, 28, 44, 60, 76, 92].map((leftPct, i) => (
@@ -1840,29 +1884,40 @@ function BeforeAfter() {
               ))}
             </div>
           )}
-          {/* Handle */}
-          <div className="pointer-events-none absolute inset-y-0 z-10" style={{ left: `${posDisplay}%` }}>
-            <div className="-translate-x-1/2 h-full w-px bg-gradient-to-b from-rose-400/0 via-white/85 to-emerald-400/0" />
-            <div
+
+          {/* Handle — pointer-events-AUTO so you can grab it directly. */}
+          <div className="absolute inset-y-0 z-30" style={{ left: `${posDisplay}%` }}>
+            <div className="pointer-events-none -translate-x-1/2 h-full w-px bg-gradient-to-b from-rose-400/0 via-white/85 to-emerald-400/0" />
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                beginDrag(e.clientX);
+              }}
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                beginDrag(e.touches[0].clientX);
+              }}
+              aria-label="Drag to reveal"
               className={`absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white bg-white/15 text-white backdrop-blur shadow-[0_0_30px_rgba(255,255,255,.25)] transition-transform duration-200 ${
-                dragging.current ? "scale-110" : "scale-100"
+                isDragging ? "scale-110 cursor-grabbing" : "scale-100 cursor-grab"
               }`}
             >
-              <svg viewBox="0 0 20 20" className="h-4 w-4 fill-current">
+              <svg viewBox="0 0 20 20" className="h-4 w-4 fill-current pointer-events-none">
                 <path d="M2 10 L7 5 L7 15 Z" />
                 <path d="M18 10 L13 15 L13 5 Z" />
               </svg>
-              {/* pulse ring */}
-              {!reduced && !dragging.current && (
+              {!reduced && !isDragging && (
                 <motion.span
-                  className="absolute inset-0 rounded-full border-2 border-white/55"
+                  className="pointer-events-none absolute inset-0 rounded-full border-2 border-white/55"
                   animate={{ scale: [1, 1.5], opacity: [0.6, 0] }}
                   transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
                 />
               )}
-            </div>
+            </button>
           </div>
-          {/* Top progress band — shows the recovery sequence as you drag */}
+
+          {/* Top progress band */}
           <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-6 py-3">
             <span className="font-mono text-[10px] uppercase tracking-[.22em] text-rose-200/70">
               incident open
@@ -1882,9 +1937,8 @@ function BeforeAfter() {
             </span>
           </div>
         </div>
-        {/* footer cue */}
         <p className="mt-5 text-center text-[11px] uppercase tracking-[.22em] text-white/40">
-          drag the handle · or arrow keys ← → for keyboard
+          drag the handle · click anywhere · arrow keys ← →
         </p>
       </div>
     </section>
