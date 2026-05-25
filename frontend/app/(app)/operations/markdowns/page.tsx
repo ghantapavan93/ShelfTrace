@@ -6,6 +6,7 @@ import { Clock, Tag, ScanLine, Globe, CheckCircle2, AlertCircle } from "lucide-r
 import { api, DEMO_BATCH } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { money, timeOf } from "@/lib/format";
+import { ListSkeleton } from "@/components/Skeleton";
 import type { ActionView, ChannelView } from "@/lib/types";
 
 const CH = { pos: { Icon: ScanLine, name: "POS" }, esl: { Icon: Tag, name: "ESL Shelf" }, ecommerce: { Icon: Globe, name: "Ecommerce" } } as const;
@@ -24,8 +25,20 @@ function ChannelChip({ c }: { c: ChannelView }) {
 export default function MarkdownsPage() {
   const { data, error } = useLive(() => api.markdowns(DEMO_BATCH));
 
-  if (error) return <div className="glass rounded-2xl p-6 text-slate-300">Could not load markdowns.</div>;
-  if (!data) return <div className="text-slate-400">Loading markdowns…</div>;
+  if (error)
+    return (
+      <div className="glass rounded-2xl p-6 text-slate-300">
+        Could not load markdowns.
+        <div className="mt-1 text-xs text-slate-500">{error}</div>
+      </div>
+    );
+  if (!data)
+    return (
+      <div className="space-y-4">
+        <div className="h-6 w-48 animate-pulse rounded bg-white/5" />
+        <ListSkeleton rows={3} />
+      </div>
+    );
 
   return (
     <div className="space-y-5">

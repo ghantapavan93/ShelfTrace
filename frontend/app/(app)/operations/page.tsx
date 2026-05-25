@@ -27,6 +27,8 @@ import { Donut } from "@/components/Donut";
 import { AuditTimeline } from "@/components/AuditTimeline";
 import { BatchPicker } from "@/components/BatchPicker";
 import { OperationsSkeleton } from "@/components/Skeleton";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 import type { ChannelView } from "@/lib/types";
 
 const CH_ICON = { esl: Tag, pos: ScanLine, ecommerce: Globe } as const;
@@ -146,6 +148,8 @@ function OperationsContent() {
   const { data, error, reload } = useLive(() => api.operations(externalId), [externalId]);
   const [resetting, setResetting] = useState(false);
   const [coldStartHint, setColdStartHint] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const { toast } = useToast();
 
   // After 5s of no data, show a cold-start hint
   useEffect(() => {
@@ -159,8 +163,12 @@ function OperationsContent() {
     try {
       await api.reset();
       await reload();
+      toast.success("Demo state reset — Memorial Day batch reseeded.");
+    } catch (e) {
+      toast.error(`Reset failed: ${(e as Error).message}`);
     } finally {
       setResetting(false);
+      setConfirmReset(false);
     }
   }
 
@@ -203,12 +211,30 @@ function OperationsContent() {
           )}
         </div>
         <button
-          onClick={resetLive}
+          onClick={() => setConfirmReset(true)}
           disabled={resetting}
           className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
         >
           <RotateCcw className={clsx("h-3.5 w-3.5", resetting && "animate-spin")} /> Reset demo seed
         </button>
+        <ConfirmDialog
+          open={confirmReset}
+          title="Reset the demo state?"
+          body={
+            <>
+              This wipes all custom scenarios and reseeds the Memorial Day
+              Dallas Zone 2 batch. Custom batches you ran via{" "}
+              <span className="text-slate-300">/scenarios</span> will be
+              removed. The seed itself is regenerated, so the original
+              demo experience comes back.
+            </>
+          }
+          confirmLabel="Reset everything"
+          variant="danger"
+          busy={resetting}
+          onCancel={() => setConfirmReset(false)}
+          onConfirm={resetLive}
+        />
       </div>
 
       {/* Hero — adaptive to ANY batch state */}
