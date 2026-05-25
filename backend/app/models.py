@@ -575,3 +575,98 @@ class ExternalSignal(Base):
     sku_pattern: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+
+# ---------------------------------------------------------------------------
+# Cross-source product knowledge graph
+# ---------------------------------------------------------------------------
+class ProductCategory(Base):
+    """Hierarchical product categories. Enables "all beverages" or "frozen aisles"
+    queries. parent_id=None for root categories."""
+
+    __tablename__ = "product_categories"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    parent_id: Mapped[str | None] = mapped_column(ForeignKey("product_categories.id", ondelete="CASCADE"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ProductEntity(Base):
+    """Canonical product entity that unifies the same physical product across
+    sources. 'Organic Large Eggs' is one entity even if sold by Whole Foods,
+    Amazon Fresh, and Target. Manually curated or auto-matched via title/category."""
+
+    __tablename__ = "product_entities"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    canonical_title: Mapped[str] = mapped_column(String(256), index=True)
+    category_id: Mapped[str | None] = mapped_column(ForeignKey("product_categories.id", ondelete="SET NULL"), nullable=True, index=True)
+    brand: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    manufacturer: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    upc: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True, index=True)  # universal product code
+    unit_size: Mapped[str | None] = mapped_column(String(64), nullable=True)  # e.g. "12-pack", "1 dozen"
+    attributes: Mapped[dict] = mapped_column(JSONColumn, default=dict)  # {color, size, organic, etc}
+    match_confidence: Mapped[float] = mapped_column(Float, default=0.0)  # 0..1, auto-match score
+    is_manual: Mapped[bool] = mapped_column(Boolean, default=False)  # true if curator-approved
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    competitor_products: Mapped[list[CompetitorProductEntity]] = relationship(
+        back_populates="entity", cascade="all, delete-orphan"
+    )
+    sku_links: Mapped[list[SKUProductLink]] = relationship(
+        back_populates="entity", cascade="all, delete-orphan"
+    )
+
+
+class CompetitorProductEntity(Base):
+    """Junction: links a competitor_product to a canonical ProductEntity.
+    Allows querying 'all sources carrying this product' or 'which entity
+    does this Whole Foods item belong to?'"""
+
+    __tablename__ = "competitor_product_entities"
+    __table_args__ = (UniqueConstraint("competitor_product_id", "entity_id", name="uq_competitor_entity"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    competitor_product_id: Mapped[str] = mapped_column(ForeignKey("competitor_products.id", ondelete="CASCADE"), index=True)
+    entity_id: Mapped[str] = mapped_column(ForeignKey("product_entities.id", ondelete="CASCADE"), index=True)
+    match_score: Mapped[float] = mapped_column(Float, default=0.0)  # title similarity, category match, etc
+    matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    entity: Mapped[ProductEntity] = relationship(back_populates="competitor_products")
+
+
+class SKUProductLink(Base):
+    """Links our internal SKUs to canonical ProductEntity. One SKU can link
+    to one entity; one entity can be referenced by many SKUs (zone variants)."""
+
+    __tablename__ = "sku_product_links"
+    __table_args__ = (UniqueConstraint("sku", "entity_id", name="uq_sku_entity"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    sku: Mapped[str] = mapped_column(String, index=True)
+    entity_id: Mapped[str] = mapped_column(ForeignKey("product_entities.id", ondelete="CASCADE"), index=True)
+    zone_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)  # optional zone scope
+    linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    entity: Mapped[ProductEntity] = relationship(back_populates="sku_links")
+
+
+class CompetitorPriceObservation(Base):
+    """Enhanced price history: tracks not just price but source, SKU mapping,
+    competitor product entity alignment. Enables queries like 'when competitor
+    X dropped price on entity Y, what happened to our margin?'"""
+
+    __tablename__ = "competitor_price_observations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    competitor_product_id: Mapped[str] = mapped_column(ForeignKey("competitor_products.id", ondelete="CASCADE"), index=True)
+    entity_id: Mapped[str | None] = mapped_column(ForeignKey("product_entities.id", ondelete="SET NULL"), nullable=True, index=True)
+    price: Mapped[float] = mapped_column(Float)
+    currency: Mapped[str] = mapped_column(String(8), default="USD")
+    zone_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    store_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    delta_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    scrape_run_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
