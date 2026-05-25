@@ -11,6 +11,7 @@ import {
   Bell,
   Tag,
   Network,
+  GitBranch,
   RotateCcw,
   ChevronDown,
   ShieldCheck,
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/vision", label: "Vision Studio", sub: "Concept showcase", icon: Sparkles, match: /^\/vision/ },
   { href: "/scenarios", label: "Scenario Builder", sub: "Configure a test run", icon: SlidersHorizontal, match: /^\/scenarios/ },
   { href: "/scrapers", label: "Competitor Scraping", sub: "Data extraction pipeline", icon: Globe, match: /^\/scrapers/ },
+  { href: "/product-graph", label: "Knowledge Graph", sub: "Cross-source unification", icon: Network, match: /^\/product-graph/ },
   { href: "/pricing", label: "Pricing Engine", sub: "Elasticity · profit-max", icon: Brain, match: /^\/pricing/ },
   { href: "/certification", label: "Certification Lab", sub: "Before go-live", icon: ShieldCheck, match: /^\/certification/ },
   { href: "/operations", label: "Live Operations", sub: "Command Center", icon: LayoutGrid, match: /^\/operations$/ },
@@ -38,7 +40,7 @@ const NAV = [
   },
   { href: "/operations/incidents", label: "Incidents", sub: "Manage & triage", icon: Bell, match: /^\/operations\/incidents/ },
   { href: "/operations/markdowns", label: "Markdown SLAs", sub: "Perishable deadlines", icon: Tag, match: /^\/operations\/markdowns/ },
-  { href: "/engineering", label: "Engineering Trace", sub: "Data lineage", icon: Network, match: /^\/engineering/ },
+  { href: "/engineering", label: "Engineering Trace", sub: "Data lineage", icon: GitBranch, match: /^\/engineering/ },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

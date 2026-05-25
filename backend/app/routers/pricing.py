@@ -215,6 +215,37 @@ def apply_recommendation_to_shelftrace(
     }
 
 
+@router.get("/sku/{sku}/suggest")
+def suggest_for_sku(
+    sku: str,
+    store_id: str | None = Query(None, description="Optional store filter; returns best rec across stores if omitted"),
+    db: Session = Depends(get_db),
+):
+    """Get the latest non-superseded pricing recommendation for a SKU.
+
+    Used by the Scenarios builder to show 'Pricing engine suggests $X.XX'
+    next to each action — connecting the pricing brain to the canary loop.
+    """
+    stmt = (
+        select(PricingRecommendation)
+        .where(PricingRecommendation.sku == sku)
+        .where(PricingRecommendation.superseded_by.is_(None))
+        .order_by(desc(PricingRecommendation.created_at))
+    )
+    if store_id:
+        stmt = stmt.where(PricingRecommendation.store_id == store_id)
+
+    rec = db.scalar(stmt.limit(1))
+    if rec is None:
+        return {"sku": sku, "store_id": store_id, "recommendation": None}
+
+    return {
+        "sku": sku,
+        "store_id": store_id,
+        "recommendation": _rec_dict(rec),
+    }
+
+
 @router.get("/sku/{sku}/history")
 def sku_history(
     sku: str,

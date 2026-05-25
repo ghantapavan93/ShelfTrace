@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { Plus, Trash2, FlaskConical, ShieldCheck, Rocket, Download, Copy, Pencil, Lock } from "lucide-react";
 import { api } from "@/lib/api";
 import { ScenariosBulkPanel } from "@/components/ScenariosBulkPanel";
+import { ScenarioActionHints } from "@/components/ScenarioActionHints";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import type { BehaviorType, ConnectorBehavior, Scenario, ScenarioAction } from "@/lib/types";
@@ -249,15 +250,29 @@ export default function ScenarioBuilder() {
         </div>
         <div className="space-y-3">
           {actions.map((a, i) => (
-            <div key={i} className="grid items-end gap-2 rounded-xl border border-white/5 bg-white/[0.02] p-3 md:grid-cols-6">
-              <div className="md:col-span-2"><div className={label}>Product name</div><input className={input} value={a.product_name} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, product_name: e.target.value } : x))} /></div>
-              <div><div className={label}>SKU</div><input className={input} value={a.sku} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, sku: e.target.value } : x))} /></div>
-              <div><div className={label}>Previous $</div><input className={input} type="number" step="0.01" value={a.previous_price} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, previous_price: e.target.value as unknown as number } : x))} /></div>
-              <div><div className={label}>Approved $</div><input className={input} type="number" step="0.01" value={a.approved_price} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, approved_price: e.target.value as unknown as number } : x))} /></div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1"><div className={label}>Reason</div><input className={input} value={a.reason} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, reason: e.target.value } : x))} /></div>
-                <button onClick={() => setActions(actions.filter((_, j) => j !== i))} className="mb-1 text-slate-500 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
+            <div key={i} className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+              <div className="grid items-end gap-2 md:grid-cols-6">
+                <div className="md:col-span-2"><div className={label}>Product name</div><input className={input} value={a.product_name} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, product_name: e.target.value } : x))} /></div>
+                <div><div className={label}>SKU</div><input className={input} value={a.sku} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, sku: e.target.value } : x))} /></div>
+                <div><div className={label}>Previous $</div><input className={input} type="number" step="0.01" value={a.previous_price} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, previous_price: e.target.value as unknown as number } : x))} /></div>
+                <div><div className={label}>Approved $</div><input className={input} type="number" step="0.01" value={a.approved_price} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, approved_price: e.target.value as unknown as number } : x))} /></div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1"><div className={label}>Reason</div><input className={input} value={a.reason} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, reason: e.target.value } : x))} /></div>
+                  <button onClick={() => setActions(actions.filter((_, j) => j !== i))} className="mb-1 text-slate-500 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
+                </div>
               </div>
+              {a.sku && (
+                <ScenarioActionHints
+                  sku={a.sku}
+                  currentApprovedPrice={Number(a.approved_price) || 0}
+                  onUseCompetitor={(price, source) => {
+                    setActions(actions.map((x, j) => j === i ? { ...x, approved_price: price, reason: `Match competitor ${source}` } : x));
+                  }}
+                  onUseRecommendation={(price) => {
+                    setActions(actions.map((x, j) => j === i ? { ...x, approved_price: price, reason: "Pricing engine recommendation" } : x));
+                  }}
+                />
+              )}
             </div>
           ))}
         </div>

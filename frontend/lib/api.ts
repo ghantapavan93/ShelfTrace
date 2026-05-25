@@ -211,6 +211,106 @@ export const api = {
       }>;
     }>(`/api/v1/scraping/products${qs.toString() ? `?${qs.toString()}` : ""}`);
   },
+
+  // ── Product Knowledge Graph ─────────────────────────────────────────
+  graphEntities: (limit = 50) =>
+    get<{
+      total: number;
+      entities: Array<{
+        id: string;
+        canonical_title: string;
+        brand: string | null;
+        manufacturer: string | null;
+        upc: string | null;
+        category_id: string | null;
+        unit_size: string | null;
+        attributes: Record<string, unknown>;
+        match_confidence: number;
+        is_manual: boolean;
+        linked_sku_count: number;
+        competitor_observation_count: number;
+        created_at: string;
+      }>;
+    }>(`/api/v1/product-graph/entities?limit=${limit}`),
+  graphEntity: (id: string) =>
+    get<{
+      entity: {
+        id: string;
+        canonical_title: string;
+        brand: string | null;
+        manufacturer: string | null;
+        upc: string | null;
+        category_id: string | null;
+        unit_size: string | null;
+        attributes: Record<string, unknown>;
+        match_confidence: number;
+        is_manual: boolean;
+        created_at: string;
+      };
+      linked_skus: Array<{ sku: string; zone_id: string | null; linked_at: string }>;
+      competitor_observations: Array<{
+        source: string;
+        price: number;
+        currency: string;
+        zone_id: string | null;
+        store_id: string | null;
+        observed_at: string;
+        delta_pct: number | null;
+      }>;
+    }>(`/api/v1/product-graph/entities/${encodeURIComponent(id)}`),
+  graphCategories: () =>
+    get<{
+      categories: Array<{
+        id: string;
+        name: string;
+        description: string | null;
+        children: Array<{ id: string; name: string; description: string | null; children: unknown[] }>;
+      }>;
+    }>(`/api/v1/product-graph/categories`),
+  graphSeedDemo: () =>
+    post<{
+      seeded: boolean;
+      categories?: number;
+      entities?: number;
+      sku_links?: number;
+      competitor_products?: number;
+      observations?: number;
+      note: string;
+    }>(`/api/v1/product-graph/seed-demo`),
+  graphBulkMatch: (minScore = 0.7) =>
+    post<{ matched_count: number; skipped_count: number; min_score: number }>(
+      `/api/v1/product-graph/bulk-match?min_score=${minScore}`,
+    ),
+  graphCompetitorPricesForSku: (sku: string) =>
+    get<{
+      sku: string;
+      entity_id: string | null;
+      canonical_title?: string;
+      observations: Array<{
+        source_id: string;
+        competitor_title: string;
+        price: number;
+        currency: string;
+        delta_pct: number | null;
+        observed_at: string;
+      }>;
+    }>(`/api/v1/product-graph/sku/${encodeURIComponent(sku)}/competitor-prices`),
+  pricingSuggestForSku: (sku: string, storeId?: string) =>
+    get<{
+      sku: string;
+      store_id: string | null;
+      recommendation: {
+        id: string;
+        sku: string;
+        store_id: string;
+        product_name: string;
+        current_price: number;
+        recommended_price: number;
+        change_pct: number;
+        confidence: number;
+        reasons: Array<{ code: string; message: string }>;
+      } | null;
+    }>(`/api/v1/pricing/sku/${encodeURIComponent(sku)}/suggest${storeId ? `?store_id=${storeId}` : ""}`),
 };
 
 export const DEMO_BATCH = "memorial-day-dallas-02";
