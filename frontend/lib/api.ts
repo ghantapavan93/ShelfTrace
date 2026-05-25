@@ -1,6 +1,7 @@
 import type {
   BatchDetail,
   BatchSummary,
+  BulkImportPreviewResponse,
   CertificationReport,
   EngineeringTrace,
   IncidentExplanation,
@@ -89,6 +90,11 @@ export const api = {
     post<ScenarioExecuteResult>(`/api/v1/scenarios/${id}/execute?mode=${mode}`),
   cloneScenario: (id: string) => post<Scenario>(`/api/v1/scenarios/${id}/clone`),
   deleteScenario: (id: string) => del(`/api/v1/scenarios/${id}`),
+  scenarioImportPreview: (format: "csv" | "tsv" | "json", content: string) =>
+    post<BulkImportPreviewResponse>(`/api/v1/scenarios/import/preview`, {
+      format,
+      content,
+    }),
 };
 
 export const DEMO_BATCH = "memorial-day-dallas-02";

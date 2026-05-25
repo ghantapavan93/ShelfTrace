@@ -209,6 +209,31 @@ export interface ScenarioExecuteResult {
   run_id: string | null;
 }
 
+/**
+ * Bulk-import response for the /api/v1/scenarios/import/preview endpoint.
+ * Every row gets a per-row validity flag + the list of errors that
+ * caused it (if any), so the UI can render a true per-row diff.
+ */
+export interface BulkImportRowView {
+  row_number: number;
+  valid: boolean;
+  errors: string[];
+  sku: string;
+  product_name: string;
+  previous_price: number;
+  approved_price: number;
+  reason: string;
+  is_kvi: boolean;
+  deadline_at: string | null;
+}
+
+export interface BulkImportPreviewResponse {
+  format: "csv" | "tsv" | "json";
+  summary: { total: number; valid: number; invalid: number };
+  payload_errors: string[];
+  rows: BulkImportRowView[];
+}
+
 export interface EngineeringTrace {
   batch: BatchSummary;
   run_mode: string;

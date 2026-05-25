@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import TestRunConfig
 from app.schemas import (
+    BulkImportPreviewResponse,
+    BulkImportRequest,
+    BulkImportRowView,
     ConnectorBehaviorView,
     ScenarioActionView,
     ScenarioExecuteResult,
@@ -13,7 +16,7 @@ from app.schemas import (
     ScenarioView,
 )
 from app.security import Identity, require_operator
-from app.services import scenarios
+from app.services import bulk_import, scenarios
 
 router = APIRouter(prefix="/api/v1/scenarios", tags=["scenarios"])
 
@@ -123,3 +126,40 @@ def delete_scenario(
         scenarios.delete_config(db, config)
     except scenarios.ScenarioValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/import/preview", response_model=BulkImportPreviewResponse)
+def import_preview(payload: BulkImportRequest):
+    """Server-side parse + validate of a CSV/TSV/JSON product payload.
+
+    Stateless — no DB write. Frontend calls this when the user clicks
+    "Validate on server" to get authoritative per-row validation that
+    matches the production write-path's expectations.
+    """
+    fmt = payload.format.lower()
+    if fmt not in ("csv", "tsv", "json"):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported format '{payload.format}'. Use csv, tsv, or json.",
+        )
+    result = bulk_import.preview(fmt, payload.content)  # type: ignore[arg-type]
+    return BulkImportPreviewResponse(
+        format=result.format,
+        summary=result.summary,
+        payload_errors=result.payload_errors,
+        rows=[
+            BulkImportRowView(
+                row_number=r.row_number,
+                valid=r.valid,
+                errors=r.errors,
+                sku=r.sku,
+                product_name=r.product_name,
+                previous_price=r.previous_price,
+                approved_price=r.approved_price,
+                reason=r.reason,
+                is_kvi=r.is_kvi,
+                deadline_at=r.deadline_at,
+            )
+            for r in result.rows
+        ],
+    )

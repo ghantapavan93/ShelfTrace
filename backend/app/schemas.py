@@ -233,6 +233,32 @@ class ScenarioActionIn(BaseModel):
     deadline_at: datetime | None = None
 
 
+# ─── Bulk import preview ──────────────────────────────────────────────
+class BulkImportRequest(BaseModel):
+    format: str  # "csv" | "tsv" | "json"
+    content: str
+
+
+class BulkImportRowView(BaseModel):
+    row_number: int
+    valid: bool
+    errors: list[str] = []
+    sku: str = ""
+    product_name: str = ""
+    previous_price: float = 0.0
+    approved_price: float = 0.0
+    reason: str = "Bulk imported"
+    is_kvi: bool = False
+    deadline_at: str | None = None
+
+
+class BulkImportPreviewResponse(BaseModel):
+    format: str
+    summary: dict[str, int]
+    payload_errors: list[str] = []
+    rows: list[BulkImportRowView]
+
+
 class ScenarioIn(BaseModel):
     name: str
     run_mode: str = "live_rollout"
