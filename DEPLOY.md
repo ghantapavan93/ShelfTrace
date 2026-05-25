@@ -7,7 +7,11 @@ for reviewers. No paid plans, no credit card.
 > - **Web** spins down after 15 min idle. First request after a sleep takes
 >   ~30 s while the container cold-starts. Subsequent requests are normal.
 > - **Postgres** auto-expires 90 days after creation.
-> - **Redis** auto-expires 30 days after creation.
+> - **No Redis.** Render free tier allows only 1 Key Value (Redis) instance
+>   per account. ShelfTrace doesn't need Redis at runtime for the demo —
+>   the API drains the outbox inline on every POST. `REDIS_ENABLED=false`
+>   in `render.yaml` tells `/health` to report Redis as "disabled" instead
+>   of probing. To run with Redis, upgrade to a paid tier and flip the flag.
 > - **No background worker.** Render has no free worker tier. The API
 >   drains the outbox inline on `POST /price-batches` already
 >   (`backend/app/routers/batches.py`), so the demo works end-to-end. You
@@ -18,31 +22,31 @@ for reviewers. No paid plans, no credit card.
 
 ## 1. Backend — Render Blueprint
 
-The repo includes `render.yaml` defining three resources:
+The repo includes `render.yaml` defining two resources:
 - `shelftrace-api` — FastAPI web service, free plan
 - `shelftrace-db` — Managed Postgres 16, free plan
-- `shelftrace-redis` — Managed Redis, free plan
 
 ### Steps
 
 1. Push the repo to GitHub.
 2. In Render dashboard → **New → Blueprint** → connect the repo.
-3. Render reads `render.yaml`, shows the three services, prompts for
+3. Render reads `render.yaml`, shows the two services, prompts for
    confirmation. Click **Apply**.
-4. Wait ~5 min for Postgres + Redis to provision and the API container to
-   build. Visit `https://shelftrace-api.onrender.com/health` — you should
-   see `{"status":"ok","db":"ok","redis":"ok"}`.
+4. Wait ~5 min for Postgres to provision and the API container to build.
+   Visit `https://shelftrace-api.onrender.com/health` — you should see
+   `"status":"healthy"` with `database:{"ok":true}` and
+   `redis:{"ok":true,"status":"disabled"}`.
 5. The startup `lifespan` hook auto-seeds the Memorial Day / Dallas Zone 2
    demo batch when `DEMO_MODE=true`. Confirm by hitting
    `/api/v1/operations/overview` — should return a batch with 4 actions.
 
 ### After Vercel is up — set CORS
 
-Once the frontend lives at `https://<your-name>.vercel.app`:
+Once the frontend lives at `https://shelf-trace.vercel.app`:
 
 ```
 Render dashboard → shelftrace-api → Environment →
-  CORS_ORIGINS = https://<your-name>.vercel.app,http://localhost:3000
+  CORS_ORIGINS = https://shelf-trace.vercel.app,http://localhost:3000
 ```
 
 Trigger a manual redeploy. The frontend can now talk to the API without
@@ -80,7 +84,7 @@ also patch `lib/api.ts` to attach one.
    > a redeploy.
 
 5. Click **Deploy**. First build takes ~3 min.
-6. Visit `https://<your-name>.vercel.app/vision/keynote`. The page loads
+6. Visit `https://shelf-trace.vercel.app/vision/keynote`. The page loads
    immediately (static). Visit `/operations` — first request triggers a
    ~30 s Render cold-start. Subsequent navigation is fast.
 
@@ -98,7 +102,7 @@ curl https://shelftrace-api.onrender.com/health
 curl https://shelftrace-api.onrender.com/api/v1/operations/overview | jq .batch.external_id
 
 # 3. Frontend talks to backend?
-#    Open https://<your-name>.vercel.app/operations in a browser. Should
+#    Open https://shelf-trace.vercel.app/operations in a browser. Should
 #    show "Memorial Day Weekend Promotion" batch with 4 actions.
 
 # 4. Run the recovery loop manually

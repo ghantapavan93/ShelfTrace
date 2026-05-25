@@ -71,11 +71,11 @@ services:
       - key: LOG_LEVEL
         value: info
 
-      # CORS — REPLACE this default once Vercel domain is provisioned.
-      # Comma-separated, no spaces. Include both the production domain and
-      # any preview-branch deploys you want to allow.
+      # CORS — production Vercel deploy + local dev. Add Vercel preview
+      # branch URLs (e.g. https://shelf-trace-git-<branch>-ghantapavan93.vercel.app)
+      # if you want to test branch deploys against this backend.
       - key: CORS_ORIGINS
-        value: "https://shelftrace.vercel.app,http://localhost:3000"
+        value: "https://shelf-trace.vercel.app,http://localhost:3000"
 
       # Optional auth — leave empty for fully open read+write demo, or set
       # to '{"viewer-key-here":{"role":"viewer","actor":"Reviewer"}}'
