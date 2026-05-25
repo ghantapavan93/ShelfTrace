@@ -10,6 +10,7 @@ import { ScenarioActionHints } from "@/components/ScenarioActionHints";
 import { ScenarioFlowStepper } from "@/components/ScenarioFlowStepper";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
+import { useWorkMode } from "@/components/ModeProvider";
 import type { BehaviorType, ConnectorBehavior, Scenario, ScenarioAction } from "@/lib/types";
 
 const BEHAVIORS: { value: BehaviorType; label: string }[] = [
@@ -33,6 +34,8 @@ const label = "text-[11px] uppercase tracking-wide text-slate-500";
 
 export default function ScenarioBuilder() {
   const router = useRouter();
+  const { mode: workMode } = useWorkMode();
+  const isLive = workMode === "live";
   const [name, setName] = useState("Custom Connector Test");
   const [zone, setZone] = useState("Custom Zone");
   const [stores, setStores] = useState("214,302");
@@ -167,11 +170,34 @@ export default function ScenarioBuilder() {
         isRunning={isRunning}
       />
 
+      {isLive && (
+        <div className="glass-strong rounded-2xl border border-rose-500/25 bg-gradient-to-br from-rose-500/5 to-transparent p-5">
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-300">
+              <Rocket className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-rose-300">
+                Live Mode · Bring your own data
+              </div>
+              <h3 className="mt-1 text-base font-semibold text-white">
+                Upload a CSV with your real catalog, or paste rows below
+              </h3>
+              <p className="mt-1 text-xs text-slate-400">
+                Memorial Day shortcuts are hidden in this mode. Drop a file in the Bulk Import section, define your stores and canary subset above, then run Certification or Live Rollout. The backend still uses simulated retailer connectors — no real POS/ESL/ecommerce traffic.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3">
-        <button onClick={loadMemorialDay} disabled={busy !== null}
-          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-50">
-          <Download className={clsx("h-4 w-4", busy === "load" && "animate-pulse")} /> Load Memorial Day Demo
-        </button>
+        {!isLive && (
+          <button onClick={loadMemorialDay} disabled={busy !== null}
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-50">
+            <Download className={clsx("h-4 w-4", busy === "load" && "animate-pulse")} /> Load Memorial Day Demo
+          </button>
+        )}
         <button onClick={() => run("certification")} disabled={busy !== null}
           className="group flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2.5 text-sm font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-50"
           title="Pre-flight checks: validates connector profile across 6 check types. Outputs a pass/fail certification report. Use this BEFORE going live.">
@@ -208,11 +234,18 @@ export default function ScenarioBuilder() {
         onConfirm={() => confirmDelete && deleteSaved(confirmDelete.id)}
       />
 
-      {/* Saved scenarios */}
+      {/* Saved scenarios — hide seeded ones in LIVE mode so the user only sees their own work */}
       <section className="glass rounded-2xl p-5">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">Saved Scenarios</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">
+          Saved Scenarios
+          {isLive && (
+            <span className="ml-2 text-[10px] font-normal normal-case tracking-normal text-slate-500">
+              (Demo scenarios hidden — switch to Demo mode to see seeded examples)
+            </span>
+          )}
+        </h2>
         <div className="space-y-2">
-          {saved.map((s) => (
+          {saved.filter((s) => !isLive || !s.is_seeded).map((s) => (
             <div key={s.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -237,7 +270,13 @@ export default function ScenarioBuilder() {
               </div>
             </div>
           ))}
-          {saved.length === 0 && <div className="text-xs text-slate-500">No saved scenarios yet.</div>}
+          {saved.filter((s) => !isLive || !s.is_seeded).length === 0 && (
+            <div className="text-xs text-slate-500">
+              {isLive
+                ? "No live scenarios yet. Configure one above and save it by running, or switch to Demo mode to explore seeded examples."
+                : "No saved scenarios yet."}
+            </div>
+          )}
         </div>
       </section>
 
