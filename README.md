@@ -2,6 +2,20 @@
 
 **Test every connector before go-live. Guard every price rollout after approval.**
 
+### 🎬 Live demo
+
+| | |
+|---|---|
+| **Cinematic pitch** | [shelf-trace.vercel.app/vision/keynote](https://shelf-trace.vercel.app/vision/keynote) |
+| **Working platform** *(live data)* | [shelf-trace.vercel.app/operations](https://shelf-trace.vercel.app/operations) |
+| **Engineering trace** *(pipeline + tests)* | [shelf-trace.vercel.app/engineering](https://shelf-trace.vercel.app/engineering) |
+| **Build your own scenario** | [shelf-trace.vercel.app/scenarios](https://shelf-trace.vercel.app/scenarios) |
+| **Backend health** | [shelftrace-api.onrender.com/health](https://shelftrace-api.onrender.com/health) |
+
+> ⏱️ **First click may take ~30s** while the free-tier backend wakes from idle. Subsequent navigation is instant. The full backend (FastAPI + PostgreSQL) runs on Render free tier; the frontend (Next.js) is on Vercel. Deploy config in [`render.yaml`](./render.yaml) + [`DEPLOY.md`](./DEPLOY.md).
+
+---
+
 One reliability platform with two modes: a **Certification Lab** that validates POS, shelf-label and ecommerce connectors before automated pricing is enabled, and a **Live Control Plane** that canaries approved price rollouts, verifies every customer-facing channel, and recovers incidents after activation.
 
 > **Disclaimer.** Independent prototype inspired by public grocery pricing workflows. Uses sample data and simulated POS, ESL and ecommerce integrations. Not affiliated with, and makes no claim about, any company's internal systems.
