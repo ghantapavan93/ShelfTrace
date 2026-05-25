@@ -42,17 +42,33 @@ class ScrapedProduct:
 
 
 @dataclass
+class RowError:
+    """One row that was rejected by validation. Captured so the run log
+    can show exactly which records were dropped and why — silent drops
+    are the #1 way scrapers ship bad data into the warehouse."""
+
+    page_url: str
+    raw_external_id: str  # best-effort; "" if even that wasn't parsed
+    field: str            # which field failed validation
+    reason: str           # human-readable
+
+
+@dataclass
 class ScrapeRunResult:
     """Summary returned by pipeline.run_scrape — easy for the API layer to
     serialise into a response body and for tests to assert on."""
 
     source_id: str
     pages_fetched: int = 0
-    products_seen: int = 0      # raw count, before dedup
-    products_persisted: int = 0  # after dedup
+    products_seen: int = 0       # raw count, before dedup + validation
+    products_persisted: int = 0  # after dedup + validation passed
     products_updated: int = 0    # existed before, refreshed price
     products_inserted: int = 0   # truly new
+    products_rejected: int = 0   # validation failed; details in row_errors
+    price_changes_detected: int = 0  # rows where price changed vs last seen
+    pages_skipped_by_robots: int = 0  # blocked by robots.txt
     errors: list[str] = field(default_factory=list)
+    row_errors: list[RowError] = field(default_factory=list)
     duration_ms: int = 0
 
 

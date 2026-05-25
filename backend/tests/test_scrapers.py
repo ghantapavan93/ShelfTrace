@@ -269,3 +269,189 @@ def test_unknown_source_returns_error_in_result():
         assert any("Unknown source_id" in e for e in result.errors)
     finally:
         db.close()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Per-row validation
+# ──────────────────────────────────────────────────────────────────────
+def test_pipeline_rejects_rows_with_zero_price(db):
+    bad_html = """
+    <article class="product_pod">
+      <h3><a href="zero-priced_1/index.html" title="Zero Priced">Zero Priced</a></h3>
+      <p class="price_color">£0.00</p>
+      <p class="availability">In stock</p>
+    </article>
+    """
+    result = run_with_fixture_html(db, "books_demo", [(FIXTURE_PAGE_URL, bad_html)])
+    assert result.products_rejected == 1
+    assert result.products_persisted == 0
+    assert any("price" in re.field for re in result.row_errors)
+
+
+def test_pipeline_captures_per_row_rejection_details(db):
+    bad_html = """
+    <article class="product_pod">
+      <h3><a href="x_1/index.html" title="">A</a></h3>
+      <p class="price_color">£5.00</p>
+    </article>
+    """
+    result = run_with_fixture_html(db, "books_demo", [(FIXTURE_PAGE_URL, bad_html)])
+    assert result.products_rejected == 1
+    err = result.row_errors[0]
+    assert err.field == "title"
+    assert "short" in err.reason or "missing" in err.reason
+    assert err.page_url == FIXTURE_PAGE_URL
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Price history
+# ──────────────────────────────────────────────────────────────────────
+def test_first_scrape_writes_baseline_price_history(db):
+    from app.models import CompetitorPriceHistory
+    from sqlalchemy import select as _select
+
+    run_with_fixture_html(db, "books_demo", [(FIXTURE_PAGE_URL, FIXTURE_HTML)])
+    rows = list(db.scalars(_select(CompetitorPriceHistory)))
+    assert len(rows) == 2  # one per product on the page
+    # First observation: delta_pct is None (no prior)
+    assert all(r.delta_pct is None for r in rows)
+
+
+def test_price_change_appends_history_row_with_delta(db):
+    from app.models import CompetitorPriceHistory
+    from sqlalchemy import select as _select
+
+    run_with_fixture_html(db, "books_demo", [(FIXTURE_PAGE_URL, FIXTURE_HTML)])
+    modified = FIXTURE_HTML.replace("£51.77", "£44.99")  # -13%
+    result = run_with_fixture_html(db, "books_demo", [(FIXTURE_PAGE_URL, modified)])
+
+    assert result.price_changes_detected == 1
+
+    # Get the price-history rows for the changed product, newest first
+    rows = list(
+        db.scalars(
+            _select(CompetitorPriceHistory)
+            .where(CompetitorPriceHistory.stable_key == "books_demo:a-light-in-the-attic_1000")
+            .order_by(CompetitorPriceHistory.observed_at.desc())
+        ),
+    )
+    assert len(rows) == 2
+    latest = rows[0]
+    assert latest.price == 44.99
+    assert latest.delta_pct is not None
+    assert -15 < latest.delta_pct < -10  # -13ish %
+
+
+def test_unchanged_price_does_not_add_history_row(db):
+    from app.models import CompetitorPriceHistory
+    from sqlalchemy import select as _select
+
+    run_with_fixture_html(db, "books_demo", [(FIXTURE_PAGE_URL, FIXTURE_HTML)])
+    # Same HTML again — no price change
+    result = run_with_fixture_html(db, "books_demo", [(FIXTURE_PAGE_URL, FIXTURE_HTML)])
+    assert result.price_changes_detected == 0
+    rows = list(db.scalars(_select(CompetitorPriceHistory)))
+    assert len(rows) == 2  # still just the baseline from first run
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Idempotency
+# ──────────────────────────────────────────────────────────────────────
+def test_idempotency_key_returns_existing_run_summary(db, monkeypatch):
+    """Second call with the same idempotency_key must NOT trigger a
+    second network round-trip — it must return the prior run's summary."""
+    import httpx
+    from app.scrapers import pipeline as scraper_pipeline
+
+    pages = {
+        BooksDemoSpider.START_URL: FIXTURE_HTML,
+        "https://books.toscrape.com/catalogue/page-2.html": FIXTURE_PAGE_2,
+    }
+
+    class _Resp:
+        def __init__(self, text="", status_code=200):
+            self.text = text
+            self.status_code = status_code
+            self.headers = {}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise httpx.HTTPStatusError("err", request=None, response=self)  # type: ignore[arg-type]
+
+    call_count = {"n": 0}
+
+    def fake_get(self, url, **kwargs):  # noqa: ARG001
+        call_count["n"] += 1
+        return _Resp(pages.get(url, ""), 200 if url in pages else 404)
+
+    monkeypatch.setattr(httpx.Client, "get", fake_get)
+    monkeypatch.setattr(scraper_pipeline, "REQUEST_DELAY_S", 0)
+    # Skip robots.txt by always allowing
+    from app.scrapers import robots as robots_mod
+    monkeypatch.setattr(robots_mod, "can_fetch", lambda *a, **kw: True)
+
+    r1 = run_scrape(db, "books_demo", idempotency_key="evaluator-test-001")
+    first_calls = call_count["n"]
+    r2 = run_scrape(db, "books_demo", idempotency_key="evaluator-test-001")
+    second_calls = call_count["n"]
+
+    # Second run made NO additional HTTP calls
+    assert second_calls == first_calls
+    # And returned the same summary
+    assert r2.products_persisted == r1.products_persisted
+    assert r2.products_inserted == r1.products_inserted
+
+
+# ──────────────────────────────────────────────────────────────────────
+# robots.txt enforcement
+# ──────────────────────────────────────────────────────────────────────
+def test_robots_blocks_disallowed_page(db, monkeypatch):
+    from app.scrapers import pipeline as scraper_pipeline
+    from app.scrapers import robots as robots_mod
+
+    monkeypatch.setattr(scraper_pipeline, "REQUEST_DELAY_S", 0)
+    monkeypatch.setattr(robots_mod, "can_fetch", lambda *a, **kw: False)
+
+    result = run_scrape(db, "books_demo")
+    assert result.pages_skipped_by_robots == 1
+    assert result.products_persisted == 0
+    assert any("robots.txt" in e for e in result.errors)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 429 Retry-After handling
+# ──────────────────────────────────────────────────────────────────────
+def test_429_response_honored_then_succeeds(db, monkeypatch):
+    import httpx
+    from app.scrapers import pipeline as scraper_pipeline
+    from app.scrapers import robots as robots_mod
+
+    monkeypatch.setattr(scraper_pipeline, "REQUEST_DELAY_S", 0)
+    monkeypatch.setattr(robots_mod, "can_fetch", lambda *a, **kw: True)
+
+    class _Resp:
+        def __init__(self, text="", status_code=200, headers=None):
+            self.text = text
+            self.status_code = status_code
+            self.headers = headers or {}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise httpx.HTTPStatusError("err", request=None, response=self)  # type: ignore[arg-type]
+
+    call_seq = [
+        _Resp(status_code=429, headers={"Retry-After": "0"}),  # first call: 429
+        _Resp(text=FIXTURE_HTML, status_code=200),              # retry: 200
+        _Resp(status_code=404),                                  # next_page: 404
+    ]
+
+    def fake_get(self, url, **kwargs):  # noqa: ARG001
+        return call_seq.pop(0) if call_seq else _Resp(status_code=404)
+
+    monkeypatch.setattr(httpx.Client, "get", fake_get)
+
+    result = run_scrape(db, "books_demo")
+    # We retried past the 429 and got the page
+    assert result.products_persisted == 2
+    # The 429 was recorded in errors
+    assert any("429" in e for e in result.errors)

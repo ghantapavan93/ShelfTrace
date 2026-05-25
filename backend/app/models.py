@@ -469,15 +469,39 @@ class ScrapeRun(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     source_id: Mapped[str] = mapped_column(String, index=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     pages_fetched: Mapped[int] = mapped_column(Integer, default=0)
+    pages_skipped_by_robots: Mapped[int] = mapped_column(Integer, default=0)
     products_seen: Mapped[int] = mapped_column(Integer, default=0)
     products_inserted: Mapped[int] = mapped_column(Integer, default=0)
     products_updated: Mapped[int] = mapped_column(Integer, default=0)
+    products_rejected: Mapped[int] = mapped_column(Integer, default=0)
+    price_changes_detected: Mapped[int] = mapped_column(Integer, default=0)
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
     errors_json: Mapped[dict] = mapped_column(JSONColumn, default=dict)
     status: Mapped[str] = mapped_column(String(32), default="running")  # running|success|failed
+
+
+class CompetitorPriceHistory(Base):
+    """Append-only log of price changes for each stable_key.
+
+    The CompetitorProduct table holds only the current price. This table
+    keeps the trend — essential for the pricing engine downstream
+    (elasticity estimation against competitor moves) and for any
+    "competitor dropped 30% in 2 days, alert!" signal.
+    """
+
+    __tablename__ = "competitor_price_history"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    stable_key: Mapped[str] = mapped_column(String, index=True)
+    price: Mapped[float] = mapped_column(Float)
+    currency: Mapped[str] = mapped_column(String(8), default="USD")
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    delta_pct: Mapped[float | None] = mapped_column(Float, nullable=True)  # change vs last observation
+    scrape_run_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 # ---------------------------------------------------------------------------

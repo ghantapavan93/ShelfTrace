@@ -30,6 +30,8 @@ import {
   Clock,
   Code2,
   RefreshCw,
+  Download,
+  ImageOff,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
@@ -46,12 +48,16 @@ type Source = {
 type RunSummary = {
   source_id: string;
   pages_fetched: number;
+  pages_skipped_by_robots?: number;
   products_seen: number;
   products_inserted: number;
   products_updated: number;
   products_persisted: number;
+  products_rejected?: number;
+  price_changes_detected?: number;
   duration_ms: number;
   errors: string[];
+  row_errors?: Array<{ page_url: string; raw_external_id: string; field: string; reason: string }>;
 };
 
 export default function ScrapersPage() {
@@ -96,12 +102,16 @@ export default function ScrapersPage() {
       setLastRun({
         source_id: selected,
         pages_fetched: 0,
+        pages_skipped_by_robots: 0,
         products_seen: 0,
         products_inserted: 0,
         products_updated: 0,
         products_persisted: 0,
+        products_rejected: 0,
+        price_changes_detected: 0,
         duration_ms: 0,
         errors: [(e as Error).message],
+        row_errors: [],
       });
     } finally {
       setRunning(false);
@@ -287,6 +297,33 @@ export default function ScrapersPage() {
                     {lastRun.products_updated}
                   </span>{" "}
                   updated
+                  {lastRun.products_rejected ? (
+                    <>
+                      {" · "}
+                      <span className="font-semibold text-rose-300">
+                        {lastRun.products_rejected}
+                      </span>{" "}
+                      rejected
+                    </>
+                  ) : null}
+                  {lastRun.price_changes_detected ? (
+                    <>
+                      {" · "}
+                      <span className="font-semibold text-amber-300">
+                        {lastRun.price_changes_detected}
+                      </span>{" "}
+                      price changes
+                    </>
+                  ) : null}
+                  {lastRun.pages_skipped_by_robots ? (
+                    <>
+                      {" · "}
+                      <span className="font-semibold text-violet-300">
+                        {lastRun.pages_skipped_by_robots}
+                      </span>{" "}
+                      blocked by robots.txt
+                    </>
+                  ) : null}
                 </div>
                 {lastRun.errors.length > 0 && (
                   <ul className="mt-1 list-disc pl-4 text-[11px] opacity-90">
@@ -297,6 +334,23 @@ export default function ScrapersPage() {
                       <li>(+{lastRun.errors.length - 3} more)</li>
                     )}
                   </ul>
+                )}
+                {lastRun.row_errors && lastRun.row_errors.length > 0 && (
+                  <details className="mt-2 text-[11px]">
+                    <summary className="cursor-pointer text-amber-300 underline-offset-2 hover:underline">
+                      {lastRun.row_errors.length} row{lastRun.row_errors.length === 1 ? "" : "s"} dropped by validation — show details
+                    </summary>
+                    <ul className="mt-1 list-disc pl-4 opacity-90">
+                      {lastRun.row_errors.slice(0, 5).map((e, i) => (
+                        <li key={i}>
+                          <span className="mono">{e.raw_external_id || "(no id)"}</span> · {e.field}: {e.reason}
+                        </li>
+                      ))}
+                      {lastRun.row_errors.length > 5 && (
+                        <li>(+{lastRun.row_errors.length - 5} more)</li>
+                      )}
+                    </ul>
+                  </details>
                 )}
               </motion.div>
             )}
@@ -371,15 +425,35 @@ export default function ScrapersPage() {
               <span className="text-slate-300">observation_count</span>.
             </p>
           </div>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search title…"
-              className="w-64 rounded-lg border border-white/10 bg-black/30 py-1.5 pl-8 pr-2 text-xs text-white outline-none focus:border-brand/50"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search title…"
+                className="w-64 rounded-lg border border-white/10 bg-black/30 py-1.5 pl-8 pr-2 text-xs text-white outline-none focus:border-brand/50"
+              />
+            </div>
+            <a
+              href={`${api.base}/api/v1/scraping/products/export.csv${
+                selected || debouncedSearch
+                  ? `?${[
+                      selected ? `source_id=${encodeURIComponent(selected)}` : "",
+                      debouncedSearch ? `q=${encodeURIComponent(debouncedSearch)}` : "",
+                    ]
+                      .filter(Boolean)
+                      .join("&")}`
+                  : ""
+              }`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-white/10"
+              title="Export current view as CSV"
+            >
+              <Download className="h-3 w-3" /> Export CSV
+            </a>
           </div>
         </div>
 
@@ -407,14 +481,7 @@ export default function ScrapersPage() {
                       >
                         <td className="py-2 pl-3 pr-2">
                           <div className="flex items-center gap-2">
-                            {p.image_url && (
-                              <img
-                                src={p.image_url}
-                                alt=""
-                                className="h-8 w-6 rounded border border-white/10 object-cover"
-                                loading="lazy"
-                              />
-                            )}
+                            <ProductImage src={p.image_url} alt={p.title} />
                             <div className="min-w-0 flex-1">
                               <div className="truncate font-medium text-white">
                                 {p.title}
@@ -513,6 +580,33 @@ function EmptyState({ onRun, sourceName }: { onRun: () => void; sourceName: stri
         <Play className="h-3 w-3" /> Run scrape now
       </button>
     </div>
+  );
+}
+
+/**
+ * ProductImage — handles null + 404 (broken-image) cases with a neutral
+ * placeholder so the table never shows browser's default missing-image icon.
+ */
+function ProductImage({ src, alt }: { src: string | null; alt: string }) {
+  const [errored, setErrored] = useState(false);
+  if (!src || errored) {
+    return (
+      <div
+        className="flex h-8 w-6 shrink-0 items-center justify-center rounded border border-white/10 bg-white/[.04] text-slate-600"
+        aria-label="No image"
+      >
+        <ImageOff className="h-3 w-3" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setErrored(true)}
+      className="h-8 w-6 rounded border border-white/10 object-cover"
+      loading="lazy"
+    />
   );
 }
 

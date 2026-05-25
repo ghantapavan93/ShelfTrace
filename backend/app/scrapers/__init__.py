@@ -30,11 +30,12 @@ In production we'd swap to Playwright/Scrapy for JS-rendered sites and
 add proxy rotation, but the spider INTERFACE here is the production
 contract. See README "Scaling the scraper" for the upgrade path.
 """
-from app.scrapers.base import ScrapedProduct, ScrapeRunResult, Spider
+from app.scrapers.base import RowError, ScrapedProduct, ScrapeRunResult, Spider
 from app.scrapers.pipeline import run_scrape
 from app.scrapers.registry import SPIDERS, get_spider, list_sources
 
 __all__ = [
+    "RowError",
     "ScrapedProduct",
     "ScrapeRunResult",
     "Spider",

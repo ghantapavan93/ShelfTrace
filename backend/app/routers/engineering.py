@@ -19,8 +19,8 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
     "command": "pytest -q  (PostgreSQL-backed, isolated test DB)",
-    "passed": 111,
-    "duration_s": 47.3,
+    "passed": 119,
+    "duration_s": 49.5,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -133,6 +133,14 @@ TEST_PROOF = {
         "tests/test_pricing.py::test_pipeline_includes_reasoning_for_every_recommendation",
         "tests/test_pricing.py::test_pipeline_confidence_score_is_zero_when_no_data",
         "tests/test_pricing.py::test_pipeline_confidence_score_higher_with_more_clean_data",
+        "tests/test_scrapers.py::test_pipeline_rejects_rows_with_zero_price",
+        "tests/test_scrapers.py::test_pipeline_captures_per_row_rejection_details",
+        "tests/test_scrapers.py::test_first_scrape_writes_baseline_price_history",
+        "tests/test_scrapers.py::test_price_change_appends_history_row_with_delta",
+        "tests/test_scrapers.py::test_unchanged_price_does_not_add_history_row",
+        "tests/test_scrapers.py::test_idempotency_key_returns_existing_run_summary",
+        "tests/test_scrapers.py::test_robots_blocks_disallowed_page",
+        "tests/test_scrapers.py::test_429_response_honored_then_succeeds",
     ],
 }
 
