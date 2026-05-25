@@ -12,7 +12,7 @@ codebase. Future sessions should keep working in this voice.
 > **A reliability control plane for approved retail price execution.**
 > Transactional outbox, deterministic reconciliation across shelf, POS and
 > ecommerce, canary containment, audit-verified recovery. Independent
-> prototype with 55 PostgreSQL-backed tests.
+> prototype with 69 PostgreSQL-backed tests.
 
 Two reviewer-facing entry points (`/vision/keynote`, `/vision/showcase`)
 bridge into the working surfaces (`/operations`, `/engineering`,
@@ -25,7 +25,7 @@ bridge into the working surfaces (`/operations`, `/engineering`,
 These exist because earlier sessions over-claimed and had to walk it back.
 
 - **No fabricated numbers.** Only claim what the repo actually proves
-  (current: 55 PostgreSQL-backed tests, configurable scenario engine,
+  (current: 69 PostgreSQL-backed tests, configurable scenario engine,
   certification lab, live control plane, deterministic reconciliation,
   audit-verified recovery, transactional outbox, FOR UPDATE SKIP LOCKED,
   row-locked recovery).
@@ -40,7 +40,7 @@ These exist because earlier sessions over-claimed and had to walk it back.
   this reason.
 - **`prefers-reduced-motion` honored** in every motion block. Test by
   toggling system preference.
-- **Backend tests must stay green.** 55/55 on real Postgres is the floor.
+- **Backend tests must stay green.** 69/69 on real Postgres is the floor.
   Any reliability-touching change requires a matching test.
 
 ---

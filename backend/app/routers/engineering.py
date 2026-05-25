@@ -19,8 +19,8 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
     "command": "pytest -q  (PostgreSQL-backed, isolated test DB)",
-    "passed": 55,
-    "duration_s": 38.7,
+    "passed": 69,
+    "duration_s": 41.2,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -77,6 +77,20 @@ TEST_PROOF = {
         "tests/test_measurement.py::test_existing_rollout_decisions_unchanged_after_derivation",
         "tests/test_measurement.py::test_existing_audit_causality_unchanged_after_derivation",
         "tests/test_measurement.py::test_batch_helper_avoids_n_plus_one",
+        "tests/test_bulk_import.py::test_csv_with_header_parses_all_rows",
+        "tests/test_bulk_import.py::test_csv_without_header_uses_positional_defaults",
+        "tests/test_bulk_import.py::test_tsv_with_header_parses",
+        "tests/test_bulk_import.py::test_json_array_of_objects_parses",
+        "tests/test_bulk_import.py::test_missing_required_field_marks_row_invalid_with_explanation",
+        "tests/test_bulk_import.py::test_non_numeric_price_flags_row",
+        "tests/test_bulk_import.py::test_price_with_currency_and_comma_is_accepted",
+        "tests/test_bulk_import.py::test_typo_protection_flags_5x_price_jump",
+        "tests/test_bulk_import.py::test_header_aliases_old_to_new_naming",
+        "tests/test_bulk_import.py::test_blank_lines_are_skipped_silently",
+        "tests/test_bulk_import.py::test_empty_payload_returns_payload_error",
+        "tests/test_bulk_import.py::test_size_cap_rejects_oversized_payload",
+        "tests/test_bulk_import.py::test_invalid_json_returns_clear_error",
+        "tests/test_bulk_import.py::test_json_payload_must_be_an_array",
     ],
 }
 
