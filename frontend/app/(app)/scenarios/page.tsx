@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Plus, Trash2, FlaskConical, ShieldCheck, Rocket, Download, Copy, Pencil, Lock } from "lucide-react";
 import { api } from "@/lib/api";
+import { ScenariosBulkPanel } from "@/components/ScenariosBulkPanel";
 import type { BehaviorType, ConnectorBehavior, Scenario, ScenarioAction } from "@/lib/types";
 
 const BEHAVIORS: { value: BehaviorType; label: string }[] = [
@@ -203,6 +204,16 @@ export default function ScenarioBuilder() {
           <div><div className={label}>Canary stores</div><input className={input} value={canary} onChange={(e) => setCanary(e.target.value)} /></div>
         </div>
       </section>
+
+      {/* Bulk import — CSV paste + behavior presets, for evaluators with
+          real data who'd rather not type every row by hand. */}
+      <ScenariosBulkPanel
+        storesCsv={stores}
+        canaryCsv={canary}
+        actions={actions}
+        onImportProducts={(next) => setActions(next)}
+        onGenerateBehaviors={(next) => setBehaviors(next)}
+      />
 
       {/* Price actions */}
       <section className="glass rounded-2xl p-5">
