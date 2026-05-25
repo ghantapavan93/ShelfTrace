@@ -16,4 +16,7 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell-form CMD with $PORT fallback. Works on both:
+#  • Render / Fly / Heroku — PORT is injected, container listens there
+#  • docker-compose / local — PORT unset, falls back to 8000
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

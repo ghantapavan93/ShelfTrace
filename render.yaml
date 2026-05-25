@@ -42,10 +42,9 @@ services:
     region: oregon
     healthCheckPath: /health
     autoDeploy: true
-    # Override the Dockerfile CMD so uvicorn listens on Render's injected
-    # $PORT (usually 10000) instead of the hardcoded 8000 used locally.
-    # Local docker-compose stays unaffected — that path still uses CMD.
-    dockerCommand: sh -c "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    # The Dockerfile CMD now uses ${PORT:-8000} natively, so no override
+    # is needed. Render injects PORT=10000; docker-compose leaves it
+    # unset and falls back to 8000.
     envVars:
       # Wire Postgres from the database above
       - key: DATABASE_URL
