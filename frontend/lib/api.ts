@@ -95,6 +95,66 @@ export const api = {
       format,
       content,
     }),
+
+  // Competitor scraping
+  scrapingSources: () =>
+    get<{ sources: Array<{ source_id: string; name: string; description: string; start_url: string; max_pages: number }> }>(
+      `/api/v1/scraping/sources`,
+    ),
+  scrapingRunTrigger: (sourceId: string) =>
+    post<{
+      source_id: string;
+      pages_fetched: number;
+      products_seen: number;
+      products_inserted: number;
+      products_updated: number;
+      products_persisted: number;
+      duration_ms: number;
+      errors: string[];
+    }>(`/api/v1/scraping/runs?source_id=${encodeURIComponent(sourceId)}`),
+  scrapingRuns: () =>
+    get<{
+      runs: Array<{
+        id: string;
+        source_id: string;
+        status: string;
+        started_at: string;
+        completed_at: string | null;
+        duration_ms: number;
+        pages_fetched: number;
+        products_seen: number;
+        products_inserted: number;
+        products_updated: number;
+        errors: string[];
+      }>;
+    }>(`/api/v1/scraping/runs`),
+  scrapingProducts: (params: { source_id?: string; q?: string; limit?: number; offset?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.source_id) qs.set("source_id", params.source_id);
+    if (params.q) qs.set("q", params.q);
+    if (params.limit != null) qs.set("limit", String(params.limit));
+    if (params.offset != null) qs.set("offset", String(params.offset));
+    return get<{
+      total_estimated: number;
+      offset: number;
+      limit: number;
+      products: Array<{
+        id: string;
+        source_id: string;
+        external_id: string;
+        title: string;
+        price: number;
+        currency: string;
+        category: string | null;
+        availability: string | null;
+        image_url: string | null;
+        source_url: string | null;
+        first_seen_at: string;
+        last_seen_at: string;
+        observation_count: number;
+      }>;
+    }>(`/api/v1/scraping/products${qs.toString() ? `?${qs.toString()}` : ""}`);
+  },
 };
 
 export const DEMO_BATCH = "memorial-day-dallas-02";

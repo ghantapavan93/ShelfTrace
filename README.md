@@ -10,6 +10,7 @@
 | **Working platform** *(live data)* | [shelf-trace.vercel.app/operations](https://shelf-trace.vercel.app/operations) |
 | **Engineering trace** *(pipeline + tests)* | [shelf-trace.vercel.app/engineering](https://shelf-trace.vercel.app/engineering) |
 | **Build your own scenario** | [shelf-trace.vercel.app/scenarios](https://shelf-trace.vercel.app/scenarios) |
+| **Competitor scraping** | [shelf-trace.vercel.app/scrapers](https://shelf-trace.vercel.app/scrapers) |
 | **Backend health** | [shelftrace-api.onrender.com/health](https://shelftrace-api.onrender.com/health) |
 
 > ⏱️ **First click may take ~30s** while the free-tier backend wakes from idle. Subsequent navigation is instant. The full backend (FastAPI + PostgreSQL) runs on Render free tier; the frontend (Next.js) is on Vercel. Deploy config in [`render.yaml`](./render.yaml) + [`DEPLOY.md`](./DEPLOY.md).

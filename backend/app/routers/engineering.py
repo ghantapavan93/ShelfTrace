@@ -19,8 +19,8 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
     "command": "pytest -q  (PostgreSQL-backed, isolated test DB)",
-    "passed": 69,
-    "duration_s": 41.2,
+    "passed": 82,
+    "duration_s": 44.1,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -91,6 +91,19 @@ TEST_PROOF = {
         "tests/test_bulk_import.py::test_size_cap_rejects_oversized_payload",
         "tests/test_bulk_import.py::test_invalid_json_returns_clear_error",
         "tests/test_bulk_import.py::test_json_payload_must_be_an_array",
+        "tests/test_scrapers.py::test_parser_extracts_all_products_from_fixture",
+        "tests/test_scrapers.py::test_parser_handles_out_of_stock",
+        "tests/test_scrapers.py::test_parser_finds_next_page_url",
+        "tests/test_scrapers.py::test_parser_returns_none_when_no_pagination",
+        "tests/test_scrapers.py::test_pipeline_persists_parsed_products",
+        "tests/test_scrapers.py::test_pipeline_dedupes_within_a_run",
+        "tests/test_scrapers.py::test_pipeline_upserts_across_runs_and_bumps_observation_count",
+        "tests/test_scrapers.py::test_upsert_refreshes_price_on_change",
+        "tests/test_scrapers.py::test_registry_resolves_known_source",
+        "tests/test_scrapers.py::test_registry_returns_none_for_unknown_source",
+        "tests/test_scrapers.py::test_list_sources_returns_serialisable_metadata",
+        "tests/test_scrapers.py::test_run_scrape_records_scrape_run_row",
+        "tests/test_scrapers.py::test_unknown_source_returns_error_in_result",
     ],
 }
 

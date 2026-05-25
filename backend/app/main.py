@@ -15,7 +15,7 @@ from app.middleware import RequestIDMiddleware
 from app.models import ConnectorProfile, PriceBatch, RunMode
 from app.observability import setup_tracing
 from app.rate_limit import get_limiter
-from app.routers import batches, certification, demo, engineering, incidents, operations, scenarios
+from app.routers import batches, certification, demo, engineering, incidents, operations, scenarios, scraping
 from app.security import auth_enabled
 from app.seed import seed_live
 from app.services import certification as cert_service
@@ -121,6 +121,7 @@ app.include_router(incidents.router)
 app.include_router(engineering.router)
 app.include_router(certification.router)
 app.include_router(scenarios.router)
+app.include_router(scraping.router)
 app.include_router(demo.router)
 
 

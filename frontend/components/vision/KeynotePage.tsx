@@ -51,7 +51,7 @@ import {
    Cinematic polish pass: real photo backdrops (dimmed), chapter rail, chapter
    announcement cards, cursor spotlight on the aisle, ambient particles in dark
    spaces, timecode HUD during the critical moment, line-stagger headline
-   reveals. No vanity stats, no unsupported tech terms. 69 PostgreSQL-backed
+   reveals. No vanity stats, no unsupported tech terms. 82 PostgreSQL-backed
    tests, configurable scenarios, certification lab, live control plane,
    deterministic reconciliation, audit-verified recovery. CinePhoto fallback
    to gradient art if any Unsplash photo 404s.
@@ -1269,7 +1269,7 @@ const PROOF_TILES = [
   },
   {
     key: "TECHNICAL PROOF",
-    main: "69 Tests",
+    main: "82 Tests",
     sub: "PostgreSQL-backed recovery checks",
     icon: BadgeCheck,
     color: "#22c55e",
@@ -1380,7 +1380,7 @@ function ProofMini({ lit }: { lit: boolean }) {
             pytest · postgres
           </p>
           <div className="mt-1 grid grid-cols-[repeat(24,1fr)] gap-[2px]">
-            {Array.from({ length: 69 }).map((_, i) => (
+            {Array.from({ length: 82 }).map((_, i) => (
               <motion.span
                 key={i}
                 initial={{ opacity: 0.18 }}
@@ -1397,7 +1397,7 @@ function ProofMini({ lit }: { lit: boolean }) {
         </div>
         {lit && (
           <span className="font-mono text-[9px] uppercase tracking-[.18em] text-emerald-300">
-            69 / 69
+            82 / 82
           </span>
         )}
       </div>
@@ -2343,7 +2343,7 @@ function NightClosing() {
                 "Configurable Scenarios",
                 "Certification + Live Rollout",
                 "Audit-Verified Recovery",
-                "69 PostgreSQL-Backed Tests",
+                "82 PostgreSQL-Backed Tests",
               ].map((chip) => (
                 <span
                   key={chip}

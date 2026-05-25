@@ -437,3 +437,45 @@ class ConnectorBehaviorProfile(Base):
     retry_success_price: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     config: Mapped[TestRunConfig] = relationship(back_populates="behaviors")
+
+
+# ---------------------------------------------------------------------------
+# Competitor scraping — feeds the pricing engine reference prices.
+# stable_key = f"{source_id}:{external_id}" lets us upsert across runs
+# without duplicating rows when the same product re-appears.
+# ---------------------------------------------------------------------------
+class CompetitorProduct(Base):
+    __tablename__ = "competitor_products"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    source_id: Mapped[str] = mapped_column(String, index=True)
+    external_id: Mapped[str] = mapped_column(String, index=True)
+    stable_key: Mapped[str] = mapped_column(String, unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(256))
+    price: Mapped[float] = mapped_column(Float)
+    currency: Mapped[str] = mapped_column(String(8), default="USD")
+    category: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    availability: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw_attributes: Mapped[dict] = mapped_column(JSONColumn, default=dict)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    observation_count: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class ScrapeRun(Base):
+    __tablename__ = "scrape_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    source_id: Mapped[str] = mapped_column(String, index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pages_fetched: Mapped[int] = mapped_column(Integer, default=0)
+    products_seen: Mapped[int] = mapped_column(Integer, default=0)
+    products_inserted: Mapped[int] = mapped_column(Integer, default=0)
+    products_updated: Mapped[int] = mapped_column(Integer, default=0)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    errors_json: Mapped[dict] = mapped_column(JSONColumn, default=dict)
+    status: Mapped[str] = mapped_column(String(32), default="running")  # running|success|failed
+
