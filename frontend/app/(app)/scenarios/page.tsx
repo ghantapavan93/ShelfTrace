@@ -6,6 +6,8 @@ import clsx from "clsx";
 import { Plus, Trash2, FlaskConical, ShieldCheck, Rocket, Download, Copy, Pencil, Lock } from "lucide-react";
 import { api } from "@/lib/api";
 import { ScenariosBulkPanel } from "@/components/ScenariosBulkPanel";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 import type { BehaviorType, ConnectorBehavior, Scenario, ScenarioAction } from "@/lib/types";
 
 const BEHAVIORS: { value: BehaviorType; label: string }[] = [
@@ -36,8 +38,9 @@ export default function ScenarioBuilder() {
   const [actions, setActions] = useState<ScenarioAction[]>([emptyAction()]);
   const [behaviors, setBehaviors] = useState<ConnectorBehavior[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Scenario[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState<Scenario | null>(null);
+  const { toast } = useToast();
 
   async function refreshList() {
     setSaved(await api.scenarios().catch(() => []));
@@ -93,21 +96,22 @@ export default function ScenarioBuilder() {
   }
 
   async function deleteSaved(id: string) {
+    const name = saved.find((s) => s.id === id)?.name ?? id;
     setBusy(`del-${id}`);
-    setError(null);
     try {
       await api.deleteScenario(id);
       await refreshList();
+      toast.success(`Deleted scenario "${name}".`);
     } catch (e) {
-      setError((e as Error).message);
+      toast.error(`Could not delete: ${(e as Error).message}`);
     } finally {
       setBusy(null);
+      setConfirmDelete(null);
     }
   }
 
   async function run(mode: "live_rollout" | "certification") {
     setBusy(mode);
-    setError(null);
     try {
       const payload = {
         name,
@@ -133,7 +137,7 @@ export default function ScenarioBuilder() {
       const url = `${res.redirect}${sep}from=scenario${res.batch_external_id ? `&external_id=${res.batch_external_id}` : ""}`;
       router.push(url);
     } catch (e) {
-      setError((e as Error).message);
+      toast.error(`Scenario run failed: ${(e as Error).message}`);
     } finally {
       setBusy(null);
     }
@@ -166,7 +170,22 @@ export default function ScenarioBuilder() {
           <Rocket className={clsx("h-4 w-4", busy === "live_rollout" && "animate-pulse")} /> Run Live Rollout Test
         </button>
       </div>
-      {error && <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 px-4 py-2.5 text-sm text-rose-200">{error}</div>}
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title="Delete this scenario?"
+        body={
+          <>
+            "{confirmDelete?.name}" will be removed. Any past batches it
+            produced stay in /operations — only the saved configuration
+            is deleted. Seeded scenarios cannot be deleted.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        busy={busy === `del-${confirmDelete?.id}`}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete && deleteSaved(confirmDelete.id)}
+      />
 
       {/* Saved scenarios */}
       <section className="glass rounded-2xl p-5">
@@ -193,7 +212,7 @@ export default function ScenarioBuilder() {
                 <button onClick={() => runSaved(s.id, "certification")} disabled={busy !== null} className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-xs font-medium text-violet-200 hover:bg-violet-500/20 disabled:opacity-50">Run Cert</button>
                 <button onClick={() => runSaved(s.id, "live_rollout")} disabled={busy !== null} className="rounded-lg border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs font-medium text-brand-400 hover:bg-brand/20 disabled:opacity-50">Run Live</button>
                 <button onClick={() => cloneSaved(s.id)} disabled={busy !== null} className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-white/10 disabled:opacity-50"><Copy className="h-3.5 w-3.5" /> Clone</button>
-                <button onClick={() => deleteSaved(s.id)} disabled={busy !== null || s.is_seeded} title={s.is_seeded ? "Seeded scenario can't be deleted" : "Delete"} className="flex items-center gap-1 rounded-lg border border-rose-500/20 bg-rose-500/5 px-2.5 py-1.5 text-xs text-rose-300 hover:bg-rose-500/15 disabled:opacity-30"><Trash2 className="h-3.5 w-3.5" /></button>
+                <button onClick={() => setConfirmDelete(s)} disabled={busy !== null || s.is_seeded} title={s.is_seeded ? "Seeded scenario can't be deleted" : "Delete"} className="flex items-center gap-1 rounded-lg border border-rose-500/20 bg-rose-500/5 px-2.5 py-1.5 text-xs text-rose-300 hover:bg-rose-500/15 disabled:opacity-30"><Trash2 className="h-3.5 w-3.5" /></button>
               </div>
             </div>
           ))}

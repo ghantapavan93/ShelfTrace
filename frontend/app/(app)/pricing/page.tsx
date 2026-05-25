@@ -43,6 +43,7 @@ import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { money } from "@/lib/format";
 import { ListSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 
 type Recommendation = {
   id: string;
@@ -91,9 +92,9 @@ const REASON_CODE_COLOR: Record<string, string> = {
 
 export default function PricingPage() {
   const [busy, setBusy] = useState<"seed" | "run" | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const { toast } = useToast();
 
   const recs = useLive<{ recommendations: Recommendation[] }>(
     () => api.pricingRecommendations(true),
@@ -102,51 +103,48 @@ export default function PricingPage() {
 
   const seedAndRun = useCallback(async () => {
     setBusy("seed");
-    setFeedback(null);
     try {
       const seedResult = await api.pricingSeedHistory();
-      // Also seed signals so the Memorial Day demand boost shows up in reasoning
       await api.pricingSeedSignals().catch(() => null);
       setBusy("run");
       const runResult = await api.pricingRunEngine();
-      setFeedback(
+      toast.success(
         `Seeded ${seedResult.inserted} observations · ${runResult.scanned} SKU·stores scanned · ${runResult.recommended} actionable recommendations${runResult.superseded ? ` · ${runResult.superseded} prior recs superseded` : ""}.`,
       );
       setReloadKey((k) => k + 1);
     } catch (e) {
-      setFeedback((e as Error).message);
+      toast.error(`Seed/Run failed: ${(e as Error).message}`);
     } finally {
       setBusy(null);
     }
-  }, []);
+  }, [toast]);
 
   const applyRec = useCallback(async (recId: string) => {
     try {
       const result = await api.pricingApplyRecommendation(recId);
-      setFeedback(
+      toast.success(
         `Applied → scenario ${result.scenario_config_id}. Open /scenarios to run it through canary → reconciliation → expansion.`,
       );
       setReloadKey((k) => k + 1);
     } catch (e) {
-      setFeedback((e as Error).message);
+      toast.error(`Apply failed: ${(e as Error).message}`);
     }
-  }, []);
+  }, [toast]);
 
   const runOnly = useCallback(async () => {
     setBusy("run");
-    setFeedback(null);
     try {
       const result = await api.pricingRunEngine();
-      setFeedback(
+      toast.success(
         `Re-ran engine · scanned ${result.scanned} · ${result.recommended} actionable recommendations.`,
       );
       setReloadKey((k) => k + 1);
     } catch (e) {
-      setFeedback((e as Error).message);
+      toast.error(`Run failed: ${(e as Error).message}`);
     } finally {
       setBusy(null);
     }
-  }, []);
+  }, [toast]);
 
   const totals = useMemo(() => {
     const list = recs.data?.recommendations ?? [];
@@ -243,18 +241,7 @@ export default function PricingPage() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {feedback && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            className="rounded-xl border border-emerald-500/30 bg-emerald-500/[.06] px-3 py-2 text-xs text-emerald-200"
-          >
-            {feedback}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* feedback now flows through the global toast system */}
 
       {/* Summary tiles */}
       {recs.data && totals.n > 0 && (

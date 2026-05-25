@@ -20,6 +20,8 @@ import {
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { StatusPill } from "@/components/StatusPill";
+import { DetailSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 import type { CertificationCheck, CertificationReport } from "@/lib/types";
 
 const CHECK_LABEL: Record<string, string> = {
@@ -92,10 +94,15 @@ export default function CertificationPage() {
   if (error)
     return (
       <div className="glass rounded-2xl p-6 text-slate-300">
-        Could not load certification. Try <button onClick={reset} className="text-brand-400 underline">Reset Certification Demo</button>.
+        Could not load certification. Try{" "}
+        <button onClick={reset} className="text-brand-400 underline">
+          Reset Certification Demo
+        </button>
+        .
+        <div className="mt-1 text-xs text-slate-500">{error}</div>
       </div>
     );
-  if (!data) return <div className="text-slate-400">Loading certification lab…</div>;
+  if (!data) return <DetailSkeleton />;
 
   const failed = data.status === "failed_pending_remediation";
   const passed = data.status === "passed";

@@ -22,12 +22,15 @@ import { ChannelPedestal, ChannelThread } from "@/components/ChannelPedestal";
 import { AuditTimeline } from "@/components/AuditTimeline";
 import { EligibilityPanel } from "@/components/EligibilityPanel";
 import { DetailSkeleton } from "@/components/Skeleton";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 import type { AuditEventView, IncidentExplanation, IncidentView } from "@/lib/types";
 
 export default function IncidentPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [busy, setBusy] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [confirmRollback, setConfirmRollback] = useState(false);
+  const { toast } = useToast();
 
   const inc = useLive<IncidentView>(() => api.incident(id), [id]);
   const exp = useLive<IncidentExplanation>(() => api.explanation(id), [id]);
@@ -35,14 +38,13 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
 
   async function act(kind: "retry" | "rollback" | "resolve" | "task") {
     setBusy(kind);
-    setToast(null);
     try {
       if (kind === "retry") await api.retry(id);
       if (kind === "rollback") await api.rollback(id);
       if (kind === "resolve") await api.resolve(id);
       if (kind === "task") await api.storeTask(id);
       await Promise.all([inc.reload(), exp.reload(), audit.reload()]);
-      setToast(
+      toast.success(
         kind === "retry"
           ? "Retry sent — channels re-verified."
           : kind === "rollback"
@@ -52,9 +54,10 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
               : "Store verification task created.",
       );
     } catch (e) {
-      setToast((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setBusy(null);
+      if (kind === "rollback") setConfirmRollback(false);
     }
   }
 
@@ -179,15 +182,29 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
             loading={busy === "retry"}
             onClick={() => act("retry")}
           />
-          <ActionButton icon={Undo2} label="Roll Back Shelf Label" loading={busy === "rollback"} onClick={() => act("rollback")} />
+          <ActionButton icon={Undo2} label="Roll Back Shelf Label" loading={busy === "rollback"} onClick={() => setConfirmRollback(true)} />
           <ActionButton icon={ClipboardList} label="Create Store Task" loading={busy === "task"} onClick={() => act("task")} />
           <ActionButton icon={CheckCircle2} label="Resolve" loading={busy === "resolve"} onClick={() => act("resolve")} />
         </section>
       )}
 
-      {toast && (
-        <div className="rounded-xl border border-brand/30 bg-brand/10 px-4 py-2.5 text-sm text-brand-400">{toast}</div>
-      )}
+      <ConfirmDialog
+        open={confirmRollback}
+        title="Roll back the shelf label?"
+        body={
+          <>
+            This will overwrite the shelf-label price to match the checkout
+            POS. The acknowledgement is audited as an operator action — it
+            does NOT change the approved price, so the next batch will
+            re-attempt the original markdown.
+          </>
+        }
+        confirmLabel="Roll back label"
+        variant="danger"
+        busy={busy === "rollback"}
+        onCancel={() => setConfirmRollback(false)}
+        onConfirm={() => act("rollback")}
+      />
 
       {/* Audit timeline */}
       <section className="glass rounded-2xl p-5">
