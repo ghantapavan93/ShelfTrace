@@ -89,3 +89,16 @@ def test_pricing_suggest_returns_none_when_no_history(db):
     body = result.json()
     assert body["sku"] == "unknown-sku"
     assert body["recommendation"] is None
+
+
+def test_mode_endpoint_returns_demo_mode():
+    """Founder needs to see at a glance whether they're in demo or live mode."""
+    client = TestClient(app)
+    result = client.get("/api/v1/mode")
+    assert result.status_code == 200
+    body = result.json()
+    assert body["mode"] in ("demo", "live")
+    assert body["label"] in ("DEMO MODE", "LIVE MODE")
+    assert body["tone"] in ("violet", "rose")
+    assert "description" in body
+    assert "details" in body

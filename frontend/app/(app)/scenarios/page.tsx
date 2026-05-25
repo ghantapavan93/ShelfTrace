@@ -7,6 +7,7 @@ import { Plus, Trash2, FlaskConical, ShieldCheck, Rocket, Download, Copy, Pencil
 import { api } from "@/lib/api";
 import { ScenariosBulkPanel } from "@/components/ScenariosBulkPanel";
 import { ScenarioActionHints } from "@/components/ScenarioActionHints";
+import { ScenarioFlowStepper } from "@/components/ScenarioFlowStepper";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import type { BehaviorType, ConnectorBehavior, Scenario, ScenarioAction } from "@/lib/types";
@@ -147,6 +148,9 @@ export default function ScenarioBuilder() {
   const skuOptions = actions.filter((a) => a.sku).map((a) => a.sku);
   const storeOptions = stores.split(",").map((s) => s.trim()).filter(Boolean);
 
+  const hasValidActions = actions.filter((a) => a.sku && a.product_name).length > 0;
+  const isRunning = busy === "live_rollout" || busy === "certification";
+
   return (
     <div className="space-y-6">
       <div>
@@ -157,18 +161,34 @@ export default function ScenarioBuilder() {
         </p>
       </div>
 
+      <ScenarioFlowStepper
+        hasActions={hasValidActions}
+        hasValidated={hasValidActions}
+        isRunning={isRunning}
+      />
+
       <div className="flex flex-wrap gap-3">
         <button onClick={loadMemorialDay} disabled={busy !== null}
           className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-50">
           <Download className={clsx("h-4 w-4", busy === "load" && "animate-pulse")} /> Load Memorial Day Demo
         </button>
         <button onClick={() => run("certification")} disabled={busy !== null}
-          className="flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2.5 text-sm font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-50">
-          <ShieldCheck className={clsx("h-4 w-4", busy === "certification" && "animate-pulse")} /> Run Certification Test
+          className="group flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2.5 text-sm font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-50"
+          title="Pre-flight checks: validates connector profile across 6 check types. Outputs a pass/fail certification report. Use this BEFORE going live.">
+          <ShieldCheck className={clsx("h-4 w-4", busy === "certification" && "animate-pulse")} />
+          <span className="flex flex-col items-start leading-tight">
+            <span>Run Certification</span>
+            <span className="text-[10px] font-normal opacity-70">Pre-flight checks · 6 tests</span>
+          </span>
         </button>
         <button onClick={() => run("live_rollout")} disabled={busy !== null}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110 disabled:opacity-50">
-          <Rocket className={clsx("h-4 w-4", busy === "live_rollout" && "animate-pulse")} /> Run Live Rollout Test
+          className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110 disabled:opacity-50"
+          title="Full rollout simulation: canary stores first, then reconciliation across POS/ESL/ecommerce, blocking expansion on mismatch. This is the operational dashboard demo.">
+          <Rocket className={clsx("h-4 w-4", busy === "live_rollout" && "animate-pulse")} />
+          <span className="flex flex-col items-start leading-tight">
+            <span>Run Live Rollout</span>
+            <span className="text-[10px] font-normal opacity-80">Canary → reconcile → expand</span>
+          </span>
         </button>
       </div>
       <ConfirmDialog

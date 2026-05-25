@@ -75,6 +75,14 @@ export const api = {
     get<{ label: string; tone: "neutral" | "danger" | "warn" | "verified"; status: string | null }>(
       `/api/v1/system-status`,
     ),
+  mode: () =>
+    get<{
+      mode: "demo" | "live";
+      label: string;
+      tone: "violet" | "rose";
+      description: string;
+      details: string;
+    }>(`/api/v1/mode`),
 
   // Certification Lab
   certificationCurrent: () => get<CertificationReport>(`/api/v1/certification/current`),

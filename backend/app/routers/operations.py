@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models import PriceAction, PriceBatch, RunMode
 from app.routers.common import get_batch_or_404
@@ -11,6 +12,34 @@ from app.schemas import OperationsOverview
 from app.services import queries
 
 router = APIRouter(prefix="/api/v1", tags=["operations"])
+
+
+@router.get("/mode")
+def get_mode():
+    """Return the platform's runtime mode so the UI can show a clear banner.
+
+    DEMO MODE: simulated retailers, no real ESL/POS/ecommerce connections.
+              Memorial Day data auto-seeded. Safe to click anything.
+    LIVE MODE: real retailer connectors wired (production deployment).
+
+    Today the prototype is always demo_mode=True. The flag drives the banner
+    so reviewers immediately understand what they're looking at.
+    """
+    if settings.demo_mode:
+        return {
+            "mode": "demo",
+            "label": "DEMO MODE",
+            "tone": "violet",
+            "description": "Simulated retailer connectors. No real POS, ESL, or ecommerce systems are contacted.",
+            "details": "Memorial Day Dallas Zone 2 batch is auto-seeded. All scenarios run against a deterministic simulator with configurable behaviors. Safe to click anything.",
+        }
+    return {
+        "mode": "live",
+        "label": "LIVE MODE",
+        "tone": "rose",
+        "description": "Real retailer connectors active. Actions affect production systems.",
+        "details": "Every executed scenario will send real price updates to wired connectors. Verify approvals before running.",
+    }
 
 
 @router.get("/system-status")

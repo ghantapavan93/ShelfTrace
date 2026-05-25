@@ -21,6 +21,7 @@ import {
   Brain,
 } from "lucide-react";
 import { Brand } from "./Brand";
+import { ModeBadge } from "./ModeBadge";
 import { api } from "@/lib/api";
 
 const NAV = [
@@ -154,9 +155,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs font-medium text-slate-300 sm:flex">
             Test before go-live · guard after approval
           </span>
-          <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-verified animate-pulse-glow" />
-            Live · updates on action
+          <div className="ml-auto flex items-center gap-3 text-xs text-slate-400">
+            <ModeBadge />
+            <span className="hidden items-center gap-1.5 sm:flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-verified animate-pulse-glow" />
+              Live · updates on action
+            </span>
           </div>
         </header>
         <main className="flex-1 px-5 py-6 lg:px-8">{children}</main>
