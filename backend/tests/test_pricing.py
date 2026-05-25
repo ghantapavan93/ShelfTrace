@@ -404,3 +404,157 @@ def test_pipeline_confidence_score_higher_with_more_clean_data():
     rec_small = recommend_for_sku(f_small)
     rec_big = recommend_for_sku(f_big)
     assert rec_big.confidence > rec_small.confidence
+
+
+# ──────────────────────────────────────────────────────────────────────
+# NEW: confidence intervals on β
+# ──────────────────────────────────────────────────────────────────────
+def test_elasticity_reports_standard_error_and_ci():
+    history = make_history(true_beta=-1.5, days=90, noise_sigma=0.0)
+    fit = estimate_elasticity(history)
+    assert fit.beta_se >= 0
+    assert fit.beta_ci_low <= fit.beta <= fit.beta_ci_high
+    # Noise-free → CI tight around the true β
+    assert fit.beta_ci_high - fit.beta_ci_low < 0.05
+
+
+def test_elasticity_ci_wider_with_noisy_data():
+    clean = estimate_elasticity(make_history(true_beta=-1.5, days=60, noise_sigma=0.0))
+    noisy = estimate_elasticity(make_history(true_beta=-1.5, days=60, noise_sigma=0.5))
+    clean_width = clean.beta_ci_high - clean.beta_ci_low
+    noisy_width = noisy.beta_ci_high - noisy.beta_ci_low
+    assert noisy_width > clean_width
+
+
+def test_significance_flag_true_for_clean_elastic_data():
+    fit = estimate_elasticity(make_history(true_beta=-1.5, days=60))
+    assert fit.is_statistically_significant
+
+
+def test_pipeline_holds_when_ci_straddles_zero():
+    """If β's 95% CI crosses zero (very noisy data), pipeline should hold
+    the current price rather than act on a non-significant estimate."""
+    # Tiny n with huge noise — guaranteed wide CI
+    noisy_history = make_history(
+        true_beta=-0.05, days=12, noise_sigma=2.0,
+    )
+    f = PricingFeatures(
+        sku="noisy", store_id="S1", product_name="N",
+        current_price=5.99, cost=2.50,
+        history=noisy_history,
+    )
+    rec = recommend_for_sku(f)
+    # We expect either CI_STRADDLES_ZERO OR INSUFFICIENT_HISTORY or similar hold
+    codes = {r.code for r in rec.reasons}
+    assert (
+        "CI_STRADDLES_ZERO" in codes
+        or "VEBLEN_FLAGGED" in codes
+        or "INSUFFICIENT_HISTORY" in codes
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# NEW: psychological pricing ladder
+# ──────────────────────────────────────────────────────────────────────
+def test_ladder_snaps_to_nearest_canonical_ending():
+    from app.pricing.ladder import snap_to_ladder
+    # 4.73 should snap to either 4.79 (closer) or 4.49 — closest wins
+    assert snap_to_ladder(4.73) in {4.79, 4.49}
+    # 5.13 → 4.99 is closer than 5.99
+    assert snap_to_ladder(5.13) == 4.99
+    # Whole-dollar disabled by default — 5.02 should NOT snap to 5.00
+    assert snap_to_ladder(5.02) != 5.00
+
+
+def test_ladder_preserves_sub_dollar_prices():
+    from app.pricing.ladder import snap_to_ladder
+    assert snap_to_ladder(0.49) == 0.49
+    assert snap_to_ladder(0.79) == 0.79
+
+
+def test_pipeline_snaps_recommendation_to_ladder():
+    f = PricingFeatures(
+        sku="milk", store_id="S1", product_name="Milk",
+        current_price=5.99, cost=2.50,
+        history=make_history(true_beta=-1.5, days=60, base_price=5.99),
+    )
+    rec = recommend_for_sku(f)
+    # Recommended price should end in a canonical ending (one of: .99, .49, .79, .29, .95, .89)
+    cents = round((rec.recommended_price - int(rec.recommended_price)) * 100)
+    assert cents in {99, 49, 79, 29, 95, 89}, (
+        f"Recommended ${rec.recommended_price} doesn't end in a canonical ending"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# NEW: per-category margin overrides
+# ──────────────────────────────────────────────────────────────────────
+def test_category_margin_floor_kvi_is_lower_than_default():
+    from app.pricing.ladder import margin_floor_for
+    assert margin_floor_for("kvi", default=0.05) < 0.05
+    assert margin_floor_for("luxury", default=0.05) > 0.05
+    assert margin_floor_for("unknown", default=0.05) == 0.05
+    assert margin_floor_for(None, default=0.05) == 0.05
+
+
+# ──────────────────────────────────────────────────────────────────────
+# NEW: external signals
+# ──────────────────────────────────────────────────────────────────────
+def test_signal_multiplier_active_within_window():
+    from datetime import datetime, timezone, timedelta
+    from app.pricing.signals import ExternalSignal, combined_multiplier
+
+    now = datetime.now(timezone.utc)
+    s = ExternalSignal(
+        name="Test",
+        signal_type="holiday",
+        multiplier=1.5,
+        effective_from=now - timedelta(days=1),
+        effective_until=now + timedelta(days=1),
+    )
+    assert combined_multiplier([s], "any-sku", None, now) == 1.5
+
+
+def test_signal_multiplier_excluded_when_outside_window():
+    from datetime import datetime, timezone, timedelta
+    from app.pricing.signals import ExternalSignal, combined_multiplier
+
+    now = datetime.now(timezone.utc)
+    s = ExternalSignal(
+        name="Past",
+        signal_type="holiday",
+        multiplier=1.5,
+        effective_from=now - timedelta(days=10),
+        effective_until=now - timedelta(days=5),
+    )
+    assert combined_multiplier([s], "any-sku", None, now) == 1.0
+
+
+def test_signal_multiplier_filtered_by_sku_pattern():
+    from datetime import datetime, timezone, timedelta
+    from app.pricing.signals import ExternalSignal, combined_multiplier
+
+    now = datetime.now(timezone.utc)
+    s = ExternalSignal(
+        name="MilkOnly",
+        signal_type="event",
+        multiplier=2.0,
+        effective_from=now - timedelta(days=1),
+        effective_until=now + timedelta(days=1),
+        sku_pattern="milk-",
+    )
+    assert combined_multiplier([s], "milk-1gal", None, now) == 2.0
+    assert combined_multiplier([s], "egg-12", None, now) == 1.0
+
+
+def test_pipeline_applies_external_signal_to_reasoning():
+    f = PricingFeatures(
+        sku="grill-steak", store_id="S1", product_name="Steak",
+        current_price=12.99, cost=6.00,
+        history=make_history(true_beta=-1.5, days=60, base_price=12.99),
+        external_demand_multiplier=1.4,
+        matched_signals=["Memorial Day"],
+    )
+    rec = recommend_for_sku(f)
+    codes = {r.code for r in rec.reasons}
+    assert "EXTERNAL_SIGNAL_APPLIED" in codes

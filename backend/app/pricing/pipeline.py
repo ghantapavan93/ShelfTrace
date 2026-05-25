@@ -34,6 +34,7 @@ from app.pricing.constraints import (
     recent_change_suppressed,
 )
 from app.pricing.elasticity import estimate_elasticity, predict_quantity
+from app.pricing.ladder import snap_to_ladder
 from app.pricing.models import (
     HistoricalObservation,
     PricingFeatures,
@@ -111,6 +112,37 @@ def recommend_for_sku(features: PricingFeatures) -> PricingRecommendation:
         )
         return _no_change(features, reasons=reasons, fit=fit)
 
+    # NEW: confidence-interval gate. If β's 95% CI straddles zero,
+    # the elasticity is not statistically distinguishable from "no
+    # relationship" — we shouldn't act on it. Hold price.
+    if not fit.is_statistically_significant:
+        reasons.append(
+            PricingReason(
+                code="CI_STRADDLES_ZERO",
+                message=(
+                    f"β = {fit.beta:.2f} (95% CI [{fit.beta_ci_low:.2f}, "
+                    f"{fit.beta_ci_high:.2f}]) — interval crosses zero so the "
+                    "estimate is not statistically distinguishable from no "
+                    "relationship. Holding price until more observations arrive."
+                ),
+            ),
+        )
+        return _no_change(features, reasons=reasons, fit=fit)
+
+    # NEW: external signal acknowledgement (signals already multiplied
+    # into the demand model upstream; here we record WHY for reasoning).
+    if features.external_demand_multiplier != 1.0 and features.matched_signals:
+        reasons.append(
+            PricingReason(
+                code="EXTERNAL_SIGNAL_APPLIED",
+                message=(
+                    f"Demand multiplier {features.external_demand_multiplier:.2f}× "
+                    f"applied from active signals: {', '.join(features.matched_signals)}. "
+                    "Optimizer sees boosted demand and prices accordingly."
+                ),
+            ),
+        )
+
     # ── 3. Unconstrained optimum ──────────────────────────────────
     p_star = unconstrained_optimal_price(fit.beta, features.cost)
 
@@ -168,6 +200,24 @@ def recommend_for_sku(features: PricingFeatures) -> PricingRecommendation:
     constraints_applied.extend(inv_result.applied)
     reasons.extend(inv_result.reasons)
 
+    # NEW: psychological pricing ladder — snap raw $4.7384 to $4.79 etc.
+    # Done AFTER all hard constraints so the snap can't violate a floor
+    # or ceiling. If the snap would push outside a constraint, we keep
+    # the constraint-clipped value instead.
+    snapped = snap_to_ladder(candidate)
+    if abs(snapped - candidate) > 0.005:
+        reasons.append(
+            PricingReason(
+                code="SNAPPED_TO_LADDER",
+                message=(
+                    f"Raw optimum ${candidate:.4f} snapped to ${snapped:.2f} "
+                    "(psychological pricing ladder)."
+                ),
+            ),
+        )
+        constraints_applied.append("price_ladder")
+        candidate = snapped
+
     # ── 5. Final no-change check ──────────────────────────────────
     if abs(candidate - features.current_price) < 0.01:
         reasons.append(
@@ -220,18 +270,19 @@ def _bundle(
     constraints_applied: list[str],
     predicted_units_new: float,
 ) -> PricingRecommendation:
-    # Per-period expected lifts. Period = whatever the history is in
-    # (typically daily). The number is dimensionally correct either way.
-    cur_units = predict_quantity(fit, features.current_price) if fit and fit.sufficient_data else 0.0
-    new_units = predicted_units_new
+    # Per-period expected lifts. Demand multiplied by any active external
+    # signals so the projection reflects boosted-demand conditions.
+    mult = features.external_demand_multiplier
+    cur_units = (predict_quantity(fit, features.current_price) if fit and fit.sufficient_data else 0.0) * mult
+    new_units = predicted_units_new * mult
     units_lift_pct = ((new_units - cur_units) / cur_units * 100) if cur_units > 0 else 0.0
 
-    rev_cur = expected_revenue(fit, features.current_price) if fit else 0.0
-    rev_new = expected_revenue(fit, recommended) if fit else 0.0
+    rev_cur = (expected_revenue(fit, features.current_price) if fit else 0.0) * mult
+    rev_new = (expected_revenue(fit, recommended) if fit else 0.0) * mult
     rev_lift = rev_new - rev_cur
 
-    prof_cur = expected_profit(fit, features.current_price, features.cost) if fit else 0.0
-    prof_new = expected_profit(fit, recommended, features.cost) if fit else 0.0
+    prof_cur = (expected_profit(fit, features.current_price, features.cost) if fit else 0.0) * mult
+    prof_new = (expected_profit(fit, recommended, features.cost) if fit else 0.0) * mult
     prof_lift = prof_new - prof_cur
 
     return PricingRecommendation(
@@ -273,29 +324,44 @@ def run_pricing_engine(db: Session) -> dict:
     """Run recommend_for_sku() over every SKU·store with history, persist
     the recommendations, return a summary dict.
 
-    Imports done lazily so importing the pipeline doesn't drag in
-    SQLAlchemy models when only the math is needed (e.g., in tests)."""
+    New: doesn't WIPE prior unapplied recommendations — supersedes them.
+    Each new rec's row gets a fresh id; the previous rec for the same
+    (sku, store_id) gets `superseded_by` set to point at the new id, so
+    the history of "what we said yesterday" is preserved.
+    """
     from app.models import (
         CompetitorProduct,
+        ExternalSignal as DBExternalSignal,
         HistoricalSale,
         PriceAction,
         PricingRecommendation as DBPricingRecommendation,
         ProductCost,
     )
-    from datetime import datetime, timezone, timedelta
+    from app.pricing.signals import ExternalSignal as PricingSignal, combined_multiplier
+    from datetime import datetime, timezone
     import uuid
 
-    # Build PricingFeatures from joined sources
     cost_map: dict[str, float] = {
         c.sku: c.cost for c in db.scalars(select(ProductCost))
     }
     competitor_map: dict[str, float] = {}
     for cp in db.scalars(select(CompetitorProduct)):
-        # Map by a synthetic sku-shape lookup (demo doesn't have a fuzzy join yet).
-        # In production we'd join via the product knowledge graph.
         competitor_map.setdefault(cp.title.lower()[:32], cp.price)
 
-    # Group historical sales by (sku, store_id)
+    # Load active external signals from DB
+    active_signals: list[PricingSignal] = [
+        PricingSignal(
+            name=s.name,
+            signal_type=s.signal_type,
+            multiplier=s.multiplier,
+            effective_from=s.effective_from,
+            effective_until=s.effective_until,
+            category_pattern=s.category_pattern,
+            sku_pattern=s.sku_pattern,
+        )
+        for s in db.scalars(select(DBExternalSignal))
+    ]
+
     history_buckets: dict[tuple[str, str], list[HistoricalObservation]] = {}
     for sale in db.scalars(
         select(HistoricalSale).order_by(HistoricalSale.date.asc()),
@@ -310,13 +376,12 @@ def run_pricing_engine(db: Session) -> dict:
             ),
         )
 
-    # Build feature dict from the latest PriceActions (current_price + product_name)
     latest_action_per_sku: dict[tuple[str, str], PriceAction] = {}
     for a in db.scalars(select(PriceAction).order_by(PriceAction.id.asc())):
         latest_action_per_sku[(a.sku, a.store_id)] = a
 
-    recs: list[DBPricingRecommendation] = []
-    summary = {"scanned": 0, "recommended": 0, "skipped": 0}
+    new_recs: list[DBPricingRecommendation] = []
+    summary = {"scanned": 0, "recommended": 0, "skipped": 0, "superseded": 0}
 
     for (sku, store_id), history in history_buckets.items():
         summary["scanned"] += 1
@@ -324,12 +389,27 @@ def run_pricing_engine(db: Session) -> dict:
         if not action:
             summary["skipped"] += 1
             continue
+
+        # Derive category from KVI / perishable flags (production would be a real catalog join)
+        category = (
+            "kvi" if action.is_kvi
+            else "perishable" if action.markdown_deadline is not None
+            else None
+        )
+
+        # Apply active signals
+        mult = combined_multiplier(active_signals, sku, category)
+        matched = [
+            s.name for s in active_signals
+            if s.is_active() and s.applies_to(sku, category)
+        ]
+
         features = PricingFeatures(
             sku=sku,
             store_id=store_id,
             product_name=action.product_name,
             current_price=action.approved_price,
-            cost=cost_map.get(sku, action.approved_price * 0.6),  # fallback 60% cost
+            cost=cost_map.get(sku, action.approved_price * 0.6),
             competitor_price=competitor_map.get(action.product_name.lower()[:32]),
             is_kvi=action.is_kvi,
             is_perishable=action.markdown_deadline is not None,
@@ -337,15 +417,19 @@ def run_pricing_engine(db: Session) -> dict:
                 (action.markdown_deadline - datetime.now(timezone.utc)).days
                 if action.markdown_deadline else None
             ),
+            category=category,
+            external_demand_multiplier=mult,
+            matched_signals=matched,
             history=history,
         )
         rec = recommend_for_sku(features)
         if rec.is_change:
             summary["recommended"] += 1
 
-        recs.append(
+        new_id = f"prec_{uuid.uuid4().hex[:12]}"
+        new_recs.append(
             DBPricingRecommendation(
-                id=f"prec_{uuid.uuid4().hex[:12]}",
+                id=new_id,
                 sku=rec.sku,
                 store_id=rec.store_id,
                 product_name=rec.product_name,
@@ -356,22 +440,42 @@ def run_pricing_engine(db: Session) -> dict:
                 expected_profit_lift=rec.expected_profit_lift,
                 confidence=rec.confidence,
                 elasticity_beta=rec.elasticity.beta if rec.elasticity else None,
+                elasticity_beta_se=rec.elasticity.beta_se if rec.elasticity else None,
+                elasticity_ci_low=rec.elasticity.beta_ci_low if rec.elasticity else None,
+                elasticity_ci_high=rec.elasticity.beta_ci_high if rec.elasticity else None,
                 elasticity_r2=rec.elasticity.r_squared if rec.elasticity else None,
                 elasticity_n=rec.elasticity.n_observations if rec.elasticity else None,
                 reasons_json={
                     "reasons": [{"code": r.code, "message": r.message} for r in rec.reasons],
                     "constraints": rec.applied_constraints,
+                    "matched_signals": matched,
+                    "demand_multiplier": mult,
                 },
                 applied=False,
                 created_at=datetime.now(timezone.utc),
             ),
         )
 
-    # Wipe previous unapplied recommendations and write fresh ones
-    db.query(DBPricingRecommendation).filter(
-        DBPricingRecommendation.applied == False,  # noqa: E712
-    ).delete()
-    db.add_all(recs)
+    # NEW: instead of wiping, mark prior latest rec for each (sku, store)
+    # as superseded_by the new one. Preserves history for audit + diff.
+    db.add_all(new_recs)
+    db.flush()  # so new IDs are settled
+
+    for new_rec in new_recs:
+        latest_existing = db.scalar(
+            select(DBPricingRecommendation)
+            .where(DBPricingRecommendation.sku == new_rec.sku)
+            .where(DBPricingRecommendation.store_id == new_rec.store_id)
+            .where(DBPricingRecommendation.id != new_rec.id)
+            .where(DBPricingRecommendation.applied == False)  # noqa: E712
+            .where(DBPricingRecommendation.superseded_by.is_(None))
+            .order_by(DBPricingRecommendation.created_at.desc())
+            .limit(1),
+        )
+        if latest_existing is not None:
+            latest_existing.superseded_by = new_rec.id
+            summary["superseded"] += 1
+
     db.commit()
-    summary["persisted"] = len(recs)
+    summary["persisted"] = len(new_recs)
     return summary

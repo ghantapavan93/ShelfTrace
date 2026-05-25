@@ -39,6 +39,9 @@ class PricingFeatures:
     days_to_deadline: int | None = None  # for perishables
     inventory_on_hand: int | None = None  # for stockout-risk capping
     days_since_last_price_change: int | None = None
+    category: str | None = None          # used for category-margin overrides
+    external_demand_multiplier: float = 1.0  # from active signals
+    matched_signals: list[str] = field(default_factory=list)  # for reasoning
     history: list[HistoricalObservation] = field(default_factory=list)
 
 
@@ -58,6 +61,10 @@ class ElasticityFit:
     `r_squared` is 0..1 — how much of demand variance the price explains.
     `n_observations` is the count of price/quantity pairs that went into the fit.
     `sufficient_data` is False if we don't have enough variation to trust β.
+
+    `beta_se`, `beta_ci_low`, `beta_ci_high` are the standard error of β
+    and the 95% confidence interval. Computed from the OLS residuals so
+    the optimizer can know how trustworthy the point estimate is.
     """
 
     beta: float
@@ -65,6 +72,9 @@ class ElasticityFit:
     r_squared: float
     n_observations: int
     sufficient_data: bool
+    beta_se: float = 0.0             # standard error of β
+    beta_ci_low: float = 0.0         # 95% CI lower bound
+    beta_ci_high: float = 0.0        # 95% CI upper bound
     notes: list[str] = field(default_factory=list)
 
     @property
@@ -74,6 +84,15 @@ class ElasticityFit:
     @property
     def is_inelastic(self) -> bool:
         return -1.0 <= self.beta < 0.0
+
+    @property
+    def is_statistically_significant(self) -> bool:
+        """β is significantly different from zero at 95% if its CI
+        does not straddle 0. Used by the optimizer to decide whether
+        the model is trustworthy enough to override the current price."""
+        if not self.sufficient_data:
+            return False
+        return self.beta_ci_low * self.beta_ci_high > 0  # same sign on both bounds
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -93,6 +112,10 @@ ReasonCode = Literal[
     "ELASTIC_OPTIMIZED",
     "NO_CHANGE_NEEDED",
     "INVENTORY_CAPPED",
+    "CI_STRADDLES_ZERO",
+    "EXTERNAL_SIGNAL_APPLIED",
+    "SNAPPED_TO_LADDER",
+    "CATEGORY_MARGIN_FLOOR",
 ]
 
 

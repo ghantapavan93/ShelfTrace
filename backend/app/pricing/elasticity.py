@@ -108,13 +108,34 @@ def estimate_elasticity(
     ss_residual = sum((y - p) ** 2 for y, p in zip(log_quants, predicted))
     ss_total = sum((y - y_mean) ** 2 for y in log_quants)
     r_squared = 1.0 - (ss_residual / ss_total) if ss_total > 0 else 0.0
-    # Clamp R² to [0, 1] — pathological data can push it negative.
     r_squared = max(0.0, min(1.0, r_squared))
+
+    # Standard error of β:
+    #   SE(β) = √[ MSE / Σ(x - x̄)² ]
+    # MSE = SS_residual / (n - 2) — n-2 degrees of freedom for simple regression.
+    # The 95% CI uses the normal approximation 1.96 — at n ≥ 30 this is
+    # essentially identical to the proper t-distribution and saves us a
+    # scipy dependency. For n < 30 the CI is mildly narrow; we note that.
+    if n > 2 and sum_xx > 0:
+        mse = ss_residual / (n - 2)
+        beta_se = math.sqrt(mse / sum_xx)
+        beta_ci_low = beta - 1.96 * beta_se
+        beta_ci_high = beta + 1.96 * beta_se
+    else:
+        beta_se = 0.0
+        beta_ci_low = beta
+        beta_ci_high = beta
 
     if beta >= 0:
         notes.append(
             f"β = {beta:.3f} is non-negative — possible Veblen good or "
             "contaminated history. Recommend human review.",
+        )
+
+    if n < 30 and n >= MIN_OBSERVATIONS:
+        notes.append(
+            f"n = {n} < 30 — CI uses normal approximation; the true "
+            "t-based interval would be slightly wider.",
         )
 
     return ElasticityFit(
@@ -123,6 +144,9 @@ def estimate_elasticity(
         r_squared=r_squared,
         n_observations=n,
         sufficient_data=True,
+        beta_se=beta_se,
+        beta_ci_low=beta_ci_low,
+        beta_ci_high=beta_ci_high,
         notes=notes,
     )
 

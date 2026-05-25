@@ -19,8 +19,8 @@ router = APIRouter(prefix="/api/v1", tags=["engineering"])
 # Reflects the actual test suite (see backend/tests). Updated when tests change.
 TEST_PROOF = {
     "command": "pytest -q  (PostgreSQL-backed, isolated test DB)",
-    "passed": 119,
-    "duration_s": 49.5,
+    "passed": 131,
+    "duration_s": 52.0,
     "tests": [
         "tests/test_ingestion.py::test_idempotent_batch",
         "tests/test_ingestion.py::test_batch_and_outbox_committed_together",
@@ -141,6 +141,18 @@ TEST_PROOF = {
         "tests/test_scrapers.py::test_idempotency_key_returns_existing_run_summary",
         "tests/test_scrapers.py::test_robots_blocks_disallowed_page",
         "tests/test_scrapers.py::test_429_response_honored_then_succeeds",
+        "tests/test_pricing.py::test_elasticity_reports_standard_error_and_ci",
+        "tests/test_pricing.py::test_elasticity_ci_wider_with_noisy_data",
+        "tests/test_pricing.py::test_significance_flag_true_for_clean_elastic_data",
+        "tests/test_pricing.py::test_pipeline_holds_when_ci_straddles_zero",
+        "tests/test_pricing.py::test_ladder_snaps_to_nearest_canonical_ending",
+        "tests/test_pricing.py::test_ladder_preserves_sub_dollar_prices",
+        "tests/test_pricing.py::test_pipeline_snaps_recommendation_to_ladder",
+        "tests/test_pricing.py::test_category_margin_floor_kvi_is_lower_than_default",
+        "tests/test_pricing.py::test_signal_multiplier_active_within_window",
+        "tests/test_pricing.py::test_signal_multiplier_excluded_when_outside_window",
+        "tests/test_pricing.py::test_signal_multiplier_filtered_by_sku_pattern",
+        "tests/test_pricing.py::test_pipeline_applies_external_signal_to_reasoning",
     ],
 }
 

@@ -130,9 +130,14 @@ export const api = {
     }>(`/api/v1/scraping/runs`),
   // Pricing engine
   pricingSeedHistory: () => post<{ inserted: number; note: string }>(`/api/v1/pricing/seed-history`),
+  pricingSeedSignals: () => post<{ inserted: number; note: string }>(`/api/v1/pricing/seed-signals`),
   pricingRunEngine: () =>
-    post<{ scanned: number; recommended: number; skipped: number; persisted: number }>(
+    post<{ scanned: number; recommended: number; skipped: number; persisted: number; superseded: number }>(
       `/api/v1/pricing/run`,
+    ),
+  pricingApplyRecommendation: (recId: string) =>
+    post<{ recommendation_id: string; scenario_config_id: string; next_step: string }>(
+      `/api/v1/pricing/recommendations/${encodeURIComponent(recId)}/apply`,
     ),
   pricingRecommendations: (onlyChanges = true) =>
     get<{
@@ -152,11 +157,18 @@ export const api = {
         expected_profit_lift: number;
         confidence: number;
         elasticity_beta: number | null;
+        elasticity_beta_se: number | null;
+        elasticity_ci_low: number | null;
+        elasticity_ci_high: number | null;
         elasticity_r2: number | null;
         elasticity_n: number | null;
         reasons: Array<{ code: string; message: string }>;
         applied_constraints: string[];
+        matched_signals: string[];
+        demand_multiplier: number;
         applied: boolean;
+        applied_to_scenario_id: string | null;
+        superseded_by: string | null;
         created_at: string;
       }>;
     }>(`/api/v1/pricing/recommendations?only_changes=${onlyChanges}`),

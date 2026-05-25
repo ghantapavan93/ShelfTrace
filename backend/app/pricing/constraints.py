@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.pricing.ladder import margin_floor_for
 from app.pricing.models import PricingFeatures, PricingReason
 
 MIN_MARGIN_PCT = 0.05            # never less than 5% above cost
@@ -36,17 +37,25 @@ class ConstraintResult:
 def apply_cost_floor(price: float, f: PricingFeatures) -> ConstraintResult:
     if f.cost is None or f.cost <= 0:
         return ConstraintResult(price, [], [])
-    floor = f.cost * (1.0 + MIN_MARGIN_PCT)
+    # Per-category margin override — KVI runs tighter (2%), perishable higher (8%), etc.
+    margin = margin_floor_for(f.category, MIN_MARGIN_PCT)
+    floor = f.cost * (1.0 + margin)
     if price < floor:
+        code = "CATEGORY_MARGIN_FLOOR" if margin != MIN_MARGIN_PCT else "AT_COST_FLOOR"
+        category_note = (
+            f" (category '{f.category}' floor = {margin * 100:.0f}%)"
+            if margin != MIN_MARGIN_PCT and f.category
+            else ""
+        )
         return ConstraintResult(
             price=floor,
             applied=["cost_floor"],
             reasons=[
                 PricingReason(
-                    code="AT_COST_FLOOR",
+                    code=code,
                     message=(
                         f"Profit-max price would land below cost-plus-margin floor "
-                        f"(${floor:.2f} = ${f.cost:.2f} × {1 + MIN_MARGIN_PCT:.2f}). "
+                        f"(${floor:.2f} = ${f.cost:.2f} × {1 + margin:.2f}){category_note}. "
                         "Clamped to floor."
                     ),
                 ),

@@ -35,6 +35,9 @@ import {
   Info,
   ExternalLink,
   Activity,
+  Download,
+  Rocket,
+  Check,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
@@ -54,11 +57,18 @@ type Recommendation = {
   expected_profit_lift: number;
   confidence: number;
   elasticity_beta: number | null;
+  elasticity_beta_se: number | null;
+  elasticity_ci_low: number | null;
+  elasticity_ci_high: number | null;
   elasticity_r2: number | null;
   elasticity_n: number | null;
   reasons: Array<{ code: string; message: string }>;
   applied_constraints: string[];
+  matched_signals: string[];
+  demand_multiplier: number;
   applied: boolean;
+  applied_to_scenario_id: string | null;
+  superseded_by: string | null;
   created_at: string;
 };
 
@@ -95,16 +105,30 @@ export default function PricingPage() {
     setFeedback(null);
     try {
       const seedResult = await api.pricingSeedHistory();
+      // Also seed signals so the Memorial Day demand boost shows up in reasoning
+      await api.pricingSeedSignals().catch(() => null);
       setBusy("run");
       const runResult = await api.pricingRunEngine();
       setFeedback(
-        `Seeded ${seedResult.inserted} observations · scanned ${runResult.scanned} SKU·stores · ${runResult.recommended} actionable recommendations.`,
+        `Seeded ${seedResult.inserted} observations · ${runResult.scanned} SKU·stores scanned · ${runResult.recommended} actionable recommendations${runResult.superseded ? ` · ${runResult.superseded} prior recs superseded` : ""}.`,
       );
       setReloadKey((k) => k + 1);
     } catch (e) {
       setFeedback((e as Error).message);
     } finally {
       setBusy(null);
+    }
+  }, []);
+
+  const applyRec = useCallback(async (recId: string) => {
+    try {
+      const result = await api.pricingApplyRecommendation(recId);
+      setFeedback(
+        `Applied → scenario ${result.scenario_config_id}. Open /scenarios to run it through canary → reconciliation → expansion.`,
+      );
+      setReloadKey((k) => k + 1);
+    } catch (e) {
+      setFeedback((e as Error).message);
     }
   }, []);
 
@@ -259,14 +283,27 @@ export default function PricingPage() {
 
       {/* Recommendations table */}
       <section className="glass rounded-2xl p-5">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">
-          Recommendations
-          {recs.data && (
-            <span className="ml-2 font-normal text-slate-500">
-              · {recs.data.recommendations.length}
-            </span>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+            Recommendations
+            {recs.data && (
+              <span className="ml-2 font-normal text-slate-500">
+                · {recs.data.recommendations.length}
+              </span>
+            )}
+          </h2>
+          {recs.data && recs.data.recommendations.length > 0 && (
+            <a
+              href={`${api.base}/api/v1/pricing/recommendations/export.csv`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-white/10"
+              title="Export current recommendations as CSV"
+            >
+              <Download className="h-3 w-3" /> Export CSV
+            </a>
           )}
-        </h2>
+        </div>
 
         {!recs.data ? (
           <ListSkeleton rows={4} />
@@ -280,6 +317,7 @@ export default function PricingPage() {
                 rec={r}
                 expanded={expanded === r.id}
                 onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
+                onApply={() => applyRec(r.id)}
               />
             ))}
           </div>
@@ -357,10 +395,12 @@ function RecommendationRow({
   rec,
   expanded,
   onToggle,
+  onApply,
 }: {
   rec: Recommendation;
   expanded: boolean;
   onToggle: () => void;
+  onApply: () => void;
 }) {
   const isIncrease = rec.recommended_price > rec.current_price;
   const Arrow = isIncrease ? TrendingUp : TrendingDown;
@@ -459,18 +499,43 @@ function RecommendationRow({
                 }
               />
               <Fact
-                label="Fit R²"
-                value={rec.elasticity_r2 != null ? rec.elasticity_r2.toFixed(2) : "—"}
+                label="95% CI on β"
+                value={
+                  rec.elasticity_ci_low != null && rec.elasticity_ci_high != null
+                    ? `[${rec.elasticity_ci_low.toFixed(2)}, ${rec.elasticity_ci_high.toFixed(2)}]`
+                    : "—"
+                }
+                hint={
+                  rec.elasticity_beta_se != null
+                    ? `SE ${rec.elasticity_beta_se.toFixed(3)}`
+                    : undefined
+                }
               />
               <Fact
-                label="Observations"
-                value={rec.elasticity_n?.toString() ?? "—"}
+                label="Fit R²"
+                value={rec.elasticity_r2 != null ? rec.elasticity_r2.toFixed(2) : "—"}
+                hint={`n = ${rec.elasticity_n ?? "—"}`}
               />
               <Fact
                 label="Confidence"
                 value={`${(rec.confidence * 100).toFixed(0)}%`}
               />
             </div>
+
+            {/* External signals (if any) */}
+            {rec.matched_signals && rec.matched_signals.length > 0 && (
+              <div className="mb-3 rounded-lg border border-violet-500/25 bg-violet-500/[.05] px-3 py-2 text-[11px] text-violet-200">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3" />
+                  <span className="font-semibold">
+                    External signals: {rec.matched_signals.join(", ")}
+                  </span>
+                  <span className="ml-auto mono">
+                    demand × {rec.demand_multiplier.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Reasoning trail */}
             <div className="mb-3">
@@ -530,6 +595,35 @@ function RecommendationRow({
                 value={`${rec.expected_profit_lift >= 0 ? "+" : ""}${money(rec.expected_profit_lift)}`}
                 tone={rec.expected_profit_lift >= 0 ? "verified" : "danger"}
               />
+            </div>
+
+            {/* Apply-to-ShelfTrace action — closes the pricing→execution loop */}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand/25 bg-brand/[.06] px-3 py-2.5">
+              <div className="flex items-start gap-2 text-[11px] text-slate-300">
+                <Rocket className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-400" />
+                <span>
+                  Apply this recommendation to ShelfTrace — creates a
+                  single-action scenario you can run through canary →
+                  verification → expansion.
+                </span>
+              </div>
+              {rec.applied ? (
+                <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-200">
+                  <Check className="h-3 w-3" />
+                  Applied → scenario {rec.applied_to_scenario_id?.slice(0, 12)}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApply();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-brand-600"
+                >
+                  <Rocket className="h-3 w-3" /> Apply to ShelfTrace
+                </button>
+              )}
             </div>
           </motion.div>
         )}

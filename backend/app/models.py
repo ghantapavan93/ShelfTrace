@@ -546,9 +546,32 @@ class PricingRecommendation(Base):
     expected_profit_lift: Mapped[float] = mapped_column(Float, default=0.0)
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     elasticity_beta: Mapped[float | None] = mapped_column(Float, nullable=True)
+    elasticity_beta_se: Mapped[float | None] = mapped_column(Float, nullable=True)
+    elasticity_ci_low: Mapped[float | None] = mapped_column(Float, nullable=True)
+    elasticity_ci_high: Mapped[float | None] = mapped_column(Float, nullable=True)
     elasticity_r2: Mapped[float | None] = mapped_column(Float, nullable=True)
     elasticity_n: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reasons_json: Mapped[dict] = mapped_column(JSONColumn, default=dict)
     applied: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    superseded_by: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    applied_to_scenario_id: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class ExternalSignal(Base):
+    """Demand multipliers for events / holidays / weather. Active rows
+    are read by the pricing engine at run time. Persisted so the system
+    has an audit trail of 'why did we boost demand on those SKUs'."""
+
+    __tablename__ = "external_signals"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    signal_type: Mapped[str] = mapped_column(String(32))  # holiday|weather|competitor|event
+    multiplier: Mapped[float] = mapped_column(Float)
+    effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    effective_until: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    category_pattern: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    sku_pattern: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
