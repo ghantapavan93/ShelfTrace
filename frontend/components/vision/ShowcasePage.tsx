@@ -35,7 +35,7 @@ import { Pill } from "./Shell";
      • Configurable Scenario Builder · Certification Lab · Live Control Plane
      • PostgreSQL Transactional Outbox · Redis Worker
      • Deterministic Reconciliation · Audit-Verified Recovery
-     • 82 PostgreSQL-Backed Tests
+     • 111 PostgreSQL-Backed Tests
    ──────────────────────────────────────────────────────────────────────────── */
 
 /* photo set — long-stable Unsplash IDs, CSS gradient fallback if any 404 */

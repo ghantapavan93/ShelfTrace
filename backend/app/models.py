@@ -479,3 +479,52 @@ class ScrapeRun(Base):
     errors_json: Mapped[dict] = mapped_column(JSONColumn, default=dict)
     status: Mapped[str] = mapped_column(String(32), default="running")  # running|success|failed
 
+
+# ---------------------------------------------------------------------------
+# Pricing engine — historical sales, cost catalog, recommendations
+# ---------------------------------------------------------------------------
+class HistoricalSale(Base):
+    """One (sku, store_id, date) observation. Powers elasticity estimation.
+    Synthetic data seeded by `app.pricing.seed.seed_history()` for the demo;
+    in production replaced by real POS exports."""
+
+    __tablename__ = "historical_sales"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    sku: Mapped[str] = mapped_column(String, index=True)
+    store_id: Mapped[str] = mapped_column(String, index=True)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    price: Mapped[float] = mapped_column(Float)
+    units_sold: Mapped[int] = mapped_column(Integer)
+    on_promotion: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ProductCost(Base):
+    __tablename__ = "product_costs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    sku: Mapped[str] = mapped_column(String, unique=True, index=True)
+    cost: Mapped[float] = mapped_column(Float)
+    effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PricingRecommendation(Base):
+    __tablename__ = "pricing_recommendations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    sku: Mapped[str] = mapped_column(String, index=True)
+    store_id: Mapped[str] = mapped_column(String, index=True)
+    product_name: Mapped[str] = mapped_column(String(256))
+    current_price: Mapped[float] = mapped_column(Float)
+    recommended_price: Mapped[float] = mapped_column(Float)
+    expected_units_lift_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    expected_revenue_lift: Mapped[float] = mapped_column(Float, default=0.0)
+    expected_profit_lift: Mapped[float] = mapped_column(Float, default=0.0)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    elasticity_beta: Mapped[float | None] = mapped_column(Float, nullable=True)
+    elasticity_r2: Mapped[float | None] = mapped_column(Float, nullable=True)
+    elasticity_n: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reasons_json: Mapped[dict] = mapped_column(JSONColumn, default=dict)
+    applied: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+

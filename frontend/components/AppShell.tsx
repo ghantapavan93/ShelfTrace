@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Globe,
+  Brain,
 } from "lucide-react";
 import { Brand } from "./Brand";
 import { api } from "@/lib/api";
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/vision", label: "Vision Studio", sub: "Concept showcase", icon: Sparkles, match: /^\/vision/ },
   { href: "/scenarios", label: "Scenario Builder", sub: "Configure a test run", icon: SlidersHorizontal, match: /^\/scenarios/ },
   { href: "/scrapers", label: "Competitor Scraping", sub: "Data extraction pipeline", icon: Globe, match: /^\/scrapers/ },
+  { href: "/pricing", label: "Pricing Engine", sub: "Elasticity · profit-max", icon: Brain, match: /^\/pricing/ },
   { href: "/certification", label: "Certification Lab", sub: "Before go-live", icon: ShieldCheck, match: /^\/certification/ },
   { href: "/operations", label: "Live Operations", sub: "Command Center", icon: LayoutGrid, match: /^\/operations$/ },
   {

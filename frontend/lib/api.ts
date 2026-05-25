@@ -128,6 +128,50 @@ export const api = {
         errors: string[];
       }>;
     }>(`/api/v1/scraping/runs`),
+  // Pricing engine
+  pricingSeedHistory: () => post<{ inserted: number; note: string }>(`/api/v1/pricing/seed-history`),
+  pricingRunEngine: () =>
+    post<{ scanned: number; recommended: number; skipped: number; persisted: number }>(
+      `/api/v1/pricing/run`,
+    ),
+  pricingRecommendations: (onlyChanges = true) =>
+    get<{
+      total_returned: number;
+      offset: number;
+      limit: number;
+      recommendations: Array<{
+        id: string;
+        sku: string;
+        store_id: string;
+        product_name: string;
+        current_price: number;
+        recommended_price: number;
+        change_pct: number;
+        expected_units_lift_pct: number;
+        expected_revenue_lift: number;
+        expected_profit_lift: number;
+        confidence: number;
+        elasticity_beta: number | null;
+        elasticity_r2: number | null;
+        elasticity_n: number | null;
+        reasons: Array<{ code: string; message: string }>;
+        applied_constraints: string[];
+        applied: boolean;
+        created_at: string;
+      }>;
+    }>(`/api/v1/pricing/recommendations?only_changes=${onlyChanges}`),
+  pricingSkuHistory: (sku: string, storeId?: string) =>
+    get<{
+      sku: string;
+      observations: Array<{
+        date: string;
+        store_id: string;
+        price: number;
+        units_sold: number;
+        on_promotion: boolean;
+      }>;
+    }>(`/api/v1/pricing/sku/${encodeURIComponent(sku)}/history${storeId ? `?store_id=${storeId}` : ""}`),
+
   scrapingProducts: (params: { source_id?: string; q?: string; limit?: number; offset?: number } = {}) => {
     const qs = new URLSearchParams();
     if (params.source_id) qs.set("source_id", params.source_id);

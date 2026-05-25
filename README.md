@@ -10,6 +10,7 @@
 | **Working platform** *(live data)* | [shelf-trace.vercel.app/operations](https://shelf-trace.vercel.app/operations) |
 | **Engineering trace** *(pipeline + tests)* | [shelf-trace.vercel.app/engineering](https://shelf-trace.vercel.app/engineering) |
 | **Build your own scenario** | [shelf-trace.vercel.app/scenarios](https://shelf-trace.vercel.app/scenarios) |
+| **Pricing engine** *(elasticity + profit-max)* | [shelf-trace.vercel.app/pricing](https://shelf-trace.vercel.app/pricing) |
 | **Competitor scraping** | [shelf-trace.vercel.app/scrapers](https://shelf-trace.vercel.app/scrapers) |
 | **Backend health** | [shelftrace-api.onrender.com/health](https://shelftrace-api.onrender.com/health) |
 
