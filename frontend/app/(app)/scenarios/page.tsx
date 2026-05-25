@@ -54,6 +54,16 @@ export default function ScenarioBuilder() {
     refreshList();
   }, []);
 
+  // When the user flips to LIVE mode and the form is still showing default
+  // Memorial Day-ish values, swap them for empty fields so they're not
+  // confused by demo store IDs sitting in their own scenario.
+  useEffect(() => {
+    if (!isLive) return;
+    setStores((s) => (s === "214,302" ? "" : s));
+    setCanary((c) => (c === "214,302" ? "" : c));
+    setZone((z) => (z === "Custom Zone" ? "My Zone" : z));
+  }, [isLive]);
+
   function loadInto(s: Scenario) {
     setName(s.is_seeded ? `${s.name} (custom)` : s.name);
     setZone(s.zone_name);
@@ -181,10 +191,25 @@ export default function ScenarioBuilder() {
                 Live Mode · Bring your own data
               </div>
               <h3 className="mt-1 text-base font-semibold text-white">
-                Upload a CSV with your real catalog, or paste rows below
+                Your workflow: Upload → Configure stores → Run rollout
               </h3>
-              <p className="mt-1 text-xs text-slate-400">
-                Memorial Day shortcuts are hidden in this mode. Drop a file in the Bulk Import section, define your stores and canary subset above, then run Certification or Live Rollout. The backend still uses simulated retailer connectors — no real POS/ESL/ecommerce traffic.
+              <ol className="mt-2 list-decimal space-y-0.5 pl-4 text-xs text-slate-400">
+                <li>Drop your CSV in the Bulk Import section (or paste rows). We server-validate every row.</li>
+                <li>Fill in your store IDs and pick a canary subset (the stores that test first).</li>
+                <li>(Optional) Generate connector failures with a behavior preset to test recovery.</li>
+                <li>Click <span className="text-rose-200">Run Live Rollout</span> — the platform simulates POS/ESL/ecommerce execution against your data.</li>
+              </ol>
+              <button
+                onClick={() => {
+                  document.getElementById("bulk-import-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/20"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Jump to upload →
+              </button>
+              <p className="mt-3 text-[11px] text-slate-500">
+                Note: backend still uses simulated retailer connectors — no real POS/ESL/ecommerce traffic is sent, even in Live mode. This is for testing YOUR catalog against the platform safely.
               </p>
             </div>
           </div>
@@ -293,13 +318,15 @@ export default function ScenarioBuilder() {
 
       {/* Bulk import — CSV paste + behavior presets, for evaluators with
           real data who'd rather not type every row by hand. */}
-      <ScenariosBulkPanel
-        storesCsv={stores}
-        canaryCsv={canary}
-        actions={actions}
-        onImportProducts={(next) => setActions(next)}
-        onGenerateBehaviors={(next) => setBehaviors(next)}
-      />
+      <div id="bulk-import-section" className="scroll-mt-6">
+        <ScenariosBulkPanel
+          storesCsv={stores}
+          canaryCsv={canary}
+          actions={actions}
+          onImportProducts={(next) => setActions(next)}
+          onGenerateBehaviors={(next) => setBehaviors(next)}
+        />
+      </div>
 
       {/* Price actions */}
       <section className="glass rounded-2xl p-5">
