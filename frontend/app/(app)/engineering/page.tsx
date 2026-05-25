@@ -8,6 +8,7 @@ import { useLive } from "@/lib/useLive";
 import { timeOf } from "@/lib/format";
 import { EligibilityPanel } from "@/components/EligibilityPanel";
 import { BlurTextAnimation } from "@/components/text/BlurTextAnimation";
+import { DetailSkeleton } from "@/components/Skeleton";
 import type { EngineeringTrace } from "@/lib/types";
 
 function Json({ value }: { value: unknown }) {
@@ -33,7 +34,7 @@ export default function EngineeringPage() {
   const { data, error } = useLive<EngineeringTrace>(() => api.engineering({ runMode: mode }), [mode]);
 
   if (error) return <div className="glass rounded-2xl p-6 text-slate-300">Could not load engineering trace.</div>;
-  if (!data) return <div className="text-slate-400">Loading trace…</div>;
+  if (!data) return <DetailSkeleton />;
 
   return (
     <div className="space-y-6">

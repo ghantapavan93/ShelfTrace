@@ -71,7 +71,12 @@ export default function ScenarioBuilder() {
     setBusy(`run-${id}`);
     try {
       const res = await api.executeScenario(id, mode);
-      router.push(res.redirect);
+      // Append from=scenario so the destination page shows a breadcrumb
+      // back to /scenarios, and external_id so the BatchPicker selects
+      // the freshly-created batch.
+      const sep = res.redirect.includes("?") ? "&" : "?";
+      const url = `${res.redirect}${sep}from=scenario${res.batch_external_id ? `&external_id=${res.batch_external_id}` : ""}`;
+      router.push(url);
     } finally {
       setBusy(null);
     }
@@ -124,7 +129,9 @@ export default function ScenarioBuilder() {
       };
       const created: Scenario = await api.createScenario(payload);
       const res = await api.executeScenario(created.id, mode);
-      router.push(res.redirect);
+      const sep = res.redirect.includes("?") ? "&" : "?";
+      const url = `${res.redirect}${sep}from=scenario${res.batch_external_id ? `&external_id=${res.batch_external_id}` : ""}`;
+      router.push(url);
     } catch (e) {
       setError((e as Error).message);
     } finally {

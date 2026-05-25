@@ -21,6 +21,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { ChannelPedestal, ChannelThread } from "@/components/ChannelPedestal";
 import { AuditTimeline } from "@/components/AuditTimeline";
 import { EligibilityPanel } from "@/components/EligibilityPanel";
+import { DetailSkeleton } from "@/components/Skeleton";
 import type { AuditEventView, IncidentExplanation, IncidentView } from "@/lib/types";
 
 export default function IncidentPage({ params }: { params: { id: string } }) {
@@ -58,7 +59,7 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
   }
 
   if (inc.error) return <div className="glass rounded-2xl p-6 text-slate-300">Incident not found.</div>;
-  if (!inc.data) return <div className="text-slate-400">Loading incident…</div>;
+  if (!inc.data) return <DetailSkeleton />;
 
   const i = inc.data;
   const offending = i.channels.find((c) => c.channel === i.offending_channel);

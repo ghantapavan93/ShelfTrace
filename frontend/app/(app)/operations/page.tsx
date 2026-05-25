@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ShieldX,
@@ -9,18 +10,23 @@ import {
   AlertTriangle,
   Clock,
   ArrowRight,
+  ArrowUpRight,
   Tag,
   ScanLine,
   Globe,
   RotateCcw,
+  FlaskConical,
+  ExternalLink,
 } from "lucide-react";
 import clsx from "clsx";
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
-import { money, timeOf } from "@/lib/format";
+import { money, timeOf, dateTimeOf } from "@/lib/format";
 import { MetricCard } from "@/components/MetricCard";
 import { Donut } from "@/components/Donut";
 import { AuditTimeline } from "@/components/AuditTimeline";
+import { BatchPicker } from "@/components/BatchPicker";
+import { OperationsSkeleton } from "@/components/Skeleton";
 import type { ChannelView } from "@/lib/types";
 
 const CH_ICON = { esl: Tag, pos: ScanLine, ecommerce: Globe } as const;
@@ -57,9 +63,96 @@ function ChannelMini({ c }: { c: ChannelView }) {
 
 const STEPS = ["Select Stores", "Canary", "Evaluate", "Expand"];
 
+/** Hero copy adapts to the batch's actual state — works for the demo
+ *  seed, a custom blocked scenario, or an all-clear success run. */
+function adaptiveHero(b: {
+  status: string;
+  expansion_blocked: boolean;
+  critical_incidents: number;
+  deadline_risks: number;
+  verified_actions: number;
+  total_actions: number;
+}) {
+  // All-clear path (no incidents, all verified) gets its own celebratory hero
+  if (
+    !b.expansion_blocked &&
+    b.critical_incidents === 0 &&
+    b.deadline_risks === 0 &&
+    b.verified_actions === b.total_actions &&
+    b.total_actions > 0
+  ) {
+    return {
+      title: "All channels verified",
+      sub: "every action confirmed across POS, shelf label, and ecommerce.",
+      line: "Eligible for expansion",
+      tone: "verified" as const,
+    };
+  }
+  const map: Record<string, { title: string; sub: string; line: string; tone: "danger" | "warn" | "verified" | "neutral" }> = {
+    blocked: {
+      title: "Rollout held by canary mismatch",
+      sub: "expansion paused until the offending channel acknowledges.",
+      line: "Expansion blocked",
+      tone: "danger",
+    },
+    partially_blocked: {
+      title: "Expansion held",
+      sub: "while shelf-label updates finish verifying.",
+      line: "Expansion held",
+      tone: "warn",
+    },
+    canary_verifying: {
+      title: "Canary verifying",
+      sub: "checking POS, shelf labels and ecommerce.",
+      line: "Verification in progress",
+      tone: "neutral",
+    },
+    ready_for_expansion: {
+      title: "Canary verified",
+      sub: "ready to expand to the full zone.",
+      line: "Expansion eligible",
+      tone: "verified",
+    },
+    expanding: {
+      title: "Expanding to the zone",
+      sub: "verifying the remaining stores.",
+      line: "Expanding",
+      tone: "neutral",
+    },
+    completed: {
+      title: "Rollout complete",
+      sub: "every store verified across all channels.",
+      line: "Completed",
+      tone: "verified",
+    },
+  };
+  return map[b.status] ?? map.canary_verifying;
+}
+
 export default function OperationsPage() {
-  const { data, error, reload } = useLive(() => api.operations());
+  // useSearchParams in a client component must be wrapped in <Suspense>
+  // for Next 14 to satisfy its prerender-bailout check.
+  return (
+    <Suspense fallback={<OperationsSkeleton />}>
+      <OperationsContent />
+    </Suspense>
+  );
+}
+
+function OperationsContent() {
+  const searchParams = useSearchParams();
+  const externalId = searchParams?.get("external_id") || undefined;
+  const fromScenario = searchParams?.get("from") === "scenario";
+  const { data, error, reload } = useLive(() => api.operations(externalId), [externalId]);
   const [resetting, setResetting] = useState(false);
+  const [coldStartHint, setColdStartHint] = useState(false);
+
+  // After 5s of no data, show a cold-start hint
+  useEffect(() => {
+    if (data || error) return;
+    const t = window.setTimeout(() => setColdStartHint(true), 5_000);
+    return () => window.clearTimeout(t);
+  }, [data, error]);
 
   async function resetLive() {
     setResetting(true);
@@ -78,69 +171,75 @@ export default function OperationsPage() {
         <div className="mt-1 text-xs text-slate-500">{error}</div>
       </div>
     );
-  if (!data) return <div className="text-slate-400">Loading command center…</div>;
+  if (!data) return <OperationsSkeleton coldStart={coldStartHint} />;
 
   const b = data.batch;
   const crit = data.critical_incident;
-
-  const HERO: Record<string, { title: string; sub: string; line: string }> = {
-    blocked: {
-      title: "Canary rollout stopped",
-      sub: "before a checkout mismatch reached the zone.",
-      line: "Expansion blocked",
-    },
-    partially_blocked: {
-      title: "Expansion held",
-      sub: "while shelf-label updates finish verifying.",
-      line: "Expansion held",
-    },
-    canary_verifying: {
-      title: "Canary verifying",
-      sub: "checking POS, shelf labels and ecommerce.",
-      line: "Verification in progress",
-    },
-    ready_for_expansion: {
-      title: "Canary verified",
-      sub: "ready to expand to the full zone.",
-      line: "Expansion eligible",
-    },
-    expanding: {
-      title: "Expanding to the zone",
-      sub: "verifying the remaining stores.",
-      line: "Expanding",
-    },
-    completed: {
-      title: "Rollout complete",
-      sub: "every store verified across all channels.",
-      line: "Completed",
-    },
-  };
-  const hero = HERO[b.status] ?? HERO.canary_verifying;
-  const danger = b.status === "blocked";
+  const hero = adaptiveHero(b);
+  const danger = hero.tone === "danger";
   const held = b.expansion_blocked;
+  const isFresh = Date.now() - new Date(b.created_at).getTime() < 60_000;
+  const allClear =
+    !b.expansion_blocked &&
+    b.critical_incidents === 0 &&
+    b.deadline_risks === 0 &&
+    b.verified_actions === b.total_actions &&
+    b.total_actions > 0;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      {/* Header: batch picker + post-scenario breadcrumb + reset */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <BatchPicker currentExternalId={b.external_id} />
+          {fromScenario && (
+            <Link
+              href="/scenarios"
+              className="inline-flex items-center gap-1 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-xs text-violet-200 hover:bg-violet-500/15"
+            >
+              <FlaskConical className="h-3 w-3" />
+              ← Back to scenario
+            </Link>
+          )}
+        </div>
         <button
           onClick={resetLive}
           disabled={resetting}
           className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
         >
-          <RotateCcw className={clsx("h-3.5 w-3.5", resetting && "animate-spin")} /> Reset Live Rollout Demo
+          <RotateCcw className={clsx("h-3.5 w-3.5", resetting && "animate-spin")} /> Reset demo seed
         </button>
       </div>
-      {/* Hero */}
+
+      {/* Hero — adaptive to ANY batch state */}
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-ink-850 via-ink-900 to-black px-7 py-8"
+        className={clsx(
+          "relative overflow-hidden rounded-3xl border px-7 py-8",
+          allClear
+            ? "border-emerald-500/30 bg-gradient-to-br from-[#06120c] via-[#04070b] to-black"
+            : "border-white/10 bg-gradient-to-br from-ink-850 via-ink-900 to-black",
+        )}
       >
-        <div className="pointer-events-none absolute right-0 top-0 h-full w-1/2 bg-[radial-gradient(60%_80%_at_80%_30%,rgba(255,106,43,0.18),transparent_70%)]" />
+        <div
+          className={clsx(
+            "pointer-events-none absolute right-0 top-0 h-full w-1/2",
+            allClear
+              ? "bg-[radial-gradient(60%_80%_at_80%_30%,rgba(34,197,94,0.18),transparent_70%)]"
+              : "bg-[radial-gradient(60%_80%_at_80%_30%,rgba(255,106,43,0.18),transparent_70%)]",
+          )}
+        />
         <div className="relative max-w-3xl">
-          <div className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-400">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.25em] text-brand-400">
             Operations Command Center
+            {isFresh && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/15 px-2 py-0.5 text-[10px] tracking-wide text-violet-200">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-300" />
+                JUST RAN
+              </span>
+            )}
           </div>
           <h1 className="mt-3 text-4xl font-bold leading-tight text-white">
             {hero.title}
@@ -151,9 +250,15 @@ export default function OperationsPage() {
               {b.critical_incidents} critical · {b.deadline_risks} deadline risk
             </span>
             <span className="text-slate-600">•</span>
-            <span className={held ? (danger ? "text-danger" : "text-warn") : "text-verified"}>{hero.line}</span>
+            <span className={clsx(
+              held ? (danger ? "text-danger" : "text-warn") : "text-verified",
+            )}>
+              {hero.line}
+            </span>
             <span className="text-slate-600">•</span>
-            <span className="text-slate-400">No shopper impact</span>
+            <span className="text-slate-400">
+              {b.name} · created {timeOf(b.created_at)}
+            </span>
           </div>
         </div>
         <div className="relative mt-6 flex items-center gap-3">
@@ -190,7 +295,7 @@ export default function OperationsPage() {
           label="Stores in canary"
           sub="Testing first"
           tone="warn"
-          progress={b.canary_store_ids.length / b.total_store_count}
+          progress={b.canary_store_ids.length / Math.max(1, b.total_store_count)}
         />
         <MetricCard
           value={b.verified_actions}
@@ -243,13 +348,48 @@ export default function OperationsPage() {
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
               <Meta k="Incident ID" v={crit.id} />
-              <Meta k="First detected" v={timeOf(crit.created_at)} />
+              <Meta k="First detected" v={dateTimeOf(crit.created_at)} />
               <Meta k="Impact" v={`Store ${crit.store_id}`} />
               <Meta k="Status" v={crit.status} />
             </div>
           </div>
         ) : (
-          <div className="glass rounded-2xl p-5 xl:col-span-2 text-slate-300">No critical incidents. 🎉</div>
+          /* All-clear state — celebratory, not "no incidents 🎉" */
+          <div className="glass-strong rounded-2xl border border-emerald-500/25 p-6 xl:col-span-2">
+            <div className="flex items-center gap-3">
+              <span className="grid h-12 w-12 place-items-center rounded-2xl border border-emerald-500/40 bg-emerald-500/10 text-verified shadow-glow-verified">
+                <ShieldCheck className="h-6 w-6" />
+              </span>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-verified">
+                  All canary actions verified
+                </div>
+                <h2 className="mt-0.5 text-lg font-semibold text-white">
+                  No mismatches, no deadline risks
+                </h2>
+              </div>
+            </div>
+            <p className="mt-3 max-w-xl text-sm text-slate-400">
+              Every action in this batch was acknowledged by POS, shelf label,
+              and ecommerce at the approved price. {b.expansion_store_ids.length > 0
+                ? `Safe to expand to ${b.expansion_store_ids.length} remaining store${b.expansion_store_ids.length === 1 ? "" : "s"}.`
+                : "Rollout is complete."}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Link
+                href={`/operations/batches/${b.external_id}`}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-200 hover:bg-emerald-500/15"
+              >
+                View verification matrix <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+              <Link
+                href="/engineering"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 hover:bg-white/10"
+              >
+                Engineering trace <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
         )}
 
         <div className="space-y-4">
@@ -282,6 +422,17 @@ export default function OperationsPage() {
               </div>
             </div>
           )}
+          {/* Quick cross-page link to full batch breakdown */}
+          <Link
+            href={`/operations/batches/${b.external_id}`}
+            className="glass group flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3 text-xs text-slate-300 transition hover:border-brand/30 hover:bg-white/[.04]"
+          >
+            <div>
+              <div className="font-medium text-white">Full verification matrix</div>
+              <div className="mt-0.5 text-[11px] text-slate-500">All {b.total_actions} action{b.total_actions === 1 ? "" : "s"} · per-channel</div>
+            </div>
+            <ExternalLink className="h-3.5 w-3.5 text-slate-500 transition group-hover:text-brand-400" />
+          </Link>
         </div>
       </section>
 
@@ -289,7 +440,11 @@ export default function OperationsPage() {
       <section className="grid gap-4 xl:grid-cols-3">
         <div className="glass rounded-2xl p-5 xl:col-span-2">
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-300">Recent Activity</h3>
-          <AuditTimeline events={data.recent_activity.slice(0, 6)} />
+          {data.recent_activity.length > 0 ? (
+            <AuditTimeline events={data.recent_activity.slice(0, 6)} />
+          ) : (
+            <p className="text-xs text-slate-500">No audit events yet for this batch.</p>
+          )}
         </div>
         <div className="space-y-4">
           <div className="glass rounded-2xl p-5">
