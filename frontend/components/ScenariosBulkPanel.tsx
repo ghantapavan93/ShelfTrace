@@ -226,12 +226,56 @@ export function ScenariosBulkPanel({
   const [dragOver, setDragOver] = useState(false);
   const [presetFeedback, setPresetFeedback] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [errorFilter, setErrorFilter] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const hasContent = content.trim().length > 0;
   const validCount = preview?.summary.valid ?? 0;
   const invalidCount = preview?.summary.invalid ?? 0;
   const totalCount = preview?.summary.total ?? 0;
+
+  // Group errors by field/category for the breakdown panel
+  const errorBreakdown = (() => {
+    if (!preview || invalidCount === 0) return [] as Array<{ category: string; count: number }>;
+    const counts: Record<string, number> = {};
+    preview.rows
+      .filter((r) => !r.valid)
+      .forEach((r) => {
+        r.errors.forEach((msg) => {
+          // Extract first 4 words as a coarse category label
+          const cat = msg.split(/[:.;,]/)[0].trim().slice(0, 60);
+          counts[cat] = (counts[cat] ?? 0) + 1;
+        });
+      });
+    return Object.entries(counts)
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
+  })();
+
+  function downloadErrorReport() {
+    if (!preview) return;
+    const invalidRows = preview.rows.filter((r) => !r.valid);
+    if (invalidRows.length === 0) return;
+    const header = "row_number,sku,product_name,prior_price,approved_price,errors";
+    const lines = invalidRows.map((r) => {
+      const cells = [
+        String(r.row_number),
+        JSON.stringify(r.sku ?? ""),
+        JSON.stringify(r.product_name ?? ""),
+        r.previous_price != null ? String(r.previous_price) : "",
+        r.approved_price != null ? String(r.approved_price) : "",
+        JSON.stringify(r.errors.join("; ")),
+      ];
+      return cells.join(",");
+    });
+    const blob = new Blob([[header, ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `shelftrace-errors-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const validateOnServer = useCallback(async (raw: string, fmt: Format) => {
     if (!raw.trim()) return;
@@ -552,15 +596,43 @@ export function ScenariosBulkPanel({
                     </span>
                   )}
                 </div>
-                {validCount > 0 && !isValidating && (
-                  <button
-                    type="button"
-                    onClick={applyValidRows}
-                    className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-emerald-950 hover:bg-emerald-400"
-                  >
-                    Apply {validCount} valid row{validCount === 1 ? "" : "s"} →
-                  </button>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {invalidCount > 0 && !isValidating && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setErrorFilter((v) => !v)}
+                        className={clsx(
+                          "rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition",
+                          errorFilter
+                            ? "border-rose-500/50 bg-rose-500/15 text-rose-200"
+                            : "border-rose-500/25 bg-rose-500/5 text-rose-300 hover:bg-rose-500/10",
+                        )}
+                        title={errorFilter ? "Showing only invalid rows" : "Filter to show only invalid rows"}
+                      >
+                        {errorFilter ? "Showing errors only ×" : `Show only errors (${invalidCount})`}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={downloadErrorReport}
+                        className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-medium text-slate-200 transition hover:bg-white/10"
+                        title="Download invalid rows + their error messages as CSV"
+                      >
+                        <Download className="h-3 w-3" />
+                        Errors CSV
+                      </button>
+                    </>
+                  )}
+                  {validCount > 0 && !isValidating && (
+                    <button
+                      type="button"
+                      onClick={applyValidRows}
+                      className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-emerald-950 hover:bg-emerald-400"
+                    >
+                      Apply {validCount} valid row{validCount === 1 ? "" : "s"} →
+                    </button>
+                  )}
+                </div>
               </div>
               {preview && preview.payload_errors.length > 0 && (
                 <ul className="mt-2 list-disc space-y-0.5 pl-5 text-[11px] opacity-90">
@@ -568,6 +640,25 @@ export function ScenariosBulkPanel({
                     <li key={i}>{e}</li>
                   ))}
                 </ul>
+              )}
+              {/* Error breakdown — show top categories so users know what to fix in bulk */}
+              {!isValidating && invalidCount > 0 && errorBreakdown.length > 0 && (
+                <div className="mt-2 border-t border-rose-500/20 pt-2">
+                  <div className="mb-1 text-[10px] uppercase tracking-wider text-rose-300/70">
+                    Why these {invalidCount} rows failed:
+                  </div>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {errorBreakdown.slice(0, 5).map(({ category, count }) => (
+                      <li
+                        key={category}
+                        className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-200"
+                      >
+                        <span className="font-semibold tabular-nums">{count}×</span>
+                        <span className="opacity-90">{category}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           )}
@@ -595,7 +686,9 @@ export function ScenariosBulkPanel({
                       </tr>
                     </thead>
                     <tbody>
-                      {preview.rows.map((r) => (
+                      {preview.rows
+                        .filter((r) => !errorFilter || !r.valid)
+                        .map((r) => (
                         <tr
                           key={r.row_number}
                           className={clsx(
