@@ -126,9 +126,10 @@ export default function ScrapersPage() {
           <h1 className="text-2xl font-bold text-white">Competitor Scraping</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Production-shaped data extraction pipeline. Fetch → parse →
-            validate → dedupe → upsert. The pipeline that runs here is the
-            same one you'd run against a real competitor grocer — only the
-            spider class's CSS selectors change.
+            validate → normalize → deduplicate → preserve observations.
+            This policy-safe reference source demonstrates the extraction
+            architecture. A real grocery source would require retailer-specific
+            access, rendering, compliance review and grocery-specific normalization.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -157,12 +158,9 @@ export default function ScrapersPage() {
         sites have anti-bot defenses and ToS restrictions that require a
         commercial scraping agreement. The DATA SHAPE is identical to a
         competitor product listing (title, price, category, availability,
-        image), and the same pipeline would consume both. A documented
-        production stub lives at{" "}
-        <code className="mono rounded bg-black/30 px-1 py-0.5 text-[11px]">
-          backend/app/scrapers/spiders/whole_foods.py
-        </code>
-        .
+        image), and the same pipeline consumes that shape regardless of source.
+        Retailer-specific adapters remain future integration work and are not
+        connected in this demo.
       </div>
 
       {/* ── Source + Run panel ───────────────────────────────────────── */}
