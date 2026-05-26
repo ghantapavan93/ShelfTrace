@@ -42,6 +42,7 @@ import {
 import { EASE } from "@/lib/motion";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
+import { ElasticityScatter } from "@/components/pricing/ElasticityScatter";
 
 // Constraint tuning — kept in sync with backend/app/pricing/constraints.py.
 // These are the same numbers the production engine enforces. Duplicating
@@ -450,6 +451,24 @@ function Inner({
           formatter={(v) => money(v)}
           deltaLabel="vs current profit"
           unavailableNote={fit.cost === null ? "no cost on file" : undefined}
+        />
+      </div>
+
+      {/* Regression scatter — the picture behind β */}
+      <div className="px-6 pt-6">
+        <ElasticityScatter
+          observations={fit.observations}
+          fit={{
+            beta: fit.elasticity.beta,
+            intercept: fit.elasticity.intercept,
+            beta_se: fit.elasticity.beta_se,
+            r_squared: fit.elasticity.r_squared,
+            n_observations: fit.elasticity.n_observations,
+            sufficient_data: fit.elasticity.sufficient_data,
+          }}
+          observedRange={fit.observed_price_range}
+          candidatePrice={candidate}
+          currentPrice={fit.current_price}
         />
       </div>
 

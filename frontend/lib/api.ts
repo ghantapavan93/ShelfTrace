@@ -322,6 +322,26 @@ export const api = {
       observations?: number;
       note: string;
     }>(`/api/v1/product-graph/seed-demo`),
+  graphEntitySubstitutes: (entityId: string) =>
+    get<{
+      entity: {
+        id: string;
+        canonical_title: string;
+        category_id: string | null;
+        category_name: string | null;
+      };
+      substitutes: Array<{
+        entity_id: string;
+        canonical_title: string;
+        category_id: string | null;
+        category_name: string | null;
+        estimated_cross_elasticity: number;
+        confidence: number;
+        kind: "substitute" | "weak_substitute" | "complement" | "weak_complement" | "unrelated";
+        same_category: boolean;
+      }>;
+      note: string;
+    }>(`/api/v1/product-graph/entities/${encodeURIComponent(entityId)}/substitutes`),
   graphBulkMatch: (minScore = 0.7) =>
     post<{ matched_count: number; skipped_count: number; min_score: number }>(
       `/api/v1/product-graph/bulk-match?min_score=${minScore}`,
@@ -399,7 +419,62 @@ export const api = {
         notes: string[];
       };
       observed_price_range: { min: number; max: number; mean: number };
+      observations: Array<{ price: number; units: number; on_promotion: boolean }>;
     }>(`/api/v1/pricing/sku/${encodeURIComponent(sku)}/what-if-fit?store_id=${encodeURIComponent(storeId)}`),
+  pricingMarginTargets: () =>
+    get<{
+      categories: Array<{
+        policy: "kvi" | "perishable" | "standard";
+        label: string;
+        target_pct: number;
+        current_pct: number | null;
+        gap_pct: number | null;
+        n_skus: number;
+        n_with_cost: number;
+        revenue_estimate: number;
+        status: "above" | "at" | "near" | "below" | "no_data";
+      }>;
+      portfolio: {
+        target_pct: number | null;
+        current_pct: number | null;
+        gap_pct: number | null;
+        n_skus: number;
+        revenue_estimate: number;
+        status: "above" | "at" | "near" | "below" | "no_data";
+      };
+      bands: { at_pp: number; near_pp: number };
+    }>(`/api/v1/pricing/margin-targets`),
+  pricingKviWatchlist: () =>
+    get<{
+      tolerance_pct: number;
+      items: Array<{
+        sku: string;
+        store_id: string;
+        product_name: string;
+        current_price: number;
+        prior_price: number | null;
+        competitor_price: number | null;
+        competitor_source: string | null;
+        gap_dollar: number | null;
+        gap_pct: number | null;
+        abs_gap_pct: number | null;
+        band: "within" | "above" | "below" | "no_competitor";
+        recommendation: {
+          id: string;
+          recommended_price: number;
+          change_pct: number;
+          applied: boolean;
+          applied_to_scenario_id: string | null;
+        } | null;
+      }>;
+      summary: {
+        total: number;
+        within_band: number;
+        above_band: number;
+        below_band: number;
+        max_abs_gap_pct: number;
+      };
+    }>(`/api/v1/pricing/kvi-watchlist`),
   pricingSuggestForSku: (sku: string, storeId?: string) =>
     get<{
       sku: string;

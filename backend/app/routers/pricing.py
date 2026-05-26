@@ -311,6 +311,19 @@ def get_what_if_fit(
     else:
         observed_min = observed_max = observed_mean = action.approved_price
 
+    # The exact (price, units) tuples the OLS regression saw — so the
+    # client can render the same dots the fit consumed. Promotional rows
+    # are flagged so the UI can dim them: they were excluded from β.
+    observation_dots = [
+        {
+            "price": obs.price,
+            "units": obs.units_sold,
+            "on_promotion": obs.on_promotion,
+        }
+        for obs in observations
+        if obs.price > 0 and obs.units_sold > 0
+    ]
+
     # Competitor reference via the knowledge graph (most recent observation in zone)
     entity = product_graph.get_entity_for_sku(db, sku)
     competitor_price: float | None = None
@@ -367,6 +380,377 @@ def get_what_if_fit(
             "min": observed_min,
             "max": observed_max,
             "mean": observed_mean,
+        },
+        "observations": observation_dots,
+    }
+
+
+# Per-policy gross-margin targets. KVI runs tight (competes on price image,
+# subsidized by basket); perishables need a spoilage buffer baked in; the
+# rest aims at a healthy default. These are policy choices the chain
+# encodes — mirrors CATEGORY_MARGIN_FLOORS but expresses the *aim* rather
+# than the absolute floor.
+MARGIN_TARGETS_BY_POLICY: dict[str, float] = {
+    "kvi": 0.10,         # 10% — beat-the-competitor lane
+    "perishable": 0.25,  # 25% — covers expected shrink
+    "standard": 0.30,    # 30% — healthy baseline
+}
+
+MARGIN_TARGET_DEFAULTS = {
+    "near_band_pp": 3.0,    # within 3 percentage points = "near"
+    "at_band_pp": 1.0,      # within 1pp = "at"
+}
+
+
+@router.get("/margin-targets")
+def margin_targets(db: Session = Depends(get_db)) -> dict:
+    """Category-level margin rollup vs targets.
+
+    Classifies every latest PriceAction into one of three policy buckets —
+    `kvi`, `perishable`, `standard` — and computes a weighted-average gross
+    margin within each bucket. When historical sales exist for a SKU·store
+    we weight by revenue (price × units); otherwise we fall back to weight
+    by approved_price (a usable proxy for basket contribution).
+
+    The portfolio rollup blends the buckets weighted by their estimated
+    revenue. Status is one of `above`/`at`/`near`/`below` based on the
+    distance to target in percentage points.
+    """
+    # Latest PriceAction per (sku, store) — same dedup as kvi-watchlist
+    actions = list(
+        db.scalars(
+            select(PriceAction).order_by(PriceAction.id.desc())
+        )
+    )
+    latest: dict[tuple[str, str], PriceAction] = {}
+    for a in actions:
+        key = (a.sku, a.store_id)
+        if key not in latest:
+            latest[key] = a
+
+    if not latest:
+        return _empty_margin_payload()
+
+    # Cost catalog
+    costs = {c.sku: c.cost for c in db.scalars(select(ProductCost))}
+
+    # Revenue weights from history (last 30 obs per sku·store gives a fair
+    # contemporary signal without going stale). Fallback to price-based
+    # weighting when no history exists.
+    revenue_weight: dict[tuple[str, str], float] = {}
+    history_rows = list(
+        db.scalars(select(HistoricalSale).order_by(HistoricalSale.date.desc()))
+    )
+    by_key: dict[tuple[str, str], list[HistoricalSale]] = {}
+    for h in history_rows:
+        by_key.setdefault((h.sku, h.store_id), []).append(h)
+    for key, hs in by_key.items():
+        sample = hs[:30]
+        revenue_weight[key] = sum(h.price * h.units_sold for h in sample)
+
+    # Bucket each action
+    buckets: dict[str, dict] = {
+        policy: {
+            "policy": policy,
+            "target_pct": MARGIN_TARGETS_BY_POLICY[policy],
+            "weighted_margin_sum": 0.0,
+            "weight_sum": 0.0,
+            "n_skus": 0,
+            "n_with_cost": 0,
+            "revenue_estimate": 0.0,
+        }
+        for policy in MARGIN_TARGETS_BY_POLICY
+    }
+
+    for (_sku, _store), action in latest.items():
+        if action.is_kvi:
+            policy = "kvi"
+        elif action.is_perishable:
+            policy = "perishable"
+        else:
+            policy = "standard"
+
+        bucket = buckets[policy]
+        bucket["n_skus"] += 1
+
+        cost = costs.get(action.sku)
+        if cost is None or cost <= 0 or action.approved_price <= 0:
+            # Counts toward SKU population but not margin math
+            continue
+
+        bucket["n_with_cost"] += 1
+        margin_pct = (action.approved_price - cost) / action.approved_price
+        weight = revenue_weight.get((action.sku, action.store_id)) or action.approved_price
+        bucket["weighted_margin_sum"] += margin_pct * weight
+        bucket["weight_sum"] += weight
+        bucket["revenue_estimate"] += weight
+
+    # Finalize per-bucket rollup
+    near_pp = MARGIN_TARGET_DEFAULTS["near_band_pp"] / 100
+    at_pp = MARGIN_TARGET_DEFAULTS["at_band_pp"] / 100
+
+    def _status(gap: float) -> str:
+        if gap >= 0:
+            return "above" if gap > at_pp else "at"
+        ag = abs(gap)
+        if ag <= at_pp:
+            return "at"
+        if ag <= near_pp:
+            return "near"
+        return "below"
+
+    categories: list[dict] = []
+    portfolio_weighted_sum = 0.0
+    portfolio_weight = 0.0
+    portfolio_revenue = 0.0
+    total_skus = 0
+    for policy, b in buckets.items():
+        current_pct = (b["weighted_margin_sum"] / b["weight_sum"]) if b["weight_sum"] > 0 else None
+        gap_pct = (current_pct - b["target_pct"]) if current_pct is not None else None
+        status = _status(gap_pct) if gap_pct is not None else "no_data"
+
+        categories.append({
+            "policy": policy,
+            "label": _policy_label(policy),
+            "target_pct": b["target_pct"],
+            "current_pct": current_pct,
+            "gap_pct": gap_pct,
+            "n_skus": b["n_skus"],
+            "n_with_cost": b["n_with_cost"],
+            "revenue_estimate": round(b["revenue_estimate"], 2),
+            "status": status,
+        })
+
+        if current_pct is not None and b["weight_sum"] > 0:
+            portfolio_weighted_sum += b["weighted_margin_sum"]
+            portfolio_weight += b["weight_sum"]
+            portfolio_revenue += b["revenue_estimate"]
+        total_skus += b["n_skus"]
+
+    # Sort: below-target first (most urgent), then near, then at/above
+    status_rank = {"below": 0, "near": 1, "at": 2, "above": 3, "no_data": 4}
+    categories.sort(key=lambda c: (status_rank.get(c["status"], 99), c["policy"]))
+
+    # Portfolio target = revenue-weighted blend of category targets
+    portfolio_target = 0.0
+    if portfolio_revenue > 0:
+        portfolio_target = sum(
+            (c["revenue_estimate"] / portfolio_revenue) * c["target_pct"]
+            for c in categories
+            if c["current_pct"] is not None
+        )
+
+    portfolio_current = (portfolio_weighted_sum / portfolio_weight) if portfolio_weight > 0 else None
+    portfolio_gap = (
+        portfolio_current - portfolio_target
+        if portfolio_current is not None and portfolio_target > 0
+        else None
+    )
+
+    return {
+        "categories": categories,
+        "portfolio": {
+            "target_pct": portfolio_target if portfolio_target > 0 else None,
+            "current_pct": portfolio_current,
+            "gap_pct": portfolio_gap,
+            "n_skus": total_skus,
+            "revenue_estimate": round(portfolio_revenue, 2),
+            "status": _status(portfolio_gap) if portfolio_gap is not None else "no_data",
+        },
+        "bands": {
+            "at_pp": MARGIN_TARGET_DEFAULTS["at_band_pp"],
+            "near_pp": MARGIN_TARGET_DEFAULTS["near_band_pp"],
+        },
+    }
+
+
+def _policy_label(policy: str) -> str:
+    return {
+        "kvi": "KVI traffic-drivers",
+        "perishable": "Perishables",
+        "standard": "Standard catalog",
+    }.get(policy, policy.title())
+
+
+def _empty_margin_payload() -> dict:
+    return {
+        "categories": [
+            {
+                "policy": p,
+                "label": _policy_label(p),
+                "target_pct": MARGIN_TARGETS_BY_POLICY[p],
+                "current_pct": None,
+                "gap_pct": None,
+                "n_skus": 0,
+                "n_with_cost": 0,
+                "revenue_estimate": 0.0,
+                "status": "no_data",
+            }
+            for p in MARGIN_TARGETS_BY_POLICY
+        ],
+        "portfolio": {
+            "target_pct": None,
+            "current_pct": None,
+            "gap_pct": None,
+            "n_skus": 0,
+            "revenue_estimate": 0.0,
+            "status": "no_data",
+        },
+        "bands": {
+            "at_pp": MARGIN_TARGET_DEFAULTS["at_band_pp"],
+            "near_pp": MARGIN_TARGET_DEFAULTS["near_band_pp"],
+        },
+    }
+
+
+@router.get("/kvi-watchlist")
+def kvi_watchlist(db: Session = Depends(get_db)) -> dict:
+    """Every KVI-flagged price action with its competitor reference and gap.
+
+    KVI = Key Value Item. Retailers fight for shopper loyalty on a handful
+    of traffic-driver SKUs (eggs, milk, OJ, hot dogs) where price perception
+    matters more than per-unit margin. Surfacing them as a dedicated panel
+    makes that strategic lens explicit instead of buried as a per-row flag.
+
+    For each KVI action we return:
+      • current approved price (truth from the latest PriceAction)
+      • competitor reference + source (most recent observation via the
+        product graph)
+      • absolute and signed gap vs the competitor
+      • a tolerance band breach flag (anything outside ±1.5% trips the lock)
+      • the latest non-superseded recommendation, if one exists, so the
+        watchlist can dual-purpose as a triage queue
+
+    Sorted by absolute gap descending — the SKUs furthest off-strategy
+    bubble to the top.
+    """
+    KVI_TOLERANCE_PCT = 1.5  # mirrors KVI_COMPETITOR_TOLERANCE in pipeline
+
+    # Latest PriceAction per SKU·store, KVI only
+    # Group is per (sku, store_id); we pick the row with the highest id.
+    actions = list(
+        db.scalars(
+            select(PriceAction)
+            .where(PriceAction.is_kvi == True)  # noqa: E712
+            .order_by(PriceAction.id.desc())
+        )
+    )
+
+    # Dedup to latest per (sku, store)
+    latest: dict[tuple[str, str], PriceAction] = {}
+    for a in actions:
+        key = (a.sku, a.store_id)
+        if key not in latest:
+            latest[key] = a
+
+    if not latest:
+        return {
+            "tolerance_pct": KVI_TOLERANCE_PCT,
+            "items": [],
+            "summary": {
+                "total": 0,
+                "within_band": 0,
+                "above_band": 0,
+                "below_band": 0,
+                "max_abs_gap_pct": 0.0,
+            },
+        }
+
+    # Latest non-superseded rec per (sku, store)
+    rec_rows = list(
+        db.scalars(
+            select(PricingRecommendation)
+            .where(PricingRecommendation.superseded_by.is_(None))
+            .order_by(desc(PricingRecommendation.created_at))
+        )
+    )
+    rec_by_key: dict[tuple[str, str], PricingRecommendation] = {}
+    for r in rec_rows:
+        key = (r.sku, r.store_id)
+        if key not in rec_by_key:
+            rec_by_key[key] = r
+
+    items: list[dict] = []
+    for (sku, store_id), action in latest.items():
+        entity = product_graph.get_entity_for_sku(db, sku)
+        competitor_price: float | None = None
+        competitor_source: str | None = None
+        if entity:
+            observations = product_graph.get_competitor_prices_for_entity(db, entity.id)
+            if observations:
+                latest_obs = max(observations, key=lambda o: o.observed_at)
+                competitor_price = latest_obs.price
+                from app.models import CompetitorProduct
+                cp = db.scalar(
+                    select(CompetitorProduct).where(CompetitorProduct.id == latest_obs.competitor_product_id)
+                )
+                competitor_source = cp.source_id if cp else None
+
+        gap_dollar: float | None = None
+        gap_pct: float | None = None
+        band: str = "no_competitor"
+        if competitor_price and competitor_price > 0:
+            gap_dollar = round(action.approved_price - competitor_price, 4)
+            gap_pct = round((action.approved_price - competitor_price) / competitor_price * 100, 2)
+            if abs(gap_pct) <= KVI_TOLERANCE_PCT:
+                band = "within"
+            elif gap_pct > 0:
+                band = "above"
+            else:
+                band = "below"
+
+        rec = rec_by_key.get((sku, store_id))
+        rec_block: dict | None = None
+        if rec is not None and abs(rec.recommended_price - rec.current_price) >= 0.005:
+            rec_block = {
+                "id": rec.id,
+                "recommended_price": rec.recommended_price,
+                "change_pct": round(
+                    (rec.recommended_price - rec.current_price) / rec.current_price * 100, 2
+                ) if rec.current_price else 0,
+                "applied": rec.applied,
+                "applied_to_scenario_id": rec.applied_to_scenario_id,
+            }
+
+        items.append({
+            "sku": sku,
+            "store_id": store_id,
+            "product_name": action.product_name,
+            "current_price": action.approved_price,
+            "prior_price": action.prior_price,
+            "competitor_price": competitor_price,
+            "competitor_source": competitor_source,
+            "gap_dollar": gap_dollar,
+            "gap_pct": gap_pct,
+            "abs_gap_pct": abs(gap_pct) if gap_pct is not None else None,
+            "band": band,
+            "recommendation": rec_block,
+        })
+
+    # Sort by absolute gap descending. Items with no competitor reference
+    # sink to the bottom, since we have nothing to act on.
+    items.sort(
+        key=lambda it: (
+            it["abs_gap_pct"] is None,
+            -(it["abs_gap_pct"] or 0.0),
+            it["sku"],
+        )
+    )
+
+    within = sum(1 for it in items if it["band"] == "within")
+    above = sum(1 for it in items if it["band"] == "above")
+    below = sum(1 for it in items if it["band"] == "below")
+    max_abs = max((it["abs_gap_pct"] or 0.0) for it in items) if items else 0.0
+
+    return {
+        "tolerance_pct": KVI_TOLERANCE_PCT,
+        "items": items,
+        "summary": {
+            "total": len(items),
+            "within_band": within,
+            "above_band": above,
+            "below_band": below,
+            "max_abs_gap_pct": round(max_abs, 2),
         },
     }
 

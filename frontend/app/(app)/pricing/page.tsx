@@ -45,6 +45,8 @@ import { money } from "@/lib/format";
 import { ListSkeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
 import { WhatIfSimulator } from "@/components/pricing/WhatIfSimulator";
+import { KviWatchlist } from "@/components/pricing/KviWatchlist";
+import { MarginTargetPanel } from "@/components/pricing/MarginTargetPanel";
 
 type Recommendation = {
   id: string;
@@ -268,6 +270,12 @@ export default function PricingPage() {
           />
         </div>
       )}
+
+      {/* Margin target policy rollup */}
+      <MarginTargetPanel reloadKey={reloadKey} />
+
+      {/* KVI watchlist — traffic-driver alignment */}
+      <KviWatchlist reloadKey={reloadKey} />
 
       {/* Recommendations table */}
       <section className="glass rounded-2xl p-5">
