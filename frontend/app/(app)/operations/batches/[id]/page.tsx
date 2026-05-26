@@ -16,9 +16,16 @@ import { useLive } from "@/lib/useLive";
 import { money } from "@/lib/format";
 import { StatusPill } from "@/components/StatusPill";
 import { DetailSkeleton } from "@/components/Skeleton";
+import { CellHistoryDrawer } from "@/components/batches/CellHistoryDrawer";
 import type { BatchDetail, ChannelView } from "@/lib/types";
 
-function Cell({ c }: { c: ChannelView | undefined }) {
+function Cell({
+  c,
+  onClick,
+}: {
+  c: ChannelView | undefined;
+  onClick?: () => void;
+}) {
   if (!c) return <td className="px-4 py-3 text-slate-600">—</td>;
   const cls =
     c.status === "verified"
@@ -34,14 +41,28 @@ function Cell({ c }: { c: ChannelView | undefined }) {
     timeout: "No ack",
     pending: "Pending",
   }[c.status];
+  const isInteractive = !!onClick;
   return (
-    <td className="px-4 py-3">
-      <div className={clsx("font-semibold tabular-nums", cls)}>
-        {c.status === "timeout"
-          ? money(c.expected_price)
-          : money(c.observed_price ?? c.expected_price)}
-      </div>
-      <div className={clsx("text-[11px]", cls)}>{label}</div>
+    <td className="px-2 py-2">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!isInteractive}
+        title={isInteractive ? "Open delivery history" : undefined}
+        className={clsx(
+          "w-full rounded-lg px-2 py-2 text-left transition",
+          isInteractive
+            ? "cursor-pointer hover:bg-white/[0.04] hover:ring-1 hover:ring-white/15 focus:outline-none focus-visible:bg-white/[0.04] focus-visible:ring-1 focus-visible:ring-brand/50"
+            : "cursor-default",
+        )}
+      >
+        <div className={clsx("font-semibold tabular-nums", cls)}>
+          {c.status === "timeout"
+            ? money(c.expected_price)
+            : money(c.observed_price ?? c.expected_price)}
+        </div>
+        <div className={clsx("text-[11px]", cls)}>{label}</div>
+      </button>
     </td>
   );
 }
@@ -57,6 +78,12 @@ export default function BatchPage({ params }: { params: { id: string } }) {
   const [expanding, setExpanding] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  // Cell-history drawer state — populated when a user clicks any matrix cell
+  const [selectedCell, setSelectedCell] = useState<{
+    actionId: string;
+    channel: "pos" | "esl" | "ecommerce";
+  } | null>(null);
 
   // Default to grouped-by-store when there are >= 12 actions
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
@@ -200,12 +227,17 @@ export default function BatchPage({ params }: { params: { id: string } }) {
       {/* Verification matrix with search + grouping for large batches */}
       <div className="glass-strong overflow-hidden rounded-2xl">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
-          <h2 className="text-sm font-semibold text-white">
-            Verification Matrix
-            <span className="ml-2 font-normal text-slate-500">
-              · {filteredActions.length} of {b.actions.length}
-            </span>
-          </h2>
+          <div>
+            <h2 className="text-sm font-semibold text-white">
+              Verification Matrix
+              <span className="ml-2 font-normal text-slate-500">
+                · {filteredActions.length} of {b.actions.length}
+              </span>
+            </h2>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              Click any channel cell to open its full delivery history.
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
@@ -262,12 +294,20 @@ export default function BatchPage({ params }: { params: { id: string } }) {
                     {rows.length} action{rows.length === 1 ? "" : "s"}
                   </span>
                 </div>
-                <MatrixRows rows={rows} ch={ch} />
+                <MatrixRows
+                  rows={rows}
+                  ch={ch}
+                  onCellClick={(actionId, channel) => setSelectedCell({ actionId, channel })}
+                />
               </div>
             ))}
           </div>
         ) : (
-          <MatrixRows rows={filteredActions} ch={ch} />
+          <MatrixRows
+            rows={filteredActions}
+            ch={ch}
+            onCellClick={(actionId, channel) => setSelectedCell({ actionId, channel })}
+          />
         )}
       </div>
 
@@ -282,6 +322,15 @@ export default function BatchPage({ params }: { params: { id: string } }) {
           View engineering trace <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
+
+      {/* Side drawer with full delivery history for the clicked cell */}
+      <CellHistoryDrawer
+        externalId={id}
+        actionId={selectedCell?.actionId ?? null}
+        channel={selectedCell?.channel ?? null}
+        isOpen={!!selectedCell}
+        onClose={() => setSelectedCell(null)}
+      />
     </div>
   );
 }
@@ -289,12 +338,14 @@ export default function BatchPage({ params }: { params: { id: string } }) {
 function MatrixRows({
   rows,
   ch,
+  onCellClick,
 }: {
   rows: BatchDetail["actions"];
   ch: (
     a: BatchDetail["actions"][number],
     name: string,
   ) => ChannelView | undefined;
+  onCellClick?: (actionId: string, channel: "pos" | "esl" | "ecommerce") => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -322,9 +373,9 @@ function MatrixRows({
                 </div>
               </td>
               <td className="px-4 py-3 text-slate-300">{a.store_id}</td>
-              <Cell c={ch(a, "pos")} />
-              <Cell c={ch(a, "esl")} />
-              <Cell c={ch(a, "ecommerce")} />
+              <Cell c={ch(a, "pos")} onClick={onCellClick ? () => onCellClick(a.id, "pos") : undefined} />
+              <Cell c={ch(a, "esl")} onClick={onCellClick ? () => onCellClick(a.id, "esl") : undefined} />
+              <Cell c={ch(a, "ecommerce")} onClick={onCellClick ? () => onCellClick(a.id, "ecommerce") : undefined} />
               <td className="px-4 py-3">
                 <StatusPill value={a.decision} />
               </td>

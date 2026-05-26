@@ -48,6 +48,43 @@ export const api = {
   batches: () => get<BatchSummary[]>(`/api/v1/batches`),
   batch: (externalId: string) => get<BatchDetail>(`/api/v1/batches/${externalId}`),
   batchAudit: (externalId: string) => get<unknown[]>(`/api/v1/batches/${externalId}/audit`),
+  channelHistory: (externalId: string, actionId: string, channel: "pos" | "esl" | "ecommerce") =>
+    get<{
+      action: {
+        id: string;
+        sku: string;
+        product_name: string;
+        store_id: string;
+        approved_price: number;
+        prior_price: number;
+        reason: string;
+        decision: string;
+      };
+      channel: string;
+      delivery: {
+        id: string;
+        status: string;
+        attempts: number;
+        created_at: string | null;
+        updated_at: string | null;
+      } | null;
+      receipt: {
+        id: string;
+        status: string;
+        expected_price: number;
+        observed_price: number | null;
+        received_at: string | null;
+        raw_payload_json: Record<string, unknown>;
+      } | null;
+      audit_events: Array<{
+        id: string;
+        event: string;
+        detail: string;
+        actor: string;
+        created_at: string | null;
+      }>;
+      note?: string;
+    }>(`/api/v1/batches/${encodeURIComponent(externalId)}/actions/${encodeURIComponent(actionId)}/channels/${channel}/history`),
   expand: (externalId: string) => post<BatchSummary>(`/api/v1/batches/${externalId}/expand`),
   incidents: () => get<IncidentView[]>(`/api/v1/incidents`),
   incident: (id: string) => get<IncidentView>(`/api/v1/incidents/${id}`),
