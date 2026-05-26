@@ -334,6 +334,35 @@ export const api = {
         observed_at: string;
       }>;
     }>(`/api/v1/product-graph/sku/${encodeURIComponent(sku)}/competitor-prices`),
+  pricingWhatIfFit: (sku: string, storeId: string) =>
+    get<{
+      sku: string;
+      store_id: string;
+      product_name: string;
+      current_price: number;
+      prior_price: number;
+      cost: number | null;
+      competitor_price: number | null;
+      competitor_source: string | null;
+      is_kvi: boolean;
+      is_perishable: boolean;
+      days_to_deadline: number | null;
+      elasticity: {
+        beta: number;
+        intercept: number;
+        beta_se: number;
+        beta_ci_low: number;
+        beta_ci_high: number;
+        r_squared: number;
+        n_observations: number;
+        sufficient_data: boolean;
+        is_elastic: boolean;
+        is_inelastic: boolean;
+        is_statistically_significant: boolean;
+        notes: string[];
+      };
+      observed_price_range: { min: number; max: number; mean: number };
+    }>(`/api/v1/pricing/sku/${encodeURIComponent(sku)}/what-if-fit?store_id=${encodeURIComponent(storeId)}`),
   pricingSuggestForSku: (sku: string, storeId?: string) =>
     get<{
       sku: string;

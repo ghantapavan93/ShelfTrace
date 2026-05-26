@@ -44,6 +44,7 @@ import { useLive } from "@/lib/useLive";
 import { money } from "@/lib/format";
 import { ListSkeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
+import { WhatIfSimulator } from "@/components/pricing/WhatIfSimulator";
 
 type Recommendation = {
   id: string;
@@ -392,6 +393,7 @@ function RecommendationRow({
   const isIncrease = rec.recommended_price > rec.current_price;
   const Arrow = isIncrease ? TrendingUp : TrendingDown;
   const dollarChange = rec.recommended_price - rec.current_price;
+  const [whatIfOpen, setWhatIfOpen] = useState(false);
 
   return (
     <div
@@ -610,6 +612,32 @@ function RecommendationRow({
                 >
                   <Rocket className="h-3 w-3" /> Apply to ShelfTrace
                 </button>
+              )}
+            </div>
+
+            {/* What-if interactive simulator — drag a price, watch units,
+                revenue, profit and constraints update live without any
+                additional API calls. */}
+            <div className="mt-3">
+              {!whatIfOpen ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setWhatIfOpen(true);
+                  }}
+                  className="group inline-flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/[.06] px-3 py-2 text-[11px] font-semibold text-violet-200 transition hover:bg-violet-500/[.12]"
+                >
+                  <Sparkles className="h-3 w-3 transition group-hover:rotate-12" />
+                  Open interactive what-if simulator
+                </button>
+              ) : (
+                <WhatIfSimulator
+                  sku={rec.sku}
+                  storeId={rec.store_id}
+                  recommendedPrice={rec.recommended_price}
+                  onClose={() => setWhatIfOpen(false)}
+                />
               )}
             </div>
           </motion.div>

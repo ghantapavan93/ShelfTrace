@@ -15,12 +15,16 @@ from app.database import get_db
 from app.models import (
     ExternalSignal,
     HistoricalSale,
+    PriceAction,
     PricingRecommendation,
     ProductCost,
 )
+from app.pricing.elasticity import estimate_elasticity
+from app.pricing.models import HistoricalObservation
 from app.pricing.pipeline import run_pricing_engine
 from app.pricing.seed import seed_history
 from app.security import Identity, require_operator
+from app.services import product_graph
 
 router = APIRouter(prefix="/api/v1/pricing", tags=["pricing"])
 
@@ -243,6 +247,127 @@ def suggest_for_sku(
         "sku": sku,
         "store_id": store_id,
         "recommendation": _rec_dict(rec),
+    }
+
+
+@router.get("/sku/{sku}/what-if-fit")
+def get_what_if_fit(
+    sku: str,
+    store_id: str = Query(..., description="Required: store the what-if simulates against"),
+    db: Session = Depends(get_db),
+):
+    """One-shot fetch of the inputs the client needs to run a live what-if
+    price simulation against a SKU·store. Returns the fitted elasticity
+    (so the client can predict units at any price), the constraint inputs
+    (cost, competitor, KVI/perishable flags), and the observed price range
+    so the UI can flag candidate prices outside the model's reliable zone.
+
+    The frontend uses this to render an interactive slider with instant
+    feedback — no per-keystroke API round-trip.
+    """
+    # Latest PriceAction = source of truth for the current/approved price
+    action = db.scalar(
+        select(PriceAction)
+        .where(PriceAction.sku == sku)
+        .where(PriceAction.store_id == store_id)
+        .order_by(PriceAction.id.desc())
+    )
+    if action is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No price action found for {sku} at store {store_id}",
+        )
+
+    # Cost catalog (optional — engine produces a less-actionable result without it)
+    cost_row = db.scalar(select(ProductCost).where(ProductCost.sku == sku))
+    cost = cost_row.cost if cost_row else None
+
+    # Historical sales → fit elasticity in-process
+    history_rows = list(
+        db.scalars(
+            select(HistoricalSale)
+            .where(HistoricalSale.sku == sku)
+            .where(HistoricalSale.store_id == store_id)
+            .order_by(HistoricalSale.date.asc())
+        )
+    )
+    observations = [
+        HistoricalObservation(
+            date=row.date.date() if hasattr(row.date, "date") else row.date,
+            price=row.price,
+            units_sold=row.units_sold,
+            on_promotion=row.on_promotion,
+        )
+        for row in history_rows
+    ]
+    fit = estimate_elasticity(observations, exclude_promotions=True)
+
+    # Observed price range — used to widen confidence band outside this zone
+    clean_prices = [obs.price for obs in observations if not obs.on_promotion]
+    if clean_prices:
+        observed_min = min(clean_prices)
+        observed_max = max(clean_prices)
+        observed_mean = sum(clean_prices) / len(clean_prices)
+    else:
+        observed_min = observed_max = observed_mean = action.approved_price
+
+    # Competitor reference via the knowledge graph (most recent observation in zone)
+    entity = product_graph.get_entity_for_sku(db, sku)
+    competitor_price: float | None = None
+    competitor_source: str | None = None
+    if entity:
+        observations_for_entity = product_graph.get_competitor_prices_for_entity(db, entity.id)
+        if observations_for_entity:
+            latest = max(observations_for_entity, key=lambda o: o.observed_at)
+            competitor_price = latest.price
+            # cp_<id> → source lookup
+            from app.models import CompetitorProduct
+            cp = db.scalar(
+                select(CompetitorProduct).where(CompetitorProduct.id == latest.competitor_product_id)
+            )
+            competitor_source = cp.source_id if cp else None
+
+    # Days to deadline (perishable only)
+    from datetime import datetime, timezone
+    days_to_deadline: int | None = None
+    if action.markdown_deadline is not None:
+        now = datetime.now(timezone.utc)
+        deadline = action.markdown_deadline
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        days_to_deadline = (deadline - now).days
+
+    return {
+        "sku": sku,
+        "store_id": store_id,
+        "product_name": action.product_name,
+        "current_price": action.approved_price,
+        "prior_price": action.prior_price,
+        "cost": cost,
+        "competitor_price": competitor_price,
+        "competitor_source": competitor_source,
+        "is_kvi": action.is_kvi,
+        "is_perishable": action.is_perishable,
+        "days_to_deadline": days_to_deadline,
+        "elasticity": {
+            "beta": fit.beta,
+            "intercept": fit.intercept,
+            "beta_se": fit.beta_se,
+            "beta_ci_low": fit.beta_ci_low,
+            "beta_ci_high": fit.beta_ci_high,
+            "r_squared": fit.r_squared,
+            "n_observations": fit.n_observations,
+            "sufficient_data": fit.sufficient_data,
+            "is_elastic": fit.is_elastic,
+            "is_inelastic": fit.is_inelastic,
+            "is_statistically_significant": fit.is_statistically_significant,
+            "notes": fit.notes,
+        },
+        "observed_price_range": {
+            "min": observed_min,
+            "max": observed_max,
+            "mean": observed_mean,
+        },
     }
 
 
