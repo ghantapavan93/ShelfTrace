@@ -13,7 +13,7 @@ import {
   Network,
   GitBranch,
   RotateCcw,
-  ChevronDown,
+  ArrowUpRight,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -132,16 +132,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="text-slate-300">{status?.label ?? "Checking rollout status…"}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 rounded-xl px-1 py-1">
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-violetglow to-brand text-xs font-bold text-white">
-              AD
+          {/* Author signature chip — replaces the Avery Davis placeholder.
+              Confidence-not-desperation tone aligned to the BetterBasket
+              founders' builder voice (Vagelis + Leon from the YC launch). */}
+          <a
+            href="https://www.linkedin.com/in/pavan-kalyan-ghanta/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Shipped solo in 2 weeks. 170+ PostgreSQL-backed tests. Open to BetterBasket — let's build."
+            className="group relative flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition hover:bg-white/[.05] focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400/40"
+          >
+            <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violetglow to-brand text-xs font-bold text-white">
+              PG
+              {/* Tiny availability pulse — matches the "Live" dot elsewhere */}
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-ink-900">
+                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
+              </span>
             </span>
-            <span className="leading-tight">
-              <span className="block text-sm font-medium text-white">Avery Davis</span>
-              <span className="block text-[11px] text-slate-500">Operations Lead</span>
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-sm font-medium text-white">Pavan Kalyan Ghanta</span>
+              <span className="block truncate text-[11px] text-slate-400 transition group-hover:text-orange-300">
+                Built ShelfTrace · reliability for grocery pricing
+              </span>
             </span>
-            <ChevronDown className="ml-auto h-4 w-4 text-slate-500" />
-          </div>
+            <ArrowUpRight className="ml-auto h-4 w-4 shrink-0 text-slate-500 transition group-hover:text-orange-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </a>
         </div>
       </aside>
 
