@@ -102,3 +102,76 @@ def test_mode_endpoint_returns_demo_mode():
     assert body["tone"] in ("violet", "rose")
     assert "description" in body
     assert "details" in body
+
+
+def test_bootstrap_from_scenario_creates_entities_and_observations(db):
+    """The killer demo feature: upload a CSV with brand-new SKUs, click
+    'Bootstrap graph', and the hint pills populate with synthetic competitor
+    data immediately. This test locks in that flow."""
+    client = TestClient(app)
+    payload = {
+        "actions": [
+            {"sku": "my-coffee-12oz", "product_name": "Premium Coffee 12oz", "approved_price": 8.99},
+            {"sku": "my-bread-loaf", "product_name": "Artisan Bread Loaf", "approved_price": 5.49},
+        ],
+        "zone_id": "Texas North",
+    }
+    result = client.post("/api/v1/product-graph/bootstrap-from-scenario", json=payload)
+    assert result.status_code == 201
+    body = result.json()
+    assert body["bootstrapped_entities"] == 2
+    assert body["competitor_observations_created"] == 4  # 2 sources × 2 SKUs
+    assert body["skipped_already_linked"] == 0
+
+    # Verify competitor prices show up for one of the SKUs
+    look = client.get("/api/v1/product-graph/sku/my-coffee-12oz/competitor-prices")
+    assert look.status_code == 200
+    obs = look.json()["observations"]
+    assert len(obs) == 2
+    sources = {o["source_id"] for o in obs}
+    assert sources == {"whole_foods_demo", "amazon_fresh_demo"}
+    # Prices should be ±5% / ±2% of 8.99
+    wf_obs = next(o for o in obs if o["source_id"] == "whole_foods_demo")
+    af_obs = next(o for o in obs if o["source_id"] == "amazon_fresh_demo")
+    assert abs(wf_obs["price"] - 8.99 * 1.05) < 0.01
+    assert abs(af_obs["price"] - 8.99 * 0.98) < 0.01
+
+
+def test_bootstrap_is_idempotent(db):
+    """Calling bootstrap twice with same SKUs should skip the second time."""
+    client = TestClient(app)
+    payload = {"actions": [{"sku": "dup-test", "product_name": "Test Item", "approved_price": 5.00}]}
+    first = client.post("/api/v1/product-graph/bootstrap-from-scenario", json=payload)
+    assert first.status_code == 201
+    assert first.json()["bootstrapped_entities"] == 1
+
+    second = client.post("/api/v1/product-graph/bootstrap-from-scenario", json=payload)
+    assert second.status_code == 201
+    body = second.json()
+    assert body["bootstrapped_entities"] == 0
+    assert body["skipped_already_linked"] == 1
+
+
+def test_bootstrap_rejects_invalid_input(db):
+    """Missing fields should skip the row, not crash."""
+    client = TestClient(app)
+    payload = {
+        "actions": [
+            {"sku": "", "product_name": "No SKU", "approved_price": 5.00},
+            {"sku": "valid-sku", "product_name": "", "approved_price": 5.00},
+            {"sku": "neg-price", "product_name": "Negative", "approved_price": -1.00},
+            {"sku": "good-one", "product_name": "Good Product", "approved_price": 5.00},
+        ],
+    }
+    result = client.post("/api/v1/product-graph/bootstrap-from-scenario", json=payload)
+    assert result.status_code == 201
+    body = result.json()
+    assert body["bootstrapped_entities"] == 1
+    assert body["skipped_invalid_input"] == 3
+
+
+def test_bootstrap_requires_actions_list(db):
+    """Empty payload returns 422."""
+    client = TestClient(app)
+    result = client.post("/api/v1/product-graph/bootstrap-from-scenario", json={})
+    assert result.status_code == 422

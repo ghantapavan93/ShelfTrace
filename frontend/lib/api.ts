@@ -289,6 +289,17 @@ export const api = {
     post<{ matched_count: number; skipped_count: number; min_score: number }>(
       `/api/v1/product-graph/bulk-match?min_score=${minScore}`,
     ),
+  graphBootstrapFromScenario: (actions: Array<{ sku: string; product_name: string; approved_price: number; category?: string }>, zoneId?: string) =>
+    post<{
+      bootstrapped_entities: number;
+      skipped_already_linked: number;
+      skipped_invalid_input: number;
+      competitor_observations_created: number;
+      note: string;
+    }>(`/api/v1/product-graph/bootstrap-from-scenario`, {
+      actions,
+      zone_id: zoneId,
+    }),
   graphCompetitorPricesForSku: (sku: string) =>
     get<{
       sku: string;

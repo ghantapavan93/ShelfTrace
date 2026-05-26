@@ -216,6 +216,134 @@ def trigger_bulk_match(min_score: float = Query(0.70, ge=0.0, le=1.0), db: Sessi
     }
 
 
+@router.post("/bootstrap-from-scenario", status_code=201)
+def bootstrap_from_scenario(body: dict, db: Session = Depends(get_db)) -> dict:
+    """Auto-create entities + synthetic competitor observations for each SKU in
+    a scenario's action list.
+
+    Accepts: {"actions": [{"sku": "...", "product_name": "...",
+                            "approved_price": 4.19, "category": "..." (optional)}, ...],
+              "zone_id": "..." (optional)}
+
+    For each unknown SKU:
+      1. Create a ProductEntity with canonical_title = product_name
+      2. Link the SKU to the entity (SKUProductLink, zone-scoped if provided)
+      3. Create 2 synthetic CompetitorProduct rows (whole_foods_demo +
+         amazon_fresh_demo) priced at ±5% of approved_price
+      4. Link competitors → entity (CompetitorProductEntity)
+      5. Persist CompetitorPriceObservation rows so the hints populate
+
+    Idempotent: SKUs already linked to an entity are skipped.
+    """
+    actions = body.get("actions") or []
+    zone_id = body.get("zone_id") or None
+    if not isinstance(actions, list) or not actions:
+        raise HTTPException(status_code=422, detail="actions list is required")
+
+    now = utcnow()
+    bootstrapped = 0
+    skipped_existing = 0
+    skipped_invalid = 0
+    created_observations = 0
+
+    for action in actions:
+        sku = (action.get("sku") or "").strip()
+        product_name = (action.get("product_name") or "").strip()
+        approved_price = action.get("approved_price")
+        category_name = action.get("category")
+
+        if not sku or not product_name or not approved_price or approved_price <= 0:
+            skipped_invalid += 1
+            continue
+
+        # Skip if already linked
+        existing_link = db.scalar(
+            select(SKUProductLink).where(SKUProductLink.sku == sku)
+        )
+        if existing_link:
+            skipped_existing += 1
+            continue
+
+        # Resolve/create category
+        category_id = None
+        if category_name:
+            cat = product_graph.find_or_create_category(db, category_name)
+            db.flush()
+            category_id = cat.id
+
+        # Create entity
+        entity = product_graph.create_product_entity(
+            db=db,
+            canonical_title=product_name,
+            category_id=category_id,
+            brand=None,
+            attributes={"bootstrapped_from_scenario": True},
+            is_manual=False,
+        )
+
+        # Link SKU
+        product_graph.link_sku_to_entity(db, sku, entity.id, zone_id=zone_id)
+
+        # Synthetic competitor observations at ±5% of approved_price
+        # whole_foods_demo: +5% (premium)
+        # amazon_fresh_demo: -2% (slightly cheaper)
+        for source_id, delta_pct in (("whole_foods_demo", 5.0), ("amazon_fresh_demo", -2.0)):
+            price = round(approved_price * (1 + delta_pct / 100), 2)
+            cp_id = f"cp_{uuid.uuid4().hex[:12]}"
+            ext_id = f"{source_id}_{sku[:32]}"
+            cp = CompetitorProduct(
+                id=cp_id,
+                source_id=source_id,
+                external_id=ext_id,
+                stable_key=f"{source_id}:{ext_id}",
+                title=product_name,
+                price=price,
+                currency="USD",
+                category=category_name,
+                availability="in_stock",
+                raw_attributes={"bootstrapped": True},
+            )
+            db.add(cp)
+
+            cpe = CompetitorProductEntity(
+                id=f"cpe_{uuid.uuid4().hex[:12]}",
+                competitor_product_id=cp_id,
+                entity_id=entity.id,
+                match_score=1.0,
+            )
+            db.add(cpe)
+
+            obs = CompetitorPriceObservation(
+                id=f"obs_{uuid.uuid4().hex[:12]}",
+                competitor_product_id=cp_id,
+                entity_id=entity.id,
+                price=price,
+                currency="USD",
+                zone_id=zone_id,
+                store_id=None,
+                observed_at=now,
+                delta_pct=delta_pct,
+            )
+            db.add(obs)
+            created_observations += 1
+
+        bootstrapped += 1
+
+    db.commit()
+
+    return {
+        "bootstrapped_entities": bootstrapped,
+        "skipped_already_linked": skipped_existing,
+        "skipped_invalid_input": skipped_invalid,
+        "competitor_observations_created": created_observations,
+        "note": (
+            f"Created {bootstrapped} canonical entities with synthetic competitor "
+            f"observations (whole_foods_demo +5%, amazon_fresh_demo -2%). "
+            "Refresh the scenario page to see hint pills populate."
+        ),
+    }
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Demo seed — populate the graph with Memorial Day demo entities so the
 # UI has something to show right after first boot.

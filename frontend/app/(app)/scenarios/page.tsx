@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Plus, Trash2, FlaskConical, ShieldCheck, Rocket, Download, Copy, Pencil, Lock } from "lucide-react";
+import { Plus, Trash2, FlaskConical, ShieldCheck, Rocket, Download, Copy, Pencil, Lock, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { ScenariosBulkPanel } from "@/components/ScenariosBulkPanel";
 import { ScenarioActionHints } from "@/components/ScenarioActionHints";
@@ -45,6 +45,7 @@ export default function ScenarioBuilder() {
   const [busy, setBusy] = useState<string | null>(null);
   const [saved, setSaved] = useState<Scenario[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<Scenario | null>(null);
+  const [hintRefreshToken, setHintRefreshToken] = useState(0);
   const { toast } = useToast();
 
   async function refreshList() {
@@ -330,9 +331,51 @@ export default function ScenarioBuilder() {
 
       {/* Price actions */}
       <section className="glass rounded-2xl p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Price actions</h2>
-          <button onClick={() => setActions([...actions, emptyAction()])} className="flex items-center gap-1 text-xs text-brand-400 hover:underline"><Plus className="h-3.5 w-3.5" /> Add product</button>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Price actions</h2>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              {actions.filter((a) => a.sku && a.product_name).length} configured · hint pills show competitor + pricing intel per SKU
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={async () => {
+                const validActions = actions.filter((a) => a.sku && a.product_name && Number(a.approved_price) > 0);
+                if (validActions.length === 0) {
+                  toast.error("Need at least one valid action (SKU + product_name + approved_price > 0).");
+                  return;
+                }
+                setBusy("bootstrap");
+                try {
+                  const res = await api.graphBootstrapFromScenario(
+                    validActions.map((a) => ({
+                      sku: a.sku,
+                      product_name: a.product_name,
+                      approved_price: Number(a.approved_price),
+                    })),
+                    zone || undefined,
+                  );
+                  toast.success(
+                    `${res.bootstrapped_entities} entit${res.bootstrapped_entities === 1 ? "y" : "ies"} created · ${res.competitor_observations_created} competitor observations · ${res.skipped_already_linked} skipped (already linked).`,
+                  );
+                  // Bump the refresh token so ScenarioActionHints refetches
+                  setHintRefreshToken((t) => t + 1);
+                } catch (e) {
+                  toast.error(`Bootstrap failed: ${(e as Error).message}`);
+                } finally {
+                  setBusy(null);
+                }
+              }}
+              disabled={busy !== null || actions.filter((a) => a.sku && a.product_name).length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-50"
+              title="Auto-create knowledge graph entities + synthetic competitor observations for each SKU in this scenario. After this, the hint pills below will populate with competitor + pricing data."
+            >
+              <Sparkles className={clsx("h-3.5 w-3.5", busy === "bootstrap" && "animate-pulse")} />
+              {busy === "bootstrap" ? "Bootstrapping…" : "Bootstrap graph for these SKUs"}
+            </button>
+            <button onClick={() => setActions([...actions, emptyAction()])} className="flex items-center gap-1 text-xs text-brand-400 hover:underline"><Plus className="h-3.5 w-3.5" /> Add product</button>
+          </div>
         </div>
         <div className="space-y-3">
           {actions.map((a, i) => (
@@ -351,6 +394,7 @@ export default function ScenarioBuilder() {
                 <ScenarioActionHints
                   sku={a.sku}
                   currentApprovedPrice={Number(a.approved_price) || 0}
+                  refreshToken={hintRefreshToken}
                   onUseCompetitor={(price, source) => {
                     setActions(actions.map((x, j) => j === i ? { ...x, approved_price: price, reason: `Match competitor ${source}` } : x));
                   }}

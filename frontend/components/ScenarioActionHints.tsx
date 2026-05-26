@@ -24,6 +24,9 @@ import { money } from "@/lib/format";
 interface Props {
   sku: string;
   currentApprovedPrice: number;
+  /** Bump this number after a bootstrap/seed action to force the hints to refetch
+   *  even when the SKU itself hasn't changed. */
+  refreshToken?: number;
   onUseCompetitor?: (price: number, source: string) => void;
   onUseRecommendation?: (price: number) => void;
 }
@@ -44,6 +47,7 @@ type PricingRec = {
 export function ScenarioActionHints({
   sku,
   currentApprovedPrice,
+  refreshToken = 0,
   onUseCompetitor,
   onUseRecommendation,
 }: Props) {
@@ -98,7 +102,7 @@ export function ScenarioActionHints({
     return () => {
       alive = false;
     };
-  }, [sku]);
+  }, [sku, refreshToken]);
 
   if (!sku || sku.trim() === "") return null;
 
