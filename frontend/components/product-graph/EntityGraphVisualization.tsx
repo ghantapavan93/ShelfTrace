@@ -35,9 +35,9 @@
  */
 
 import { useMemo, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
-import { Layers } from "lucide-react";
+import { Layers, Check, X as XIcon } from "lucide-react";
 import { EASE } from "@/lib/motion";
 import { money } from "@/lib/format";
 
@@ -46,14 +46,26 @@ interface SKU {
   zone_id: string | null;
 }
 
+interface MatchSignals {
+  title_sim: number | null;
+  brand_match: boolean | null;
+  unit_size_match: boolean | null;
+  category_match: boolean | null;
+}
+
 interface CompetitorObservation {
   source: string;             // really the competitor_product_id; we group by inferred source
+  source_id?: string | null;
+  competitor_title?: string | null;
+  competitor_category?: string | null;
   price: number;
   currency: string;
   zone_id: string | null;
   store_id: string | null;
   observed_at: string;
   delta_pct: number | null;
+  match_score?: number | null;
+  match_signals?: MatchSignals;
 }
 
 interface Props {
@@ -62,6 +74,7 @@ interface Props {
     brand: string | null;
     unit_size: string | null;
     is_manual: boolean;
+    category_name?: string | null;
   };
   linkedSkus: SKU[];
   competitorObservations: CompetitorObservation[];
@@ -123,6 +136,42 @@ export function EntityGraphVisualization({ entity, linkedSkus, competitorObserva
 
   const isEmpty = linkedSkus.length === 0 && sources.length === 0;
 
+  // Build a lookup of hover-ids → tooltip payload. The same id keys both
+  // the satellite node and its edge, so hovering either reveals the
+  // match-reason card. We position tooltips at the satellite's pixel
+  // location (the data-rich end of the edge) and let the card overflow
+  // toward the center.
+  const tooltipById = useMemo(() => {
+    const map: Record<
+      string,
+      {
+        kind: "sku" | "competitor";
+        x: number; // svg-space anchor x
+        y: number; // svg-space anchor y
+        side: "left" | "right";
+        sku?: SKU;
+        observation?: CompetitorObservation;
+      }
+    > = {};
+    linkedSkus.forEach((sku, i) => {
+      const id = `sku-${sku.sku}-${sku.zone_id ?? "all"}`;
+      map[id] = { kind: "sku", x: LEFT_X, y: skuPositions[i], side: "left", sku };
+    });
+    sources.forEach((src, i) => {
+      const id = `src-${src.source}`;
+      map[id] = {
+        kind: "competitor",
+        x: RIGHT_X,
+        y: sourcePositions[i],
+        side: "right",
+        observation: src,
+      };
+    });
+    return map;
+  }, [linkedSkus, sources, skuPositions, sourcePositions]);
+
+  const hoveredTooltip = hovered ? tooltipById[hovered] : null;
+
   return (
     <div className="rounded-2xl border border-violet-500/20 bg-[#0a0a14]/60 p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -137,6 +186,7 @@ export function EntityGraphVisualization({ entity, linkedSkus, competitorObserva
         </div>
       </div>
 
+      <div className="relative">
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="h-auto w-full"
@@ -288,6 +338,230 @@ export function EntityGraphVisualization({ entity, linkedSkus, competitorObserva
           </g>
         )}
       </svg>
+
+      {/* HTML overlay: match-reason tooltip card. Positioned in viewBox-%
+          space so it tracks the SVG at any width. Pointer-events disabled
+          so it never interferes with hover. */}
+      <AnimatePresence>
+        {hoveredTooltip && (
+          <MatchReasonCard
+            key={hovered}
+            tooltip={hoveredTooltip}
+            entity={entity}
+            reduced={reduced}
+          />
+        )}
+      </AnimatePresence>
+      </div>
+
+      {/* Hint copy — discoverable without being intrusive */}
+      {!isEmpty && (
+        <p className="mt-2 text-[10px] text-slate-600">
+          Hover any satellite to see the match signals that produced its link.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Match-reason tooltip card
+// ────────────────────────────────────────────────────────────────────────
+
+function MatchReasonCard({
+  tooltip,
+  entity,
+  reduced,
+}: {
+  tooltip: {
+    kind: "sku" | "competitor";
+    x: number;
+    y: number;
+    side: "left" | "right";
+    sku?: SKU;
+    observation?: CompetitorObservation;
+  };
+  entity: Props["entity"];
+  reduced: boolean;
+}) {
+  // Convert SVG coords → percentage of the wrapper. The card sits just
+  // inside the satellite, pointing toward the center.
+  const left = (tooltip.x / WIDTH) * 100;
+  const top = (tooltip.y / HEIGHT) * 100;
+  const placement = tooltip.side === "left" ? "left" : "right";
+
+  // Build the body
+  let body: React.ReactNode = null;
+
+  if (tooltip.kind === "sku" && tooltip.sku) {
+    body = (
+      <SkuReasonBody sku={tooltip.sku} />
+    );
+  } else if (tooltip.kind === "competitor" && tooltip.observation) {
+    body = (
+      <CompetitorReasonBody
+        observation={tooltip.observation}
+        entityTitle={entity.canonical_title}
+      />
+    );
+  }
+
+  return (
+    <motion.div
+      initial={reduced ? false : { opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={reduced ? { opacity: 0 } : { opacity: 0, y: -2 }}
+      transition={reduced ? { duration: 0 } : { duration: 0.12, ease: EASE.outQuart }}
+      className={clsx(
+        "pointer-events-none absolute z-10 w-[270px] rounded-xl border border-white/10 bg-[#0a0e18]/95 p-3 shadow-2xl backdrop-blur-sm",
+        placement === "left" ? "translate-x-4" : "-translate-x-[calc(100%+1rem)]",
+      )}
+      style={{
+        left: `${left}%`,
+        top: `${top}%`,
+        marginTop: "-2.5rem",
+      }}
+    >
+      {body}
+    </motion.div>
+  );
+}
+
+function SkuReasonBody({ sku }: { sku: SKU }) {
+  return (
+    <>
+      <div className="mb-1 flex items-center gap-2">
+        <span className="text-[9px] font-semibold uppercase tracking-[.22em] text-orange-300">
+          Internal SKU link
+        </span>
+      </div>
+      <div className="mono text-[11px] text-white">{sku.sku}</div>
+      <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
+        <SignalRow label="Link type" value="Explicit" yes />
+        <SignalRow label="Zone scope" value={sku.zone_id ?? "all zones"} yes />
+      </div>
+      <div className="mt-2 border-t border-white/5 pt-2 text-[10px] leading-relaxed text-slate-500">
+        SKU&nbsp;→&nbsp;entity links are exact registrations — no fuzzy
+        matching. Owned by the merchandising taxonomy.
+      </div>
+    </>
+  );
+}
+
+function CompetitorReasonBody({
+  observation,
+  entityTitle,
+}: {
+  observation: CompetitorObservation;
+  entityTitle: string;
+}) {
+  const sig = observation.match_signals;
+  const titleSimPct = sig?.title_sim != null ? Math.round(sig.title_sim * 100) : null;
+  const overallPct =
+    observation.match_score != null
+      ? Math.round(observation.match_score * 100)
+      : titleSimPct;
+
+  return (
+    <>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-[9px] font-semibold uppercase tracking-[.22em] text-emerald-300">
+          Match reason
+        </span>
+        {overallPct != null && (
+          <span className="mono rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-200">
+            {overallPct}% match
+          </span>
+        )}
+      </div>
+
+      <div className="text-[11px] text-white truncate" title={observation.competitor_title ?? observation.source}>
+        {observation.competitor_title ?? observation.source}
+      </div>
+      <div className="mt-0.5 text-[9px] text-slate-500 truncate">
+        vs <span className="text-slate-400">{entityTitle}</span>
+      </div>
+
+      <div className="mt-2 space-y-1 text-[10px]">
+        {titleSimPct != null && (
+          <SignalRow
+            label="Title similarity"
+            value={`${titleSimPct}%`}
+            yes={titleSimPct >= 70}
+            partial={titleSimPct >= 50 && titleSimPct < 70}
+          />
+        )}
+        <SignalRow
+          label="Brand"
+          value={sig?.brand_match ? "matched" : "—"}
+          yes={!!sig?.brand_match}
+        />
+        <SignalRow
+          label="Unit size"
+          value={sig?.unit_size_match ? "matched" : "—"}
+          yes={!!sig?.unit_size_match}
+        />
+        <SignalRow
+          label="Category"
+          value={sig?.category_match ? "matched" : "—"}
+          yes={!!sig?.category_match}
+        />
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/5 pt-2 text-[10px]">
+        <span className="text-slate-500">
+          {observation.source_id ?? "competitor"}
+        </span>
+        <span className="mono tabular-nums text-slate-300">
+          {money(observation.price)}
+          {observation.delta_pct != null && (
+            <span
+              className={clsx(
+                "ml-1.5",
+                observation.delta_pct > 0 ? "text-rose-300" : "text-emerald-300",
+              )}
+            >
+              {observation.delta_pct > 0 ? "+" : ""}
+              {observation.delta_pct.toFixed(1)}%
+            </span>
+          )}
+        </span>
+      </div>
+    </>
+  );
+}
+
+function SignalRow({
+  label,
+  value,
+  yes,
+  partial,
+}: {
+  label: string;
+  value: string;
+  yes?: boolean;
+  partial?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="flex items-center gap-1 text-slate-500">
+        {yes ? (
+          <Check className="h-2.5 w-2.5 text-emerald-400" />
+        ) : partial ? (
+          <Check className="h-2.5 w-2.5 text-amber-400" />
+        ) : (
+          <XIcon className="h-2.5 w-2.5 text-slate-600" />
+        )}
+        {label}
+      </span>
+      <span
+        className={clsx(
+          "mono text-[10px]",
+          yes ? "text-emerald-200" : partial ? "text-amber-200" : "text-slate-500",
+        )}
+      >
+        {value}
+      </span>
     </div>
   );
 }

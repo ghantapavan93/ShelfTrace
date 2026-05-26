@@ -96,7 +96,14 @@ def list_entities(
 
 @router.get("/entities/{entity_id}")
 def get_entity(entity_id: str, db: Session = Depends(get_db)) -> dict:
-    """Get a single entity and all linked SKUs + competitor products."""
+    """Get a single entity and all linked SKUs + competitor products.
+
+    Each competitor observation is enriched with the per-signal match
+    breakdown the matcher used to link the competitor product to this
+    entity — title similarity, brand match, unit-size match, category
+    match — so the UI can show "why did we trust this match?" without
+    a second roundtrip.
+    """
     entity = db.scalar(select(ProductEntity).where(ProductEntity.id == entity_id))
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
@@ -105,9 +112,67 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)) -> dict:
     sku_links = db.scalars(select(SKUProductLink).where(SKUProductLink.entity_id == entity_id)).all()
 
     # Get competitor price observations
-    price_obs = db.scalars(
-        select(CompetitorPriceObservation).where(CompetitorPriceObservation.entity_id == entity_id)
-    ).all()
+    price_obs = list(
+        db.scalars(
+            select(CompetitorPriceObservation).where(CompetitorPriceObservation.entity_id == entity_id)
+        )
+    )
+
+    # Bulk-fetch competitor products + their entity-match scores so we can
+    # explain each edge. One query per join, not one per observation.
+    cp_ids = list({obs.competitor_product_id for obs in price_obs})
+    cp_by_id: dict[str, CompetitorProduct] = {}
+    cpe_by_cp_id: dict[str, CompetitorProductEntity] = {}
+    if cp_ids:
+        for cp in db.scalars(select(CompetitorProduct).where(CompetitorProduct.id.in_(cp_ids))):
+            cp_by_id[cp.id] = cp
+        cpe_rows = db.scalars(
+            select(CompetitorProductEntity)
+            .where(CompetitorProductEntity.competitor_product_id.in_(cp_ids))
+            .where(CompetitorProductEntity.entity_id == entity_id)
+        )
+        for cpe in cpe_rows:
+            cpe_by_cp_id[cpe.competitor_product_id] = cpe
+
+    # Category name for category-match comparison
+    entity_category_name: str | None = None
+    if entity.category_id:
+        cat = db.scalar(select(ProductCategory).where(ProductCategory.id == entity.category_id))
+        entity_category_name = cat.name if cat else None
+
+    def _explain(cp: CompetitorProduct | None) -> dict:
+        """Per-signal breakdown — same factors the matcher weighs."""
+        if cp is None:
+            return {
+                "title_sim": None,
+                "brand_match": None,
+                "unit_size_match": None,
+                "category_match": None,
+            }
+        title_sim = product_graph.title_similarity(
+            entity_matcher.normalize_title(cp.title),
+            entity_matcher.normalize_title(entity.canonical_title),
+        )
+        brand_match = bool(entity.brand and cp.title and entity.brand.lower() in cp.title.lower())
+        unit_size_match = bool(
+            entity.unit_size
+            and cp.title
+            and _unit_size_in_title(entity.unit_size, cp.title)
+        )
+        category_match = bool(
+            entity_category_name
+            and cp.category
+            and (
+                entity_category_name.lower() in cp.category.lower()
+                or cp.category.lower() in entity_category_name.lower()
+            )
+        )
+        return {
+            "title_sim": round(title_sim, 3),
+            "brand_match": brand_match,
+            "unit_size_match": unit_size_match,
+            "category_match": category_match,
+        }
 
     return {
         "entity": {
@@ -117,6 +182,7 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)) -> dict:
             "manufacturer": entity.manufacturer,
             "upc": entity.upc,
             "category_id": entity.category_id,
+            "category_name": entity_category_name,
             "unit_size": entity.unit_size,
             "attributes": entity.attributes,
             "match_confidence": entity.match_confidence,
@@ -128,21 +194,136 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)) -> dict:
                 "sku": link.sku,
                 "zone_id": link.zone_id,
                 "linked_at": link.linked_at.isoformat(),
+                "current_price": _latest_action_price_for_sku(db, link.sku),
             }
             for link in sku_links
         ],
         "competitor_observations": [
             {
                 "source": obs.competitor_product_id,
+                "source_id": (cp_by_id.get(obs.competitor_product_id).source_id
+                              if cp_by_id.get(obs.competitor_product_id) else None),
+                "competitor_title": (cp_by_id.get(obs.competitor_product_id).title
+                                     if cp_by_id.get(obs.competitor_product_id) else None),
+                "competitor_category": (cp_by_id.get(obs.competitor_product_id).category
+                                        if cp_by_id.get(obs.competitor_product_id) else None),
                 "price": obs.price,
                 "currency": obs.currency,
                 "zone_id": obs.zone_id,
                 "store_id": obs.store_id,
                 "observed_at": obs.observed_at.isoformat(),
                 "delta_pct": obs.delta_pct,
+                "match_score": (cpe_by_cp_id.get(obs.competitor_product_id).match_score
+                                if cpe_by_cp_id.get(obs.competitor_product_id) else None),
+                "match_signals": _explain(cp_by_id.get(obs.competitor_product_id)),
             }
             for obs in price_obs
         ],
+    }
+
+
+def _latest_action_price_for_sku(db: Session, sku: str) -> float | None:
+    """Latest approved price across all stores for this SKU, or None."""
+    from app.models import PriceAction
+    row = db.scalar(
+        select(PriceAction)
+        .where(PriceAction.sku == sku)
+        .order_by(PriceAction.id.desc())
+    )
+    return row.approved_price if row else None
+
+
+def _unit_size_in_title(unit_size: str, title: str) -> bool:
+    """True if the entity's unit-size token (e.g. '12-count', '1 lb', '52 oz')
+    appears in the competitor title in a tolerant form. We compare lowercased
+    tokens and treat hyphens/spaces as interchangeable so '12-count' matches
+    '12 count' or '12ct'."""
+    if not unit_size or not title:
+        return False
+    t = title.lower()
+    u = unit_size.lower().replace("-", " ").strip()
+    if u in t:
+        return True
+    # Compact form: '12 count' → '12ct', '1 lb' → '1lb'
+    compact = u.replace(" ", "")
+    if compact in t.replace(" ", "").replace("-", ""):
+        return True
+    # First numeric token of the unit size (e.g. '12') alongside a keyword
+    parts = u.split()
+    if parts and parts[0].isdigit() and parts[0] in t:
+        keyword = parts[1] if len(parts) > 1 else ""
+        if keyword and (keyword in t or keyword[:2] in t):
+            return True
+    return False
+
+
+@router.get("/entities/{entity_id}/substitutes")
+def get_substitutes(entity_id: str, db: Session = Depends(get_db)) -> dict:
+    """Find products that compete with or complement this entity.
+
+    Calls the cannibalization heuristic: products in the same (or adjacent)
+    category with non-zero estimated cross-elasticity. Positive cross-
+    elasticity → substitute (raising A's price lifts B's demand); negative
+    → complement (often purchased together). Returns ranked by absolute
+    magnitude so the strongest relationships surface first.
+
+    Real systems use learned embeddings on basket co-purchase data; this
+    is a heuristic that produces a usable ranking from the price-history
+    we already collect.
+    """
+    from app.pricing.cannibalization import find_substitute_products
+
+    entity = db.scalar(select(ProductEntity).where(ProductEntity.id == entity_id))
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    subs = find_substitute_products(db, entity_id, same_category_only=False)
+
+    # Pre-fetch category names so the UI can render "Dairy & Eggs" not "cat_42"
+    cat_ids = {s.category_id for s in subs if s.category_id} | (
+        {entity.category_id} if entity.category_id else set()
+    )
+    cat_names: dict[str, str] = {}
+    if cat_ids:
+        for c in db.scalars(select(ProductCategory).where(ProductCategory.id.in_(cat_ids))):
+            cat_names[c.id] = c.name
+
+    def _kind(xelast: float) -> str:
+        if xelast > 0.15:
+            return "substitute"
+        if xelast < -0.15:
+            return "complement"
+        if xelast > 0.05:
+            return "weak_substitute"
+        if xelast < -0.05:
+            return "weak_complement"
+        return "unrelated"
+
+    return {
+        "entity": {
+            "id": entity.id,
+            "canonical_title": entity.canonical_title,
+            "category_id": entity.category_id,
+            "category_name": cat_names.get(entity.category_id) if entity.category_id else None,
+        },
+        "substitutes": [
+            {
+                "entity_id": s.entity_id,
+                "canonical_title": s.canonical_title,
+                "category_id": s.category_id,
+                "category_name": cat_names.get(s.category_id) if s.category_id else None,
+                "estimated_cross_elasticity": round(s.estimated_cross_elasticity, 3),
+                "confidence": round(s.confidence, 2),
+                "kind": _kind(s.estimated_cross_elasticity),
+                "same_category": s.category_id == entity.category_id,
+            }
+            for s in subs
+        ],
+        "note": (
+            "Cross-elasticity is estimated from co-movement in price history. "
+            "|ε| > 0.15 is treated as a strong relationship. Real-world systems "
+            "augment this with basket co-purchase signals and learned embeddings."
+        ),
     }
 
 

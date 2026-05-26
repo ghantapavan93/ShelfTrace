@@ -42,6 +42,8 @@ import { money } from "@/lib/format";
 import { ListSkeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
 import { EntityGraphVisualization } from "@/components/product-graph/EntityGraphVisualization";
+import { SubstitutesPanel } from "@/components/product-graph/SubstitutesPanel";
+import { TierLadder } from "@/components/product-graph/TierLadder";
 
 type EntitySummary = {
   id: string;
@@ -67,21 +69,37 @@ type EntityDetail = {
     manufacturer: string | null;
     upc: string | null;
     category_id: string | null;
+    category_name?: string | null;
     unit_size: string | null;
     attributes: Record<string, unknown>;
     match_confidence: number;
     is_manual: boolean;
     created_at: string;
   };
-  linked_skus: Array<{ sku: string; zone_id: string | null; linked_at: string }>;
+  linked_skus: Array<{
+    sku: string;
+    zone_id: string | null;
+    linked_at: string;
+    current_price?: number | null;
+  }>;
   competitor_observations: Array<{
     source: string;
+    source_id?: string | null;
+    competitor_title?: string | null;
+    competitor_category?: string | null;
     price: number;
     currency: string;
     zone_id: string | null;
     store_id: string | null;
     observed_at: string;
     delta_pct: number | null;
+    match_score?: number | null;
+    match_signals?: {
+      title_sim: number | null;
+      brand_match: boolean | null;
+      unit_size_match: boolean | null;
+      category_match: boolean | null;
+    };
   }>;
 };
 
@@ -504,6 +522,7 @@ function EntityDetailCard({ detail }: { detail: EntityDetail }) {
             brand: entity.brand,
             unit_size: entity.unit_size,
             is_manual: entity.is_manual,
+            category_name: entity.category_name ?? null,
           }}
           linkedSkus={linked_skus}
           competitorObservations={competitor_observations}
@@ -587,6 +606,20 @@ function EntityDetailCard({ detail }: { detail: EntityDetail }) {
             })}
           </ul>
         )}
+      </div>
+
+      {/* Good · Better · Best tier ladder for this canonical product */}
+      <div className="mt-5">
+        <TierLadder
+          entityTitle={entity.canonical_title}
+          linkedSkus={linked_skus}
+          competitorObservations={competitor_observations}
+        />
+      </div>
+
+      {/* Substitutes & complements — cross-elasticity neighbours */}
+      <div className="mt-5">
+        <SubstitutesPanel entityId={entity.id} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/5 pt-4">
