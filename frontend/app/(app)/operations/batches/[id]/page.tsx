@@ -236,6 +236,7 @@ export default function BatchPage({ params }: { params: { id: string } }) {
             </h2>
             <p className="mt-0.5 text-[11px] text-slate-500">
               Click any channel cell to open its full delivery history.
+              <span className="ml-2 md:hidden">Swipe horizontally to see all channels.</span>
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

@@ -172,13 +172,60 @@ function OperationsContent() {
     }
   }
 
-  if (error)
+  if (error) {
+    // Distinguish "no batch yet" (the friendly cold-start case) from a
+    // genuine API failure. The backend returns 404 when no live batch
+    // exists — that should read as a CTA, not an error.
+    const looksLikeColdStart =
+      /->\s*404/.test(error) || /not.*found/i.test(error);
+    if (looksLikeColdStart) {
+      return (
+        <div className="space-y-4">
+          <div className="glass-strong rounded-3xl border border-violet-500/25 bg-gradient-to-br from-violet-500/[.04] via-ink-900 to-black p-7 sm:p-10">
+            <div className="flex items-start gap-4">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-violet-500/30 bg-violet-500/10 text-violet-200">
+                <FlaskConical className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[.22em] text-violet-300">
+                  No batch yet
+                </div>
+                <h2 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
+                  This is where your live rollout will land.
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm text-slate-400">
+                  The Operations command center watches an approved price batch as it travels
+                  through canary stores, reconciles every channel, and surfaces incidents
+                  the moment a shopper-facing system disagrees. Start a scenario to populate it.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Link
+                    href="/scenarios"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110"
+                  >
+                    Build a scenario
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/vision/keynote"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                  >
+                    Watch the keynote
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="glass rounded-2xl p-6 text-sm text-slate-300">
         Could not reach the API at <span className="mono text-brand-400">{api.base}</span>. Is the backend running?
         <div className="mt-1 text-xs text-slate-500">{error}</div>
       </div>
     );
+  }
   if (!data) return <OperationsSkeleton coldStart={coldStartHint} />;
 
   const b = data.batch;
