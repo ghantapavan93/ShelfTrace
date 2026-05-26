@@ -232,6 +232,7 @@ export interface BulkImportPreviewResponse {
   summary: { total: number; valid: number; invalid: number };
   payload_errors: string[];
   rows: BulkImportRowView[];
+  blank_rows_skipped: number;
 }
 
 export interface EngineeringTrace {

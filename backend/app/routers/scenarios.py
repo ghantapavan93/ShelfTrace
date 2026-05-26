@@ -147,6 +147,7 @@ def import_preview(payload: BulkImportRequest):
         format=result.format,
         summary=result.summary,
         payload_errors=result.payload_errors,
+        blank_rows_skipped=result.blank_rows_skipped,
         rows=[
             BulkImportRowView(
                 row_number=r.row_number,

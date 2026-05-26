@@ -53,6 +53,7 @@ class ImportPreview:
     rows: list[ImportRow]
     summary: dict[str, int]
     payload_errors: list[str] = field(default_factory=list)
+    blank_rows_skipped: int = 0  # count of fully-empty rows quietly dropped
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -73,16 +74,23 @@ def preview(format_: ImportFormat, content: str) -> ImportPreview:
         )
         return ImportPreview(format_, [], _summary([], 0), payload_errors)
 
+    blank_skipped = 0
     if format_ == "json":
         rows = _parse_json(content, payload_errors)
     elif format_ == "tsv":
-        rows = _parse_delimited(content, "\t", payload_errors)
+        rows, blank_skipped = _parse_delimited(content, "\t", payload_errors)
     else:
-        rows = _parse_delimited(content, ",", payload_errors)
+        rows, blank_skipped = _parse_delimited(content, ",", payload_errors)
 
     _mark_duplicate_skus(rows)
 
-    return ImportPreview(format_, rows, _summary(rows, len(rows)), payload_errors)
+    return ImportPreview(
+        format_,
+        rows,
+        _summary(rows, len(rows)),
+        payload_errors,
+        blank_rows_skipped=blank_skipped,
+    )
 
 
 def _mark_duplicate_skus(rows: list[ImportRow]) -> None:
@@ -159,17 +167,17 @@ def _parse_delimited(
     content: str,
     delimiter: str,
     payload_errors: list[str],
-) -> list[ImportRow]:
+) -> tuple[list[ImportRow], int]:
     reader = csv.reader(io.StringIO(content), delimiter=delimiter)
     try:
         all_rows = list(reader)
     except csv.Error as exc:
         payload_errors.append(f"CSV parse error: {exc}")
-        return []
+        return [], 0
 
     if not all_rows:
         payload_errors.append("No rows found.")
-        return []
+        return [], 0
 
     # Header detection: looks for "sku" or "product_name" or "price" in row 0.
     header_candidates = [c.strip().lower() for c in all_rows[0]]
@@ -194,15 +202,18 @@ def _parse_delimited(
         data_rows = data_rows[:MAX_ROWS]
 
     rows: list[ImportRow] = []
+    blank_skipped = 0
     base_offset = 2 if has_header else 1  # 1-indexed; row 1 is header if present
     for offset, raw in enumerate(data_rows):
         row_no = base_offset + offset - (1 if has_header else 0)
         if not raw or all(not (c or "").strip() for c in raw):
-            # Skip empty lines silently
+            # Track skipped blank rows so the UI can surface them in the summary;
+            # don't error on them (Excel exports often have trailing blanks).
+            blank_skipped += 1
             continue
         record = _zip_record(headers, raw)
         rows.append(_validate_row(row_no, record))
-    return rows
+    return rows, blank_skipped
 
 
 def _normalize_header(header: str) -> str:

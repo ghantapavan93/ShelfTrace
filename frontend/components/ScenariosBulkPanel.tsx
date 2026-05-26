@@ -220,6 +220,7 @@ export function ScenariosBulkPanel({
     rows: BulkImportRowView[];
     summary: { total: number; valid: number; invalid: number };
     payload_errors: string[];
+    blank_rows_skipped?: number;
   } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [validationSource, setValidationSource] = useState<"server" | null>(null);
@@ -286,6 +287,7 @@ export function ScenariosBulkPanel({
         rows: res.rows,
         summary: res.summary,
         payload_errors: res.payload_errors,
+        blank_rows_skipped: res.blank_rows_skipped,
       });
       setValidationSource("server");
     } catch (err) {
@@ -587,6 +589,11 @@ export function ScenariosBulkPanel({
                       <span className="font-semibold text-emerald-300">{validCount} valid</span>
                       {invalidCount > 0 && (
                         <> · <span className="font-semibold text-rose-300">{invalidCount} invalid</span></>
+                      )}
+                      {(preview?.blank_rows_skipped ?? 0) > 0 && (
+                        <> · <span className="font-semibold text-slate-400" title="Fully-blank rows are quietly dropped — common with Excel exports that have trailing empty rows.">
+                          {preview!.blank_rows_skipped} blank skipped
+                        </span></>
                       )}
                     </span>
                   )}

@@ -257,6 +257,7 @@ class BulkImportPreviewResponse(BaseModel):
     summary: dict[str, int]
     payload_errors: list[str] = []
     rows: list[BulkImportRowView]
+    blank_rows_skipped: int = 0
 
 
 class ScenarioIn(BaseModel):

@@ -218,3 +218,38 @@ def test_empty_sku_not_treated_as_duplicate():
         assert row.valid is False
         assert any("sku is required" in e for e in row.errors)
         assert not any("duplicate sku" in e.lower() for e in row.errors)
+
+
+def test_blank_rows_are_skipped_and_counted():
+    """Fully-empty rows shouldn't fail validation (Excel exports often have
+    trailing blanks), but they SHOULD be surfaced in the summary so users
+    aren't surprised by a missing row count."""
+    csv_data = (
+        "sku,product_name,prior_price,approved_price\n"
+        "eggs,Eggs,3.99,4.19\n"
+        ",,,\n"
+        "milk,Milk,5.99,4.99\n"
+        ",,,\n"
+        ",,,\n"
+    )
+    result = bulk_import.preview("csv", csv_data)
+    assert result.summary["total"] == 2  # 2 real rows
+    assert result.summary["valid"] == 2
+    assert result.blank_rows_skipped == 3  # 3 blank rows dropped
+    assert result.payload_errors == []
+
+
+def test_partial_blank_row_with_only_prices_fails_validation():
+    """A row that has prices but no SKU and no product_name should fail
+    validation, not be silently skipped. Two errors expected."""
+    csv_data = (
+        "sku,product_name,prior_price,approved_price\n"
+        ",,5.99,4.99\n"
+    )
+    result = bulk_import.preview("csv", csv_data)
+    assert result.summary["total"] == 1
+    assert result.summary["invalid"] == 1
+    assert result.blank_rows_skipped == 0  # this row WAS NOT blank
+    row = result.rows[0]
+    assert any("sku is required" in e for e in row.errors)
+    assert any("product_name is required" in e for e in row.errors)
