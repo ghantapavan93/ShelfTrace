@@ -41,6 +41,7 @@ import { useLive } from "@/lib/useLive";
 import { money } from "@/lib/format";
 import { ListSkeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
+import { EntityGraphVisualization } from "@/components/product-graph/EntityGraphVisualization";
 
 type EntitySummary = {
   id: string;
@@ -492,6 +493,21 @@ function EntityDetailCard({ detail }: { detail: EntityDetail }) {
     <div className="glass-strong rounded-2xl border border-violet-500/25 p-5">
       <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-violet-300">
         <Network className="h-4 w-4" /> Entity detail
+      </div>
+
+      {/* Cross-source graph visualization — shows how this canonical entity
+          unifies internal SKUs (left) with competitor sources (right). */}
+      <div className="mb-5">
+        <EntityGraphVisualization
+          entity={{
+            canonical_title: entity.canonical_title,
+            brand: entity.brand,
+            unit_size: entity.unit_size,
+            is_manual: entity.is_manual,
+          }}
+          linkedSkus={linked_skus}
+          competitorObservations={competitor_observations}
+        />
       </div>
 
       {/* Metadata grid */}
