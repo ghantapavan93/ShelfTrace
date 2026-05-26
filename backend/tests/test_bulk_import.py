@@ -143,3 +143,78 @@ def test_json_payload_must_be_an_array():
     result = bulk_import.preview("json", '{"sku": "x"}')
     assert result.rows == []
     assert any("array of objects" in e.lower() for e in result.payload_errors)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Preview must catch what runtime catches — caught at the wrong layer
+# is worse than not caught at all, because reviewers think the row is fine
+# and then crash on Run.
+# ──────────────────────────────────────────────────────────────────────
+def test_zero_approved_price_is_invalid_at_preview():
+    """approved_price = 0 must fail preview, not pass and crash later at Run.
+    Mirrors validate_scenario in services/scenarios.py which requires > 0."""
+    csv_data = (
+        "sku,product_name,prior_price,approved_price\n"
+        "zero-test,Zero Price Item,1.99,0\n"
+    )
+    result = bulk_import.preview("csv", csv_data)
+    assert result.summary["invalid"] == 1
+    row = result.rows[0]
+    assert row.valid is False
+    assert any("approved_price must be > 0" in e for e in row.errors)
+
+
+def test_negative_approved_price_is_invalid():
+    csv_data = (
+        "sku,product_name,prior_price,approved_price\n"
+        "neg-test,Negative Price,2.99,-1.00\n"
+    )
+    result = bulk_import.preview("csv", csv_data)
+    assert result.summary["invalid"] == 1
+    assert any("approved_price must be > 0" in e for e in result.rows[0].errors)
+
+
+def test_duplicate_sku_marks_second_row_invalid():
+    """Two rows with the same SKU would create an ambiguous batch.
+    The first stays valid, the second is flagged so the user knows to fix it."""
+    csv_data = (
+        "sku,product_name,prior_price,approved_price\n"
+        "milk-1gal,Original Milk,6.49,5.99\n"
+        "milk-1gal,Duplicate Milk,6.49,5.99\n"
+    )
+    result = bulk_import.preview("csv", csv_data)
+    assert result.summary["total"] == 2
+    assert result.summary["valid"] == 1
+    assert result.summary["invalid"] == 1
+    assert result.rows[0].valid is True
+    assert result.rows[1].valid is False
+    assert any("duplicate sku" in e.lower() for e in result.rows[1].errors)
+
+
+def test_three_duplicates_only_first_passes():
+    """N copies of the same SKU → 1 valid, N-1 flagged."""
+    csv_data = (
+        "sku,product_name,prior_price,approved_price\n"
+        "dup,A,1,1\n"
+        "dup,B,1,1\n"
+        "dup,C,1,1\n"
+    )
+    result = bulk_import.preview("csv", csv_data)
+    assert result.summary["valid"] == 1
+    assert result.summary["invalid"] == 2
+
+
+def test_empty_sku_not_treated_as_duplicate():
+    """Missing-SKU rows are already invalid for the empty-sku reason;
+    they should not also be marked as duplicates of each other (which
+    would be confusing — the real fix is to add SKUs)."""
+    csv_data = (
+        "sku,product_name,prior_price,approved_price\n"
+        ",First Missing,1,1\n"
+        ",Second Missing,1,1\n"
+    )
+    result = bulk_import.preview("csv", csv_data)
+    for row in result.rows:
+        assert row.valid is False
+        assert any("sku is required" in e for e in row.errors)
+        assert not any("duplicate sku" in e.lower() for e in row.errors)

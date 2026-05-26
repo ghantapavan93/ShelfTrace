@@ -80,7 +80,29 @@ def preview(format_: ImportFormat, content: str) -> ImportPreview:
     else:
         rows = _parse_delimited(content, ",", payload_errors)
 
+    _mark_duplicate_skus(rows)
+
     return ImportPreview(format_, rows, _summary(rows, len(rows)), payload_errors)
+
+
+def _mark_duplicate_skus(rows: list[ImportRow]) -> None:
+    """Cross-row check: if the same non-empty SKU appears more than once,
+    mark every duplicate occurrence as invalid. The first occurrence stays
+    valid (so the user can still apply the canonical row). Without this,
+    two rows with the same SKU would create an ambiguous batch — second
+    write wins, silently."""
+    seen: dict[str, int] = {}
+    for row in rows:
+        if not row.sku:
+            continue
+        prev_count = seen.get(row.sku, 0)
+        if prev_count >= 1:
+            row.valid = False
+            row.errors.append(
+                f"duplicate sku — '{row.sku}' already appeared in this payload; "
+                "remove or rename one of the duplicates",
+            )
+        seen[row.sku] = prev_count + 1
 
 
 def _summary(rows: list[ImportRow], total: int) -> dict[str, int]:
@@ -236,8 +258,10 @@ def _validate_row(row_no: int, record: dict[str, Any]) -> ImportRow:
 
     if prior is not None and prior < 0:
         errors.append("prior_price must be ≥ 0")
-    if approved is not None and approved < 0:
-        errors.append("approved_price must be ≥ 0")
+    if approved is not None and approved <= 0:
+        # Matches scenario runtime validation (approved must be strictly > 0).
+        # Catching here avoids a confusing crash at Run time.
+        errors.append("approved_price must be > 0")
     if prior is not None and approved is not None and approved > prior * 5:
         errors.append(
             f"approved_price ({approved}) is more than 5× prior_price ({prior}); "
