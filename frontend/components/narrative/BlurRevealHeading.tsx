@@ -22,7 +22,7 @@
  *   />
  */
 
-import React, { useMemo } from "react";
+import React, { Fragment, useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import clsx from "clsx";
 import { EASE } from "@/lib/motion";
@@ -148,33 +148,36 @@ export function BlurRevealHeading({
         {tokens.map((t, i) => {
           const isEmphasis = emphasisIndexes.has(i);
           return (
-            <motion.span
-              key={i}
-              variants={{
-                hidden: { opacity: 0, y: 14, filter: "blur(12px)" },
-                visible: {
-                  opacity: 1,
-                  y: 0,
-                  filter: "blur(0px)",
-                  transition: {
-                    duration: 0.75,
-                    ease: EASE.outQuart,
-                    delay: delay + i * stagger,
+            <Fragment key={i}>
+              <motion.span
+                variants={{
+                  hidden: { opacity: 0, y: 14, filter: "blur(12px)" },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    filter: "blur(0px)",
+                    transition: {
+                      duration: 0.75,
+                      ease: EASE.outQuart,
+                      delay: delay + i * stagger,
+                    },
                   },
-                },
-              }}
-              className={clsx(
-                "inline-block",
-                isEmphasis && useGradient &&
-                  "bg-gradient-to-r from-orange-200 via-orange-300 to-rose-300 bg-clip-text text-transparent",
-              )}
-              style={{ willChange: "filter, transform, opacity" }}
-            >
-              {t.word}
-              {/* Trailing whitespace must live outside the gradient span so the
-                  bg-clip-text doesn't bleed onto it. */}
-              {t.trailing && <span className="text-white">{t.trailing}</span>}
-            </motion.span>
+                }}
+                className={clsx(
+                  "inline-block",
+                  isEmphasis && useGradient &&
+                    "bg-gradient-to-r from-orange-200 via-orange-300 to-rose-300 bg-clip-text text-transparent",
+                )}
+                style={{ willChange: "filter, transform, opacity" }}
+              >
+                {t.word}
+              </motion.span>
+              {/* Trailing whitespace MUST live outside the inline-block as a
+                  plain text-node sibling. If it lives inside the inline-block,
+                  CSS collapses it at the right edge of the box and adjacent
+                  inline-blocks have no gap — words run together. */}
+              {t.trailing}
+            </Fragment>
           );
         })}
       </motion.span>
