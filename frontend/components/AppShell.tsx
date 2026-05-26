@@ -139,7 +139,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href="https://www.linkedin.com/in/pavankalyan-ghanta-b20115200/"
             target="_blank"
             rel="noopener noreferrer"
-            title="Shipped solo in 2 weeks. 170+ PostgreSQL-backed tests. Open to BetterBasket — let's build."
+            title="ShelfTrace makes the approved price land at every shelf, every register, every listing. Ready to build that at BetterBasket."
             className="group relative flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition hover:bg-white/[.05] focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400/40"
           >
             <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violetglow to-brand text-xs font-bold text-white">
@@ -152,7 +152,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="min-w-0 leading-tight">
               <span className="block truncate text-sm font-medium text-white">Pavan Kalyan Ghanta</span>
               <span className="block truncate text-[11px] text-slate-400 transition group-hover:text-orange-300">
-                Built ShelfTrace · reliability for grocery pricing
+                Reliability layer for grocery price execution
               </span>
             </span>
             <ArrowUpRight className="ml-auto h-4 w-4 shrink-0 text-slate-500 transition group-hover:text-orange-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
