@@ -136,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Confidence-not-desperation tone aligned to the BetterBasket
               founders' builder voice (Vagelis + Leon from the YC launch). */}
           <a
-            href="https://www.linkedin.com/in/pavan-kalyan-ghanta/"
+            href="https://www.linkedin.com/in/pavankalyan-ghanta-b20115200/"
             target="_blank"
             rel="noopener noreferrer"
             title="Shipped solo in 2 weeks. 170+ PostgreSQL-backed tests. Open to BetterBasket — let's build."
