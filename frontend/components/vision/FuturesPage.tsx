@@ -53,6 +53,7 @@ import {
   YogurtGlyph,
 } from "./cinematic";
 import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
+import { BlurRevealHeading } from "@/components/narrative/BlurRevealHeading";
 
 /* ────────────────────────────────────────────────────────────────────────────
    /vision/futures — "Beyond reliability — the product imagination."
@@ -94,18 +95,15 @@ function Hero({ onScroll }: { onScroll: () => void }) {
           <Pill tone="purple">Futures · product imagination</Pill>
           <Pill tone="neutral">Vision concepts · exploratory · not built today</Pill>
         </motion.div>
-        <motion.h1
-          initial={reduced ? false : MOTION_VARIANTS.fadeUpLarge.initial}
-          animate={MOTION_VARIANTS.fadeUpLarge.animate}
-          transition={{ ...PRESET.heroEntrance, delay: 0.15 }}
-          className="mt-8 max-w-[22ch] text-[clamp(44px,7.5vw,120px)] font-semibold leading-[0.96] tracking-[-0.03em] text-white"
-        >
-          Beyond reliability —
-          <br />
-          <span className="bg-gradient-to-r from-orange-300 via-rose-300 to-violet-300 bg-clip-text text-transparent">
-            the product imagination.
-          </span>
-        </motion.h1>
+        <BlurRevealHeading
+          text="Beyond reliability — the product imagination."
+          emphasis={["the product imagination."]}
+          as="h1"
+          size="hero"
+          delay={0.15}
+          stagger={0.07}
+          className="mt-8 max-w-[22ch]"
+        />
         <motion.p
           initial={reduced ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}

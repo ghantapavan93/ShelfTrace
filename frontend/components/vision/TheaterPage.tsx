@@ -21,6 +21,7 @@ import {
   Zap,
 } from "lucide-react";
 import { BackgroundOrbits, Pill } from "./Shell";
+import { BlurRevealHeading } from "@/components/narrative/BlurRevealHeading";
 
 type TheaterMode = "certification" | "rollout" | "trace";
 
@@ -278,11 +279,15 @@ export default function TheaterPage() {
       <div className="relative flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
           <Pill tone="orange">02 · Reliability Theater</Pill>
-          <h1 className="mt-5 text-4xl font-semibold tracking-[-.06em] text-white sm:text-5xl">
-            The working system behind
-            <br />
-            <span className="text-orange-400">trusted price execution.</span>
-          </h1>
+          <BlurRevealHeading
+            text="The working system behind trusted price execution."
+            emphasis={["trusted price execution."]}
+            as="h1"
+            size="display"
+            delay={0.1}
+            stagger={0.06}
+            className="mt-5"
+          />
           <p className="mt-4 max-w-2xl text-base leading-7 text-white/55">
             Certification before launch. Canary protection after approval. The same execution engine
             makes each failure visible, recoverable and auditable.

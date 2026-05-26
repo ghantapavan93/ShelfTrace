@@ -23,6 +23,8 @@ import {
   Zap,
 } from "lucide-react";
 import { Pill } from "./Shell";
+import { BlurRevealHeading } from "@/components/narrative/BlurRevealHeading";
+import { PriceVerificationAnimation } from "@/components/narrative/PriceVerificationAnimation";
 
 /* ────────────────────────────────────────────────────────────────────────────
    /vision/showcase — cinematic marketing twin to the Keynote.
@@ -135,17 +137,15 @@ function HeroCinematic() {
           <Pill tone="orange">Showcase · cinematic vision</Pill>
           <Pill tone="neutral">Independent execution-reliability prototype</Pill>
         </motion.div>
-        <motion.h1
-          initial={reduced ? false : { opacity: 0, y: 36 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.1, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-7 max-w-[20ch] text-[clamp(48px,8vw,128px)] font-semibold leading-[0.95] tracking-[-0.03em] text-white"
-        >
-          The price they ring up{" "}
-          <span className="bg-gradient-to-r from-orange-300 via-orange-400 to-rose-400 bg-clip-text text-transparent">
-            should be the price you approved.
-          </span>
-        </motion.h1>
+        <BlurRevealHeading
+          text="The price they ring up should be the price you approved."
+          emphasis={["should be the price you approved."]}
+          as="h1"
+          size="hero"
+          delay={0.15}
+          stagger={0.06}
+          className="mt-7 max-w-[20ch]"
+        />
         <motion.p
           initial={reduced ? false : { opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -224,6 +224,67 @@ function MarqueeStrip() {
   );
 }
 
+/* ─────────────────────── 2b. Price-Verification proof moment ──────────────
+   The hero promises "the price they ring up should be the price you
+   approved." This section makes that promise operational — the viewer
+   watches an approved price travel to POS / ESL / Ecommerce, see one
+   channel disagree, and resolve to either MISMATCH or VERIFIED. No
+   numbers we don't actually have. ──────────────────────────────────────── */
+
+function PriceVerificationProof() {
+  return (
+    <section className="relative mx-auto max-w-[1500px] px-5 py-28 sm:px-8 sm:py-36">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent" />
+      <div className="max-w-3xl">
+        <Pill tone="orange">Proof moment</Pill>
+        <BlurRevealHeading
+          text="Approval is only valuable when execution can be verified."
+          emphasis={["execution can be verified."]}
+          as="h2"
+          size="section"
+          inView
+          className="mt-5"
+        />
+        <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/55">
+          One approved price is sent to three shopper-facing channels. The
+          system watches what each channel actually rings, and stops the
+          rollout the moment one of them disagrees — before zone-wide expansion.
+        </p>
+      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-15%" }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        className="mt-14 overflow-hidden rounded-3xl border border-white/10 bg-[#0a0e18]/85 p-6 backdrop-blur sm:p-10"
+      >
+        <PriceVerificationAnimation />
+      </motion.div>
+      <div className="mt-8 grid gap-6 sm:grid-cols-3">
+        <ProofMeta n="01" title="Approve" body="Approved price + dispatch commit in one PostgreSQL transaction. The outbox is the source of truth." />
+        <ProofMeta n="02" title="Execute" body="Redis worker fans the same event to POS, shelf label and ecommerce with safe concurrent locking." />
+        <ProofMeta n="03" title="Reconcile" body="Acknowledgements reconcile against the approved price. Disagreement raises an incident before expansion." />
+      </div>
+    </section>
+  );
+}
+
+function ProofMeta({ n, title, body }: { n: string; title: string; body: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-10%" }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      className="border-t border-white/10 pt-5"
+    >
+      <span className="font-mono text-[10px] uppercase tracking-[.22em] text-orange-300">{n}</span>
+      <p className="mt-2 text-base font-semibold text-white">{title}</p>
+      <p className="mt-2 text-sm leading-relaxed text-white/55">{body}</p>
+    </motion.div>
+  );
+}
+
 /* ─────────────────────────── 3. Outcomes (no numbers) ────────────────────── */
 
 const OUTCOMES = [
@@ -248,9 +309,14 @@ const OUTCOMES = [
 function OutcomeBand() {
   return (
     <section className="relative mx-auto max-w-[1500px] px-5 py-28 sm:px-8 sm:py-36">
-      <p className="max-w-3xl text-[clamp(28px,4vw,56px)] font-semibold leading-[1.05] tracking-[-0.02em] text-white">
-        What becomes possible when execution itself is observable.
-      </p>
+      <BlurRevealHeading
+        text="What becomes possible when execution itself is observable."
+        emphasis={["execution itself is observable."]}
+        as="p"
+        size="section"
+        inView
+        className="max-w-3xl"
+      />
       <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/55">
         These are outcomes the working ShelfTrace engine is built to enable — qualitative, because
         honest pre-launch claims belong in plain language, not invented metrics.
@@ -720,6 +786,7 @@ export default function ShowcasePage() {
       <FilmGrain />
       <HeroCinematic />
       <MarqueeStrip />
+      <PriceVerificationProof />
       <OutcomeBand />
       <PinnedScene
         eyebrow="Scene · the moment of truth"

@@ -40,6 +40,7 @@ import {
 } from "./cinematic";
 import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
 import { BlurTextAnimation } from "@/components/text/BlurTextAnimation";
+import { BlurRevealHeading } from "@/components/narrative/BlurRevealHeading";
 
 /* ────────────────────────────────────────────────────────────────────────────
    /vision/principle — "It guides. It does not act alone."
@@ -82,18 +83,15 @@ function Hero({ onScroll }: { onScroll: () => void }) {
           <Pill tone="sky">Positioning · how ShelfTrace fits</Pill>
           <Pill tone="neutral">Smart guide · not an autonomous agent</Pill>
         </motion.div>
-        <motion.h1
-          initial={reduced ? false : MOTION_VARIANTS.fadeUpLarge.initial}
-          animate={MOTION_VARIANTS.fadeUpLarge.animate}
-          transition={{ ...PRESET.heroEntrance, delay: 0.15 }}
-          className="mt-8 max-w-[24ch] text-[clamp(44px,7.5vw,120px)] font-semibold leading-[0.96] tracking-[-0.03em] text-white"
-        >
-          It guides.
-          <br />
-          <span className="bg-gradient-to-r from-sky-200 via-emerald-200 to-emerald-300 bg-clip-text text-transparent">
-            It does not act alone.
-          </span>
-        </motion.h1>
+        <BlurRevealHeading
+          text="It guides. It does not act alone."
+          emphasis={["does not act alone."]}
+          as="h1"
+          size="hero"
+          delay={0.15}
+          stagger={0.08}
+          className="mt-8 max-w-[24ch]"
+        />
         <motion.p
           initial={reduced ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}

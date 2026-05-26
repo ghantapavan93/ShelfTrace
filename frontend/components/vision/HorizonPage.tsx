@@ -23,6 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 import { BackgroundOrbits, Pill } from "./Shell";
+import { BlurRevealHeading } from "@/components/narrative/BlurRevealHeading";
 
 type HorizonConcept = "impact" | "replay" | "regression" | "blast";
 
@@ -274,10 +275,15 @@ export default function HorizonPage() {
           <Pill tone="purple">03 · Horizon Studio</Pill>
           <Pill>Exploratory concepts · Not implemented claims</Pill>
         </div>
-        <h1 className="mt-6 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-.07em] text-white sm:text-6xl">
-          What this reliability foundation could{" "}
-          <span className="text-orange-400">enable next.</span>
-        </h1>
+        <BlurRevealHeading
+          text="What this reliability foundation could enable next."
+          emphasis={["enable next."]}
+          as="h1"
+          size="display"
+          delay={0.1}
+          stagger={0.06}
+          className="mt-6 max-w-4xl"
+        />
         <p className="mt-5 max-w-2xl text-base leading-7 text-white/56">
           Future ideas built around the same operational boundary: evidence, trust, learning and safe
           expansion.

@@ -42,6 +42,18 @@ import {
 } from "./cinematic";
 import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
 import { api } from "@/lib/api";
+import { BlurRevealHeading } from "@/components/narrative/BlurRevealHeading";
+import { OperationalCapabilityCard } from "@/components/narrative/OperationalCapabilityCard";
+import {
+  AnimatedApprovalPolicy,
+  AnimatedApprovalQueue,
+  AnimatedCatalogGraph,
+  AnimatedCompetitorPulse,
+  AnimatedInventoryAware,
+  AnimatedMarginGuardrail,
+  AnimatedPromotionalWindow,
+  AnimatedSubstitutionFlow,
+} from "@/components/narrative/AnimatedCapabilityVisuals";
 
 /* ────────────────────────────────────────────────────────────────────────────
    /vision/connect — "Bring your retailer data. Watch it travel through."
@@ -82,18 +94,15 @@ function Hero({ onLive }: { onLive: () => void }) {
           <Pill tone="purple">Connect · data flow</Pill>
           <Pill tone="neutral">Prototype shows the workflow · production uses approved integrations</Pill>
         </motion.div>
-        <motion.h1
-          initial={reduced ? false : MOTION_VARIANTS.fadeUpLarge.initial}
-          animate={MOTION_VARIANTS.fadeUpLarge.animate}
-          transition={{ ...PRESET.heroEntrance, delay: 0.15 }}
-          className="mt-8 max-w-[24ch] text-[clamp(44px,7.5vw,120px)] font-semibold leading-[0.96] tracking-[-0.03em] text-white"
-        >
-          Bring your data.
-          <br />
-          <span className="bg-gradient-to-r from-violet-200 via-sky-200 to-orange-200 bg-clip-text text-transparent">
-            Watch it travel through.
-          </span>
-        </motion.h1>
+        <BlurRevealHeading
+          text="Bring your data. Watch it travel through."
+          emphasis={["travel through."]}
+          as="h1"
+          size="hero"
+          delay={0.15}
+          stagger={0.07}
+          className="mt-8 max-w-[24ch]"
+        />
         <motion.p
           initial={reduced ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -128,132 +137,9 @@ function Hero({ onLive }: { onLive: () => void }) {
 /* ─────────────────────────── data-field mini mockups ────────────────────── */
 /* Tiny illustrative previews — one per data shape. Inline SVG, no chrome. */
 
-function MiniProductCatalog() {
-  return (
-    <svg viewBox="0 0 160 60" className="h-full w-full">
-      {[6, 58, 110].map((x, i) => (
-        <g key={x}>
-          <rect x={x} y="6" width="44" height="48" rx="3" fill="#0e1320" stroke={i === 1 ? "#fb923c" : "#1e293b"} strokeWidth="0.6" />
-          <rect x={x + 6} y="12" width="32" height="18" rx="1.5" fill="rgba(255,255,255,.05)" />
-          <text x={x + 22} y="42" fontSize="6" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-monospace, monospace">
-            ${[5.99, 4.19, 6.79][i]}
-          </text>
-          <text x={x + 22} y="49" fontSize="3.5" textAnchor="middle" fill="rgba(255,255,255,.45)" fontFamily="ui-sans-serif, system-ui">
-            {["MILK", "EGGS", "OJ"][i]}
-          </text>
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-function MiniApprovedActions() {
-  return (
-    <svg viewBox="0 0 160 60" className="h-full w-full">
-      <text x="14" y="22" fontSize="11" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace" textDecoration="line-through">$5.49</text>
-      <line x1="56" y1="20" x2="100" y2="20" stroke="#fb923c" strokeWidth="1.4" />
-      <polygon points="100,20 94,16 94,24" fill="#fb923c" />
-      <text x="108" y="22" fontSize="13" fontWeight="700" fill="#fb923c" fontFamily="ui-monospace, monospace">$5.99</text>
-      <rect x="14" y="36" width="132" height="14" rx="2" fill="#0e1320" stroke="#22c55e" strokeWidth="0.5" />
-      <text x="20" y="46" fontSize="7" fill="#86efac" fontFamily="ui-monospace, monospace">approved · memorial-day · zone DAL</text>
-    </svg>
-  );
-}
-
-function MiniMarginBar() {
-  return (
-    <svg viewBox="0 0 160 60" className="h-full w-full">
-      <text x="10" y="14" fontSize="7" fill="rgba(255,255,255,.55)" fontFamily="ui-monospace, monospace">COST</text>
-      <text x="106" y="14" fontSize="7" fill="rgba(255,255,255,.55)" fontFamily="ui-monospace, monospace">PRICE</text>
-      <rect x="10" y="20" width="140" height="14" rx="3" fill="#0e1320" stroke="#1e293b" strokeWidth="0.5" />
-      <rect x="10" y="20" width="84" height="14" rx="3" fill="rgba(244,63,94,.25)" />
-      <rect x="94" y="20" width="56" height="14" rx="3" fill="rgba(34,197,94,.45)" />
-      <text x="50" y="29" fontSize="7" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-monospace, monospace">$3.59</text>
-      <text x="122" y="29" fontSize="7" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-monospace, monospace">+$2.40</text>
-      <text x="10" y="46" fontSize="6.5" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace">margin 40% · target 38%</text>
-    </svg>
-  );
-}
-
-function MiniInventory() {
-  const dots = Array.from({ length: 12 });
-  return (
-    <svg viewBox="0 0 160 60" className="h-full w-full">
-      {dots.map((_, i) => {
-        const filled = i < 4;
-        return (
-          <rect
-            key={i}
-            x={10 + i * 12}
-            y="22"
-            width="10"
-            height="22"
-            rx="2"
-            fill={filled ? "#22c55e" : "rgba(255,255,255,.06)"}
-            stroke={filled ? "#16a34a" : "#1e293b"}
-            strokeWidth="0.4"
-          />
-        );
-      })}
-      <text x="10" y="14" fontSize="7" fill="rgba(255,255,255,.55)" fontFamily="ui-monospace, monospace">ON HAND</text>
-      <text x="150" y="14" fontSize="7" textAnchor="end" fill="#fda4af" fontFamily="ui-monospace, monospace">4 / 12 · low</text>
-    </svg>
-  );
-}
-
-function MiniCompetitor() {
-  return (
-    <svg viewBox="0 0 160 60" className="h-full w-full">
-      <rect x="6" y="10" width="64" height="40" rx="3" fill="#0e1320" stroke="#22c55e" strokeWidth="0.6" />
-      <text x="38" y="22" fontSize="6.5" textAnchor="middle" fill="#86efac" fontFamily="ui-monospace, monospace">OURS</text>
-      <text x="38" y="38" fontSize="12" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-monospace, monospace">$5.99</text>
-      <rect x="90" y="10" width="64" height="40" rx="3" fill="#0e1320" stroke="#f43f5e" strokeWidth="0.6" />
-      <text x="122" y="22" fontSize="6.5" textAnchor="middle" fill="#fda4af" fontFamily="ui-monospace, monospace">THEIRS</text>
-      <text x="122" y="38" fontSize="12" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-monospace, monospace">$5.49</text>
-      <text x="80" y="56" fontSize="6.5" textAnchor="middle" fill="#fda4af" fontFamily="ui-monospace, monospace">gap −$0.50</text>
-    </svg>
-  );
-}
-
-function MiniSubstitution() {
-  return (
-    <svg viewBox="0 0 160 60" className="h-full w-full">
-      <rect x="10" y="14" width="52" height="32" rx="3" fill="#0e1320" stroke="#94a3b8" strokeWidth="0.5" />
-      <text x="36" y="28" fontSize="7" textAnchor="middle" fill="#fff" fontFamily="ui-sans-serif, system-ui">Brand A</text>
-      <text x="36" y="40" fontSize="6" textAnchor="middle" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace">out</text>
-      <line x1="70" y1="30" x2="92" y2="30" stroke="#a78bfa" strokeWidth="1.4" strokeDasharray="3 2" />
-      <polygon points="92,30 86,26 86,34" fill="#a78bfa" />
-      <rect x="98" y="14" width="52" height="32" rx="3" fill="#0e1320" stroke="#a78bfa" strokeWidth="0.5" />
-      <text x="124" y="28" fontSize="7" textAnchor="middle" fill="#fff" fontFamily="ui-sans-serif, system-ui">Brand B</text>
-      <text x="124" y="40" fontSize="6" textAnchor="middle" fill="#c4b5fd" fontFamily="ui-monospace, monospace">substitute</text>
-    </svg>
-  );
-}
-
-function MiniPromotional() {
-  return (
-    <svg viewBox="0 0 160 60" className="h-full w-full">
-      <rect x="10" y="10" width="140" height="40" rx="3" fill="#0e1320" stroke="#fb923c" strokeWidth="0.6" />
-      <rect x="10" y="10" width="140" height="10" rx="3" fill="rgba(251,146,60,.18)" />
-      <text x="14" y="18" fontSize="6" fill="#fdba74" fontFamily="ui-monospace, monospace">MEMORIAL DAY · MAY 27</text>
-      <text x="14" y="32" fontSize="8" fill="#fff" fontFamily="ui-sans-serif, system-ui">Markdown · 4 SKUs · zone DAL</text>
-      <text x="14" y="43" fontSize="6" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace">deadline · 6 PM</text>
-    </svg>
-  );
-}
-
-function MiniApprovalPolicy() {
-  return (
-    <svg viewBox="0 0 160 60" className="h-full w-full">
-      <circle cx="32" cy="30" r="14" fill="rgba(167,139,250,.18)" stroke="#a78bfa" strokeWidth="0.6" />
-      <text x="32" y="33" fontSize="8" fontWeight="700" textAnchor="middle" fill="#fff" fontFamily="ui-sans-serif, system-ui">AD</text>
-      <text x="56" y="26" fontSize="8" fill="#fff" fontFamily="ui-sans-serif, system-ui">Avery Davis</text>
-      <text x="56" y="36" fontSize="6.5" fill="rgba(255,255,255,.55)" fontFamily="ui-monospace, monospace">operator · zones DAL/AUS</text>
-      <rect x="56" y="42" width="42" height="10" rx="2" fill="rgba(34,197,94,.18)" stroke="#22c55e" strokeWidth="0.4" />
-      <text x="77" y="49" fontSize="5.5" textAnchor="middle" fill="#86efac" fontFamily="ui-monospace, monospace">may expand</text>
-    </svg>
-  );
-}
+// Legacy static MiniXxx mockups removed — replaced by the AnimatedXxx
+// visuals in components/narrative/AnimatedCapabilityVisuals.tsx which
+// each demonstrate the capability operating, not just its shape.
 
 /* ─────────────────────────── 2. DATA THE SYSTEM NEEDS ────────────────────── */
 
@@ -261,16 +147,16 @@ const DATA_FIELDS: {
   icon: any;
   label: string;
   body: string;
-  mockup: React.ReactNode;
+  visual: React.ReactNode;
 }[] = [
-  { icon: Package, label: "Product catalog", body: "SKU · name · category · brand · KVI flag", mockup: <MiniProductCatalog /> },
-  { icon: TrendingUp, label: "Approved price actions", body: "Approved price · prior price · reason · effective window", mockup: <MiniApprovedActions /> },
-  { icon: Tag, label: "Cost & margin context", body: "Unit cost · margin target · projected impact", mockup: <MiniMarginBar /> },
-  { icon: Boxes, label: "Inventory snapshot", body: "On-hand units · replenishment timing · perishable flag", mockup: <MiniInventory /> },
-  { icon: ScanLine, label: "Competitor reference", body: "Recent observed prices · trusted-source attribution", mockup: <MiniCompetitor /> },
-  { icon: GitBranch, label: "Substitution map", body: "Acceptable alternates when inventory or supply slips", mockup: <MiniSubstitution /> },
-  { icon: Sparkles, label: "Promotional context", body: "Event · markdown deadline · bundle membership", mockup: <MiniPromotional /> },
-  { icon: ShieldCheck, label: "Approval policy", body: "Who can expand · which zones · which categories", mockup: <MiniApprovalPolicy /> },
+  { icon: Package, label: "Product catalog", body: "SKU · name · category · brand · KVI flag", visual: <AnimatedCatalogGraph /> },
+  { icon: TrendingUp, label: "Approved price actions", body: "Approved price · prior price · reason · effective window", visual: <AnimatedApprovalQueue /> },
+  { icon: Tag, label: "Cost & margin context", body: "Unit cost · margin target · projected impact", visual: <AnimatedMarginGuardrail /> },
+  { icon: Boxes, label: "Inventory snapshot", body: "On-hand units · replenishment timing · perishable flag", visual: <AnimatedInventoryAware /> },
+  { icon: ScanLine, label: "Competitor reference", body: "Recent observed prices · trusted-source attribution", visual: <AnimatedCompetitorPulse /> },
+  { icon: GitBranch, label: "Substitution map", body: "Acceptable alternates when inventory or supply slips", visual: <AnimatedSubstitutionFlow /> },
+  { icon: Sparkles, label: "Promotional context", body: "Event · markdown deadline · bundle membership", visual: <AnimatedPromotionalWindow /> },
+  { icon: ShieldCheck, label: "Approval policy", body: "Who can expand · which zones · which categories", visual: <AnimatedApprovalPolicy /> },
 ];
 
 function DataFields() {
@@ -280,45 +166,32 @@ function DataFields() {
       <div className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-28">
         <div className="max-w-3xl">
           <Pill tone="orange">The contract</Pill>
-          <h2 className="mt-5 text-[clamp(30px,4.5vw,60px)] font-semibold leading-[1.05] tracking-[-0.02em] text-white">
-            Eight data shapes describe almost any retailer's pricing reality.
-          </h2>
+          <BlurRevealHeading
+            text="Eight data shapes describe almost any retailer's pricing reality."
+            emphasis={["Eight data shapes", "any retailer's pricing reality"]}
+            as="h2"
+            size="section"
+            inView
+            className="mt-5"
+          />
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/55">
             The engine doesn't need every column populated for every SKU — it gracefully handles
-            missing fields and routes risky cases to a human. But these are the categories it knows
-            how to evaluate.
+            missing fields and routes risky cases to a human. Each tile below shows the capability
+            operating, not just a label.
           </p>
         </div>
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {DATA_FIELDS.map((f, i) => {
-            const Icon = f.icon;
-            return (
-              <motion.div
-                key={f.label}
-                initial={{ opacity: 0, y: 18 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.5, delay: i * 0.04, ease: EASE.outQuart }}
-                whileHover={{ y: -3 }}
-                className="group rounded-2xl border border-white/10 bg-white/[.025] p-5 transition-colors duration-200 hover:border-orange-500/30 hover:bg-orange-500/[.04]"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[.04] text-orange-300">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="font-mono text-[10px] tracking-[.22em] text-white/30">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                </div>
-                <p className="mt-4 text-sm font-semibold text-white">{f.label}</p>
-                <p className="mt-1 text-xs leading-relaxed text-white/55">{f.body}</p>
-                {/* mini-mockup — shows the shape of the data, not just words */}
-                <div className="mt-4 h-[70px] overflow-hidden rounded-xl border border-white/[.06] bg-black/30 p-2">
-                  {f.mockup}
-                </div>
-              </motion.div>
-            );
-          })}
+          {DATA_FIELDS.map((f, i) => (
+            <OperationalCapabilityCard
+              key={f.label}
+              index={i}
+              icon={f.icon}
+              label={f.label}
+              body={f.body}
+            >
+              {f.visual}
+            </OperationalCapabilityCard>
+          ))}
         </div>
       </div>
     </section>
