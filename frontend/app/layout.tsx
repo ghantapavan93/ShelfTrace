@@ -6,9 +6,37 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swa
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "ShelfTrace Control Plane",
+  metadataBase: new URL("https://shelf-trace.vercel.app"),
+  title: {
+    default: "ShelfTrace — Reliability for grocery price execution",
+    template: "%s · ShelfTrace",
+  },
   description:
-    "Canary rollout, execution reconciliation, and incident recovery for AI-approved grocery price changes.",
+    "A reliability control plane for approved retail price execution. Canary containment, deterministic reconciliation across shelf, POS and ecommerce, audit-verified recovery — backed by 184 PostgreSQL tests.",
+  applicationName: "ShelfTrace Control Plane",
+  authors: [{ name: "Pavan Kalyan Ghanta" }],
+  keywords: [
+    "grocery pricing",
+    "price execution",
+    "retail reliability",
+    "canary rollout",
+    "transactional outbox",
+    "BetterBasket",
+  ],
+  openGraph: {
+    type: "website",
+    siteName: "ShelfTrace",
+    title: "ShelfTrace — A price is not real until every system agrees.",
+    description:
+      "Reliability layer for approved grocery price execution. Canary containment, deterministic reconciliation, audit-verified recovery.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ShelfTrace — Reliability for grocery price execution",
+    description:
+      "Canary containment, deterministic reconciliation across shelf · POS · ecommerce, audit-verified recovery.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
