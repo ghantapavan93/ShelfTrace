@@ -324,7 +324,42 @@ export default function ScenarioBuilder() {
           storesCsv={stores}
           canaryCsv={canary}
           actions={actions}
-          onImportProducts={(next) => setActions(next)}
+          onImportProducts={(next) => {
+            setActions(next);
+            // Auto-enrich: bootstrap the graph + seed history + run pricing engine
+            // for the imported SKUs, so the 🌐 Competitor and 🧠 Pricing hint
+            // pills populate without the founder navigating to /product-graph
+            // or /pricing. Runs in the background; UI stays interactive.
+            const validForEnrich = next
+              .filter((a) => a.sku && a.product_name && Number(a.approved_price) > 0)
+              .map((a) => ({
+                sku: a.sku,
+                product_name: a.product_name,
+                approved_price: Number(a.approved_price),
+              }));
+            if (validForEnrich.length === 0) return;
+            const storeIds = stores.split(",").map((s) => s.trim()).filter(Boolean);
+            setBusy("auto-enrich");
+            toast.info(`Enriching ${validForEnrich.length} SKUs with competitor + pricing intelligence…`);
+            api
+              .scenarioAutoEnrich(validForEnrich, storeIds, zone || undefined)
+              .then((res) => {
+                const parts: string[] = [];
+                if (res.bootstrapped_entities > 0) parts.push(`${res.bootstrapped_entities} entit${res.bootstrapped_entities === 1 ? "y" : "ies"}`);
+                if (res.competitor_observations_created > 0) parts.push(`${res.competitor_observations_created} competitor obs`);
+                if (res.historical_sales_seeded > 0) parts.push(`${res.historical_sales_seeded} sales rows`);
+                if (res.pricing_scanned > 0) parts.push(`${res.pricing_scanned} SKU·stores priced`);
+                const summary = parts.length > 0 ? parts.join(" · ") : "already enriched";
+                toast.success(`Enrichment complete — ${summary}.`);
+                setHintRefreshToken((t) => t + 1);
+              })
+              .catch((e) => {
+                toast.error(`Auto-enrich failed: ${(e as Error).message}. Use the manual button below if needed.`);
+              })
+              .finally(() => {
+                setBusy(null);
+              });
+          }}
           onGenerateBehaviors={(next) => setBehaviors(next)}
         />
       </div>

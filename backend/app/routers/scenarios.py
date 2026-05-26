@@ -16,7 +16,7 @@ from app.schemas import (
     ScenarioView,
 )
 from app.security import Identity, require_operator
-from app.services import bulk_import, scenarios
+from app.services import bulk_import, scenario_enrichment, scenarios
 
 router = APIRouter(prefix="/api/v1/scenarios", tags=["scenarios"])
 
@@ -126,6 +126,44 @@ def delete_scenario(
         scenarios.delete_config(db, config)
     except scenarios.ScenarioValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/auto-enrich", status_code=201)
+def auto_enrich_scenario(
+    body: dict,
+    db: Session = Depends(get_db),
+):
+    """One-shot enrichment for a fresh scenario.
+
+    Takes the founder's just-applied actions + stores and:
+      1. Bootstraps the knowledge graph (entity + SKU link + competitor obs)
+      2. Seeds product costs (default 62% of approved_price)
+      3. Seeds 30 days of synthetic sales history per SKU × store
+      4. Runs the pricing engine across everything
+
+    After this call returns, the 🌐 Competitor and 🧠 Pricing hint pills
+    on the scenario page populate without the founder navigating away.
+
+    Body: {
+      actions: [{sku, product_name, approved_price}, ...],
+      store_ids: ["Store-A", ...] (optional but recommended),
+      zone_id: "Texas North" (optional)
+    }
+    """
+    actions = body.get("actions") or []
+    store_ids = body.get("store_ids") or []
+    zone_id = body.get("zone_id") or None
+
+    if not isinstance(actions, list) or not actions:
+        raise HTTPException(status_code=422, detail="actions list is required")
+
+    result = scenario_enrichment.auto_enrich_for_actions(
+        db=db,
+        actions=actions,
+        store_ids=store_ids if isinstance(store_ids, list) else [],
+        zone_id=zone_id,
+    )
+    return result
 
 
 @router.post("/import/preview", response_model=BulkImportPreviewResponse)

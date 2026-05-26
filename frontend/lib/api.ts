@@ -300,6 +300,26 @@ export const api = {
       actions,
       zone_id: zoneId,
     }),
+  scenarioAutoEnrich: (
+    actions: Array<{ sku: string; product_name: string; approved_price: number }>,
+    storeIds: string[],
+    zoneId?: string,
+  ) =>
+    post<{
+      bootstrapped_entities: number;
+      skipped_existing_entities: number;
+      competitor_observations_created: number;
+      product_costs_seeded: number;
+      historical_sales_seeded: number;
+      pricing_scanned: number;
+      pricing_recommended: number;
+      pricing_skipped: number;
+      note: string;
+    }>(`/api/v1/scenarios/auto-enrich`, {
+      actions,
+      store_ids: storeIds,
+      zone_id: zoneId,
+    }),
   graphCompetitorPricesForSku: (sku: string) =>
     get<{
       sku: string;
