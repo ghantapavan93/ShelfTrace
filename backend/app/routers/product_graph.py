@@ -485,6 +485,11 @@ def bootstrap_from_scenario(body: dict, db: Session = Depends(get_db)) -> dict:
                 raw_attributes={"bootstrapped": True},
             )
             db.add(cp)
+            # Force CompetitorProduct INSERT before any FK referrers below.
+            # Postgres enforces immediate FK constraints; without this flush
+            # SQLAlchemy's reordering can put the observation INSERT first
+            # and trip a ForeignKeyViolation. SQLite tolerates it.
+            db.flush()
 
             cpe = CompetitorProductEntity(
                 id=f"cpe_{uuid.uuid4().hex[:12]}",
@@ -619,6 +624,9 @@ def seed_demo_graph(db: Session = Depends(get_db)) -> dict:
             raw_attributes={},
         )
         db.add(cp)
+        # See bootstrap-from-scenario comment: Postgres needs the parent
+        # CompetitorProduct INSERT to land before its FK referrers.
+        db.flush()
 
         cpe = CompetitorProductEntity(
             id=f"cpe_{uuid.uuid4().hex[:12]}",
