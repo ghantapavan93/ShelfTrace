@@ -168,6 +168,18 @@ def execute_live(db: Session, config: TestRunConfig) -> PriceBatch:
     wipe_batch(db, external_id)
     payload = build_payload(config, "live_rollout", external_id, f"idem-{external_id}")
     result = ingest_batch(db, payload)
+    # Stamp source_run_id on the resulting batch so the Live/Demo filter
+    # can distinguish it. The Memorial Day seed scenario inherits the
+    # demo:memorial-day scope; everything else gets a user:<hash> id
+    # derived from the upload provenance, or user:scenario-<id> when no
+    # CSV provenance is present (manual form-based scenarios).
+    if config.is_seeded:
+        result.batch.source_run_id = "demo:memorial-day"
+    elif config.import_source_hash:
+        result.batch.source_run_id = f"user:{config.import_source_hash[:16]}"
+    else:
+        result.batch.source_run_id = f"user:scenario-{config.id[:16]}"
+    db.commit()
     orchestrator.drain(db)
 
     # The scenario UI may pre-enrich uploaded SKUs before execution so graph

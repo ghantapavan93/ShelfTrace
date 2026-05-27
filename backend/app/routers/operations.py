@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import PriceAction, PriceBatch, RunMode
 from app.routers.common import get_batch_or_404
 from app.schemas import OperationsOverview
+from app.scope import apply_filter, current_scope
 from app.services import queries
 
 router = APIRouter(prefix="/api/v1", tags=["operations"])
@@ -63,8 +64,39 @@ def system_status(db: Session = Depends(get_db)):
 
 
 @router.get("/operations", response_model=OperationsOverview)
-def operations(external_id: str | None = None, db: Session = Depends(get_db)):
-    batch = get_batch_or_404(db, external_id)
+def operations(
+    external_id: str | None = None,
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. "
+        "Applied only when external_id is omitted — explicit URL lookups remain the "
+        "documented escape hatch and bypass the filter.",
+    ),
+    db: Session = Depends(get_db),
+):
+    if external_id:
+        # Explicit URL → honor the escape hatch contract. A Live-mode user
+        # who navigates directly to the demo batch by id still gets it
+        # (the UI then renders the "Demo batch · Live mode" chip).
+        batch = get_batch_or_404(db, external_id)
+    else:
+        # Implicit default → pick the latest batch that matches the scope
+        # filter. Without this, Live mode users with no live batches yet
+        # would fall through to the seeded Memorial Day demo.
+        resolved = current_scope(scope)
+        stmt = (
+            select(PriceBatch)
+            .where(PriceBatch.run_mode == RunMode.LIVE_ROLLOUT)
+            .order_by(PriceBatch.created_at.desc())
+        )
+        stmt = apply_filter(stmt, PriceBatch.source_run_id, resolved)
+        batch = db.scalar(stmt)
+        if batch is None:
+            # No batch in the requested scope. Fall back to the unfiltered
+            # latest so /operations still has SOMETHING to render — the
+            # Live-mode clean-slate banner on the frontend handles this
+            # case explicitly by detecting the seeded external_id.
+            batch = get_batch_or_404(db, None)
     return queries.operations_overview(db, batch)
 
 

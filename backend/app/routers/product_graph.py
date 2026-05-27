@@ -419,7 +419,8 @@ def bootstrap_from_scenario(body: dict, db: Session = Depends(get_db)) -> dict:
 
     Accepts: {"actions": [{"sku": "...", "product_name": "...",
                             "approved_price": 4.19, "category": "..." (optional)}, ...],
-              "zone_id": "..." (optional)}
+              "zone_id": "..." (optional),
+              "source_run_id": "user:..." (optional — Live/Demo data scope)}
 
     For each unknown SKU:
       1. Create a ProductEntity with canonical_title = product_name
@@ -430,9 +431,18 @@ def bootstrap_from_scenario(body: dict, db: Session = Depends(get_db)) -> dict:
       5. Persist CompetitorPriceObservation rows so the hints populate
 
     Idempotent: SKUs already linked to an entity are skipped.
+
+    Data scope: every row this endpoint creates carries the source_run_id
+    passed in the request body (falls back to 'user:bootstrap-anonymous'
+    when omitted). Frontend should pass the same source_run_id used to
+    stamp the parent batch so Live mode filters consistently.
     """
     actions = body.get("actions") or []
     zone_id = body.get("zone_id") or None
+    # Source-run id for the rows we're about to create. NULL would be
+    # treated as user:legacy by Scope.LIVE — fine for backward compat,
+    # but explicit is better.
+    source_run_id = body.get("source_run_id") or "user:bootstrap-anonymous"
     if not isinstance(actions, list) or not actions:
         raise HTTPException(status_code=422, detail="actions list is required")
 
@@ -467,7 +477,7 @@ def bootstrap_from_scenario(body: dict, db: Session = Depends(get_db)) -> dict:
             db.flush()
             category_id = cat.id
 
-        # Create entity
+        # Create entity (helper doesn't accept source_run_id — stamp after)
         entity = product_graph.create_product_entity(
             db=db,
             canonical_title=product_name,
@@ -476,13 +486,19 @@ def bootstrap_from_scenario(body: dict, db: Session = Depends(get_db)) -> dict:
             attributes={"bootstrapped_from_scenario": True},
             is_manual=False,
         )
+        entity.source_run_id = source_run_id
 
-        # Link SKU
-        product_graph.link_sku_to_entity(db, sku, entity.id, zone_id=zone_id)
+        # Link SKU — same pattern: helper is scope-agnostic, stamp here.
+        link = product_graph.link_sku_to_entity(db, sku, entity.id, zone_id=zone_id)
+        link.source_run_id = source_run_id
 
         # Synthetic competitor observations at ±5% of approved_price
         # whole_foods_demo: +5% (premium)
         # amazon_fresh_demo: -2% (slightly cheaper)
+        # Every row carries the caller's source_run_id so the Live/Demo
+        # data-scope filter is honored uniformly. Without this, bootstrap
+        # would create "stateless" rows that Scope.LIVE would treat as
+        # legacy and Scope.DEMO would hide — both wrong.
         for source_id, delta_pct in (("whole_foods_demo", 5.0), ("amazon_fresh_demo", -2.0)):
             price = round(approved_price * (1 + delta_pct / 100), 2)
             cp_id = f"cp_{uuid.uuid4().hex[:12]}"
@@ -524,6 +540,7 @@ def bootstrap_from_scenario(body: dict, db: Session = Depends(get_db)) -> dict:
                 store_id=None,
                 observed_at=now,
                 delta_pct=delta_pct,
+                source_run_id=source_run_id,
             )
             db.add(obs)
             created_observations += 1

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+
+from app.scope import Scope, current_scope
 
 from app.database import get_db
 from app.models import TestRunConfig
@@ -78,10 +80,33 @@ def create_scenario(
 
 
 @router.get("", response_model=list[ScenarioView])
-def list_scenarios(db: Session = Depends(get_db)):
+def list_scenarios(
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user-built scenarios only), 'demo' (seeded only), 'all'. "
+        "TestRunConfig.is_seeded is the demo marker — Live mode hides seeded configs.",
+    ),
+    db: Session = Depends(get_db),
+):
+    """List saved scenarios honoring the Live/Demo data-scope contract.
+
+    TestRunConfig has its own demo marker (`is_seeded`) since it predates
+    source_run_id. Mapping is straightforward:
+      Scope.LIVE → is_seeded = False
+      Scope.DEMO → is_seeded = True
+      Scope.ALL  → no filter
+    """
     # Ensure the seeded showcase scenario always exists.
     scenarios.ensure_memorial_day(db)
-    return [_view(c) for c in scenarios.list_configs(db)]
+    resolved = current_scope(scope)
+    all_configs = scenarios.list_configs(db)
+    if resolved == Scope.LIVE:
+        configs = [c for c in all_configs if not c.is_seeded]
+    elif resolved == Scope.DEMO:
+        configs = [c for c in all_configs if c.is_seeded]
+    else:
+        configs = all_configs
+    return [_view(c) for c in configs]
 
 
 @router.get("/{config_id}", response_model=ScenarioView)

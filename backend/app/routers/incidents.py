@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -12,6 +12,7 @@ from app.schemas import (
     IncidentView,
     StoreTaskView,
 )
+from app.scope import Scope, apply_filter, current_scope
 from app.security import Identity, require_operator
 from app.services import queries, recovery
 
@@ -26,14 +27,34 @@ def _get_incident(db: Session, incident_id: str) -> Incident:
 
 
 @router.get("/incidents", response_model=list[IncidentView])
-def list_incidents(run_mode: str = "live_rollout", db: Session = Depends(get_db)):
-    # Scope to the CURRENT run (latest batch of this run mode) so older test
-    # incidents from previous runs don't clutter the demo view.
-    current = db.scalar(
+def list_incidents(
+    run_mode: str = "live_rollout",
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. "
+        "Applied to the batch lookup so older demo/cert incidents stay out of Live mode.",
+    ),
+    db: Session = Depends(get_db),
+):
+    """Incidents for the most recent batch in the requested scope.
+
+    Two-level scoping:
+      • Batch selection respects ?scope= — Live mode picks the most recent
+        user-uploaded batch, not the latest demo seed.
+      • Incident filtering then runs WITHIN that batch.
+
+    Result: Live-mode users with no live batches yet see an empty list
+    (and the frontend's clean-slate empty state), not the Memorial Day
+    eggs critical incident from the seed.
+    """
+    resolved = current_scope(scope)
+    stmt = (
         select(PriceBatch)
         .where(PriceBatch.run_mode == RunMode(run_mode))
         .order_by(PriceBatch.created_at.desc())
     )
+    stmt = apply_filter(stmt, PriceBatch.source_run_id, resolved)
+    current = db.scalar(stmt)
     if current is None:
         return []
     incidents = list(

@@ -175,3 +175,108 @@ def test_bootstrap_requires_actions_list(db):
     client = TestClient(app)
     result = client.post("/api/v1/product-graph/bootstrap-from-scenario", json={})
     assert result.status_code == 422
+
+
+def test_bootstrap_stamps_source_run_id_on_all_rows(db):
+    """Tier 1 Fix 5 contract: every row created by bootstrap-from-scenario
+    must carry the caller's source_run_id so the Live/Demo data-scope
+    filter is honored uniformly. Without this, bootstrap rows are scope-
+    invisible to Scope.LIVE (treated as legacy) and excluded by Scope.DEMO,
+    breaking either side of the boundary depending on which one renders
+    the page.
+
+    We verify by:
+      1. POSTing bootstrap with an explicit source_run_id
+      2. Listing entities with scope=live — they must appear
+      3. Listing entities with scope=demo — they must NOT appear
+      4. Reading the entity directly and checking the stamped row value
+    """
+    from sqlalchemy import select
+    from app.models import (
+        CompetitorPriceObservation,
+        ProductEntity,
+        SKUProductLink,
+    )
+
+    client = TestClient(app)
+    payload = {
+        "actions": [
+            {
+                "sku": "scope-test-sku",
+                "product_name": "Scope Probe Product",
+                "approved_price": 10.00,
+            }
+        ],
+        "source_run_id": "user:scope-probe",
+    }
+    result = client.post(
+        "/api/v1/product-graph/bootstrap-from-scenario", json=payload
+    )
+    assert result.status_code == 201
+    assert result.json()["bootstrapped_entities"] == 1
+
+    # Look up the entity by canonical title — the bootstrap helper doesn't
+    # echo the id back, so we round-trip via the SKU lookup.
+    sku_link = db.scalar(
+        select(SKUProductLink).where(SKUProductLink.sku == "scope-test-sku")
+    )
+    assert sku_link is not None
+    assert sku_link.source_run_id == "user:scope-probe"
+
+    entity = db.scalar(
+        select(ProductEntity).where(ProductEntity.id == sku_link.entity_id)
+    )
+    assert entity is not None
+    assert entity.source_run_id == "user:scope-probe"
+
+    # Both observations (whole_foods + amazon) carry the same scope tag.
+    obs_rows = list(
+        db.scalars(
+            select(CompetitorPriceObservation).where(
+                CompetitorPriceObservation.entity_id == entity.id
+            )
+        )
+    )
+    assert len(obs_rows) == 2
+    assert all(o.source_run_id == "user:scope-probe" for o in obs_rows)
+
+    # And the entity is reachable via scope=live (user-stamped) but hidden
+    # from scope=demo (which filters on LIKE 'demo:%').
+    live = client.get("/api/v1/product-graph/entities?scope=live")
+    assert live.status_code == 200
+    live_titles = {e["canonical_title"] for e in live.json()["entities"]}
+    assert "Scope Probe Product" in live_titles
+
+    demo = client.get("/api/v1/product-graph/entities?scope=demo")
+    assert demo.status_code == 200
+    demo_titles = {e["canonical_title"] for e in demo.json()["entities"]}
+    assert "Scope Probe Product" not in demo_titles
+
+
+def test_bootstrap_defaults_source_run_id_when_omitted(db):
+    """Caller omits source_run_id → we still stamp a sentinel value so
+    rows are never NULL. NULL would land in the Scope.LIVE bucket (good
+    for back-compat) but we prefer explicit lineage."""
+    from sqlalchemy import select
+    from app.models import SKUProductLink
+
+    client = TestClient(app)
+    payload = {
+        "actions": [
+            {
+                "sku": "anon-sku",
+                "product_name": "Anonymous Product",
+                "approved_price": 3.50,
+            }
+        ],
+    }
+    result = client.post(
+        "/api/v1/product-graph/bootstrap-from-scenario", json=payload
+    )
+    assert result.status_code == 201
+
+    link = db.scalar(
+        select(SKUProductLink).where(SKUProductLink.sku == "anon-sku")
+    )
+    assert link is not None
+    assert link.source_run_id == "user:bootstrap-anonymous"
