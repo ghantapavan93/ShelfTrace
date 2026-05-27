@@ -97,14 +97,16 @@ export function BatchPicker({ currentExternalId, onPick }: Props) {
     return () => window.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  // In live mode, hide every demo-seeded batch: the Memorial Day showcase
-  // AND certification-sandbox runs that the backend boots on first start.
+  // In live mode, hide every demo-seeded batch: the Memorial Day showcase,
+  // certification-sandbox runs that the backend boots on first start, AND
+  // the Realistic Scale demo catalog (external_id "realistic-scale-catalog").
   // Anything else (live-cfg_*, scenario-*, user-uploaded) is honest "your data".
   const visibleBatches =
     isHydrated && mode === "live"
       ? batches.filter(
           (b) =>
             b.external_id !== DEMO_BATCH &&
+            b.external_id !== "realistic-scale-catalog" &&
             !b.external_id.startsWith("certification-"),
         )
       : batches;

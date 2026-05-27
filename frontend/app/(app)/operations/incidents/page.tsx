@@ -29,15 +29,16 @@ export default function IncidentsPage() {
   const isLiveWorkMode = isHydrated && mode === "live";
 
   // In Live mode, drop incidents that come from the seeded Memorial Day
-  // batch or certification sandbox runs — same rule the BatchPicker uses.
-  // Mode-filter runs BEFORE the user's status/severity filter so the
-  // visible counts reflect "only your data."
+  // batch, the Realistic Scale catalog, or certification sandbox runs —
+  // same rule the BatchPicker uses. Mode-filter runs BEFORE the user's
+  // status/severity filter so the visible counts reflect "only your data."
   const modeScoped = useMemo(() => {
     if (!data) return [];
     if (!isLiveWorkMode) return data;
     return data.filter(
       (i) =>
         i.batch_external_id !== DEMO_BATCH &&
+        i.batch_external_id !== "realistic-scale-catalog" &&
         !i.batch_external_id.startsWith("certification-"),
     );
   }, [data, isLiveWorkMode]);

@@ -141,12 +141,14 @@ export default function BatchPage({ params }: { params: { id: string } }) {
   if (!b) return <DetailSkeleton />;
 
   const isLarge = b.actions.length >= 12;
-  // When a Live-mode user explicitly opens the demo batch (or a certification
-  // sandbox run), surface a small chip so they know exactly what they're
-  // viewing — this is the documented "explicit escape hatch" path.
+  // When a Live-mode user explicitly opens the demo batch, the Realistic
+  // Scale catalog, or a certification sandbox run, surface a small chip
+  // so they know what they're viewing — this is the documented
+  // "explicit escape hatch" path.
   const viewingDemoFromLive =
     isLiveWorkMode &&
     (b.external_id === DEMO_BATCH ||
+      b.external_id === "realistic-scale-catalog" ||
       b.external_id.startsWith("certification-"));
 
   return (
@@ -168,7 +170,11 @@ export default function BatchPage({ params }: { params: { id: string } }) {
               {viewingDemoFromLive && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.18em] text-violet-200">
                   <FlaskConical className="h-2.5 w-2.5" />
-                  {b.external_id === DEMO_BATCH ? "Demo batch" : "Cert sandbox"}
+                  {b.external_id === DEMO_BATCH
+                    ? "Demo batch"
+                    : b.external_id === "realistic-scale-catalog"
+                      ? "Realistic Scale demo"
+                      : "Cert sandbox"}
                   <span className="text-violet-300/70">· Live mode</span>
                 </span>
               )}

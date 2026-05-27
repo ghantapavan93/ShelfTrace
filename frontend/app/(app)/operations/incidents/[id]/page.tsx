@@ -72,11 +72,13 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
   const offending = i.channels.find((c) => c.channel === i.offending_channel);
   const variance = offending?.observed_price != null ? offending.observed_price - i.approved_price : null;
   const resolved = i.status === "resolved" || i.status === "rolled_back";
-  // Surface a small chip when a Live-mode user opens an incident that
-  // belongs to a demo or certification batch — explicit escape hatch.
+  // Surface a small chip when a Live-mode user opens an incident from
+  // a demo batch, the Realistic Scale catalog, or a certification
+  // sandbox — explicit escape hatch.
   const viewingDemoFromLive =
     isLiveWorkMode &&
     (i.batch_external_id === DEMO_BATCH ||
+      i.batch_external_id === "realistic-scale-catalog" ||
       i.batch_external_id.startsWith("certification-"));
 
   return (

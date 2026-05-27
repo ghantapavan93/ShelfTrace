@@ -585,7 +585,12 @@ def load_realistic_scale(
                     "realistic_scale_preset": True,
                 },
                 match_confidence=1.0,
-                is_manual=False,  # marked as bootstrapped, not seed-demo
+                # is_manual=True marks this as curated demo data. Live
+                # mode hides every is_manual entity (unless it also has
+                # the bootstrapped_from_scenario flag from a user CSV
+                # upload), keeping the Realistic Scale catalog scoped to
+                # Demo mode just like the Memorial Day showcase.
+                is_manual=True,
             )
             db.add(entity)
             db.flush()
