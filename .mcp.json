@@ -16,6 +16,13 @@
         "--db-path",
         "./backend/shelftrace_dev.db"
       ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
     }
   }
 }
