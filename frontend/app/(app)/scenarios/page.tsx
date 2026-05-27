@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Plus, Trash2, FlaskConical, ShieldCheck, Rocket, Download, Copy, Pencil, Lock, Sparkles } from "lucide-react";
+import { Plus, Trash2, FlaskConical, ShieldCheck, Rocket, Download, Copy, Pencil, Lock, Sparkles, Layers, ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { ScenariosBulkPanel } from "@/components/ScenariosBulkPanel";
 import { ScenarioActionHints } from "@/components/ScenarioActionHints";
@@ -101,6 +101,30 @@ export default function ScenarioBuilder() {
       const all = await api.scenarios();
       const seeded = all.find((s) => s.is_seeded) ?? all[0];
       if (seeded) loadInto(seeded);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function loadRealisticScale() {
+    setBusy("scale");
+    try {
+      const result = await api.scenariosLoadRealisticScale(false);
+      const s = result.summary;
+      if (result.loaded) {
+        const lines = [
+          `${s.skus_in_catalog} SKUs across ${s.categories_top_level} categories`,
+          `${s.kvi_skus} KVI · ${s.perishable_skus} perishable`,
+          `${(s.historical_sales_created ?? 0).toLocaleString()} sales records · ${s.competitor_observations_created} competitor obs`,
+        ];
+        toast.success(`Realistic Scale loaded — ${lines.join(" · ")}`);
+      } else {
+        toast.info(
+          `Realistic Scale already loaded — ${s.existing_entities ?? 0} entities, ${s.existing_costs ?? 0} costs. Open /pricing to see recommendations.`,
+        );
+      }
+    } catch (e) {
+      toast.error(`Realistic Scale failed: ${(e as Error).message}`);
     } finally {
       setBusy(null);
     }
@@ -247,6 +271,38 @@ export default function ScenarioBuilder() {
           <button onClick={loadMemorialDay} disabled={busy !== null}
             className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-50">
             <Download className={clsx("h-4 w-4", busy === "load" && "animate-pulse")} /> Load Memorial Day Demo
+          </button>
+        )}
+        {!isLive && (
+          <button
+            onClick={loadRealisticScale}
+            disabled={busy !== null}
+            className="group relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/[.12] via-violet-500/[.06] to-fuchsia-500/[.08] px-4 py-2.5 text-sm font-semibold text-violet-100 transition hover:from-violet-500/[.18] hover:to-fuchsia-500/[.14] disabled:opacity-50"
+            title="Loads ~150 SKUs across 8 grocery categories with realistic per-category elasticities, 60 days of sales history, and 4 illustrative competitor sources. Every working-platform surface lights up with production-shape data."
+          >
+            <Layers
+              className={clsx(
+                "h-4 w-4 text-violet-300 transition-transform group-hover:scale-110",
+                busy === "scale" && "animate-pulse",
+              )}
+            />
+            <span className="flex flex-col items-start leading-tight">
+              <span className="flex items-center gap-1.5">
+                Load Realistic Scale
+                <span className="rounded-full bg-violet-500/25 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-widest text-violet-100">
+                  150 SKUs
+                </span>
+              </span>
+              <span className="text-[10px] font-normal text-violet-200/70">
+                Production-shape catalog · 8 categories · 60d history
+              </span>
+            </span>
+            <ArrowRight
+              className={clsx(
+                "h-3.5 w-3.5 text-violet-300/60 transition-transform group-hover:translate-x-0.5",
+                busy === "scale" && "animate-pulse",
+              )}
+            />
           </button>
         )}
         <button onClick={() => run("certification")} disabled={busy !== null}

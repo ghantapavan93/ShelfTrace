@@ -140,6 +140,29 @@ export const api = {
       format,
       content,
     }),
+  scenariosLoadRealisticScale: (reload = false) =>
+    post<{
+      loaded: boolean;
+      summary: {
+        skus_in_catalog: number;
+        kvi_skus?: number;
+        perishable_skus?: number;
+        categories_top_level?: number;
+        categories_leaf?: number;
+        stores?: number;
+        history_days?: number;
+        competitor_sources?: number;
+        entities_created?: number;
+        sku_links_created?: number;
+        product_costs_created?: number;
+        competitor_observations_created?: number;
+        historical_sales_created?: number;
+        skus_per_category?: Record<string, number>;
+        existing_costs?: number;
+        existing_entities?: number;
+      };
+      note: string;
+    }>(`/api/v1/scenarios/load-realistic-scale${reload ? "?reload=true" : ""}`),
 
   // Competitor scraping
   scrapingSources: () =>

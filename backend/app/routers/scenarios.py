@@ -15,6 +15,7 @@ from app.schemas import (
     ScenarioIn,
     ScenarioView,
 )
+from app.scenarios import realistic_scale
 from app.security import Identity, require_operator
 from app.services import bulk_import, scenario_enrichment, scenarios
 
@@ -168,6 +169,26 @@ def auto_enrich_scenario(
         zone_id=zone_id,
     )
     return result
+
+
+@router.post("/load-realistic-scale", status_code=201)
+def load_realistic_scale(
+    reload: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Load the production-shape "Realistic Scale" preset.
+
+    Populates the product graph, cost catalog, competitor observations,
+    and 60 days of sales history for ~150 SKUs across 8 grocery
+    categories with realistic per-category elasticities. Lets every
+    working-platform surface (knowledge graph, pricing engine, KVI
+    watchlist, margin target buckets, substitutes, tier ladder,
+    operations) demonstrate at production data volumes.
+
+    Idempotent — subsequent calls no-op unless `reload=true`. Returns
+    rich summary stats the UI uses for the "just loaded" toast.
+    """
+    return realistic_scale.load_realistic_scale(db, reload=reload)
 
 
 @router.post("/import/preview", response_model=BulkImportPreviewResponse)
