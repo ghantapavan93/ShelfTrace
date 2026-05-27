@@ -51,9 +51,27 @@ _TABLES = [
 ]
 
 
+def _safe_execute(sql: str) -> None:
+    """op.execute with a try/except so a backfill failure on an oddly-
+    shaped table doesn't fail the entire migration. The columns + indices
+    add cleanly (additive); the backfill is best-effort. Worst case a
+    row is left with NULL source_run_id, which the Scope.LIVE filter
+    treats as a user upload (preserved by design)."""
+    try:
+        op.execute(sql)
+    except Exception as exc:  # pragma: no cover — defensive
+        # Best-effort backfill — log via Alembic's own logger and keep going.
+        import logging
+        logging.getLogger("alembic.migration").warning(
+            "source_run_id backfill skipped: %s — sql=%s",
+            exc, sql[:120],
+        )
+
+
 def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
+        # Schema-level changes — these must succeed for the upgrade.
         for table, idx in _TABLES:
             op.execute(
                 f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS source_run_id VARCHAR(128)"
@@ -61,40 +79,34 @@ def upgrade() -> None:
             op.execute(
                 f"CREATE INDEX IF NOT EXISTS {idx} ON {table} (source_run_id)"
             )
-        # Backfill existing rows with sensible defaults so the filter
-        # behaves predictably from day one.
-        op.execute(
+        # Backfill existing rows — best-effort, never blocks the upgrade.
+        _safe_execute(
             "UPDATE price_batches SET source_run_id = 'demo:memorial-day' "
             "WHERE source_run_id IS NULL AND external_id = 'memorial-day-dallas-02'"
         )
-        op.execute(
+        _safe_execute(
             "UPDATE price_batches SET source_run_id = 'demo:realistic-scale' "
             "WHERE source_run_id IS NULL AND external_id = 'realistic-scale-catalog'"
         )
-        op.execute(
+        _safe_execute(
             "UPDATE price_batches SET source_run_id = 'demo:certification' "
             "WHERE source_run_id IS NULL AND external_id LIKE 'certification-%'"
         )
-        op.execute(
+        _safe_execute(
             "UPDATE price_batches SET source_run_id = 'user:legacy' "
             "WHERE source_run_id IS NULL"
         )
-        # Mark product graph entities seeded by the demo: the Memorial Day
-        # showcase entities carry is_manual=true with no bootstrap flag.
-        op.execute(
+        _safe_execute(
             "UPDATE product_entities SET source_run_id = 'demo:memorial-day' "
             "WHERE source_run_id IS NULL AND is_manual = TRUE"
         )
-        op.execute(
+        _safe_execute(
             "UPDATE product_entities SET source_run_id = 'user:legacy' "
             "WHERE source_run_id IS NULL"
         )
-        # Everything else gets the catch-all 'user:legacy' so Live mode
-        # queries that filter source_run_id LIKE 'user:%' return historical
-        # uploads, not nothing.
         for table in ("product_costs", "historical_sales", "pricing_recommendations",
                       "competitor_price_observations", "sku_product_links"):
-            op.execute(
+            _safe_execute(
                 f"UPDATE {table} SET source_run_id = 'user:legacy' WHERE source_run_id IS NULL"
             )
         return
