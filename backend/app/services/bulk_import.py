@@ -22,12 +22,32 @@ import csv
 import hashlib
 import io
 import json
-from dataclasses import dataclass, field
-from typing import Any, Literal
+from dataclasses import asdict, dataclass, field
+from typing import Any, Iterator, Literal
 
 MAX_BYTES = 1_048_576  # 1 MiB — generous for a paste/upload preview
 MAX_ROWS = 5_000  # hard cap on rows to keep the round-trip snappy
 IMPORT_SCHEMA_VERSION = "bulk-import-v1"
+
+# ──────────────────────────────────────────────────────────────────────
+# Streaming protocol — yielded by stream_preview() for SSE endpoint
+# ──────────────────────────────────────────────────────────────────────
+
+# Each event is a (type, payload) tuple. The SSE wrapper translates these
+# into `event: <type>\ndata: <json(payload)>\n\n` text frames. Consumers
+# (the frontend EventSource client, tests) read events in this order:
+#
+#   meta    once   {format, source_sha256, schema_version}
+#   error   0..n   {message}                  (payload-level errors)
+#   row     0..n   {row_number, valid, ...}   (per-row validation)
+#   done    once   {total, valid, invalid, blank_rows_skipped}
+#
+# The 'meta' and 'done' events MUST always fire so the client can pin
+# its lifecycle (loading → processing → finished). 'error' events do not
+# imply the stream terminates — payload validation errors emit alongside
+# 'row' events for partial visibility.
+
+StreamEvent = tuple[str, dict[str, Any]]
 
 ImportFormat = Literal["csv", "tsv", "json"]
 
@@ -61,42 +81,150 @@ class ImportPreview:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Entrypoint
+# Entrypoint — synchronous (existing contract)
 # ──────────────────────────────────────────────────────────────────────
 def preview(format_: ImportFormat, content: str) -> ImportPreview:
-    """Parse `content` as `format_` and return a per-row preview."""
+    """Parse `content` as `format_` and return a per-row preview.
+
+    Implemented in terms of `stream_preview()` so the streaming path and
+    the synchronous path share one validator. Difference is purely
+    delivery shape (collected vs streamed).
+    """
+    rows: list[ImportRow] = []
     payload_errors: list[str] = []
-    source_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-    if not content or not content.strip():
-        payload_errors.append("Payload is empty.")
-        return ImportPreview(format_, [], _summary([], 0), payload_errors, source_sha256=source_sha256)
-
-    if len(content.encode("utf-8")) > MAX_BYTES:
-        payload_errors.append(
-            f"Payload exceeds {MAX_BYTES // 1024} KiB. "
-            "Split into smaller files or remove unused columns.",
-        )
-        return ImportPreview(format_, [], _summary([], 0), payload_errors, source_sha256=source_sha256)
-
-    blank_skipped = 0
-    if format_ == "json":
-        rows = _parse_json(content, payload_errors)
-    elif format_ == "tsv":
-        rows, blank_skipped = _parse_delimited(content, "\t", payload_errors)
-    else:
-        rows, blank_skipped = _parse_delimited(content, ",", payload_errors)
-
-    _mark_duplicate_skus(rows)
-
+    source_sha256 = ""
+    blank_rows_skipped = 0
+    for kind, payload in stream_preview(format_, content):
+        if kind == "meta":
+            source_sha256 = payload.get("source_sha256", "")
+        elif kind == "error":
+            payload_errors.append(payload.get("message", ""))
+        elif kind == "row":
+            rows.append(_row_from_dict(payload))
+        elif kind == "done":
+            blank_rows_skipped = payload.get("blank_rows_skipped", 0)
     return ImportPreview(
         format_,
         rows,
         _summary(rows, len(rows)),
         payload_errors,
-        blank_rows_skipped=blank_skipped,
+        blank_rows_skipped=blank_rows_skipped,
         source_sha256=source_sha256,
     )
+
+
+def _row_from_dict(d: dict[str, Any]) -> ImportRow:
+    """Reverse of asdict(ImportRow) — used by preview() to reconstruct."""
+    return ImportRow(
+        row_number=d.get("row_number", 0),
+        valid=d.get("valid", False),
+        errors=list(d.get("errors", [])),
+        sku=d.get("sku", ""),
+        product_name=d.get("product_name", ""),
+        previous_price=d.get("previous_price", 0.0),
+        approved_price=d.get("approved_price", 0.0),
+        reason=d.get("reason", "Bulk imported"),
+        is_kvi=d.get("is_kvi", False),
+        deadline_at=d.get("deadline_at"),
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Streaming entrypoint — yields events as it processes
+# ──────────────────────────────────────────────────────────────────────
+def stream_preview(format_: ImportFormat, content: str) -> Iterator[StreamEvent]:
+    """Stream validation events as the payload is parsed row-by-row.
+
+    Always yields exactly one 'meta' event first and one 'done' event
+    last. Between them, 0..n 'row' events (one per parsed row) and 0..n
+    'error' events (payload-level problems — empty input, oversized,
+    invalid JSON shape).
+
+    Cross-row checks like duplicate-SKU detection run online: each row
+    is compared against the set of SKUs already yielded so the second
+    occurrence is marked invalid before the event fires. This keeps the
+    streaming experience honest — no "this row looked valid but actually
+    wasn't" updates after the fact.
+    """
+    source_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    yield ("meta", {
+        "format": format_,
+        "source_sha256": source_sha256,
+        "schema_version": IMPORT_SCHEMA_VERSION,
+    })
+
+    if not content or not content.strip():
+        yield ("error", {"message": "Payload is empty."})
+        yield ("done", {
+            "total": 0, "valid": 0, "invalid": 0, "blank_rows_skipped": 0,
+        })
+        return
+
+    if len(content.encode("utf-8")) > MAX_BYTES:
+        yield ("error", {
+            "message": (
+                f"Payload exceeds {MAX_BYTES // 1024} KiB. "
+                "Split into smaller files or remove unused columns."
+            ),
+        })
+        yield ("done", {
+            "total": 0, "valid": 0, "invalid": 0, "blank_rows_skipped": 0,
+        })
+        return
+
+    # Cross-row state tracked incrementally so duplicate-SKU rows are
+    # caught and emitted invalid in-band, not after a buffer pass.
+    seen_skus: set[str] = set()
+    valid_count = 0
+    invalid_count = 0
+    total = 0
+    blank_skipped = 0
+
+    def _emit_row(row: ImportRow) -> StreamEvent:
+        nonlocal valid_count, invalid_count, total
+        if row.sku:
+            if row.sku in seen_skus:
+                row.valid = False
+                row.errors.append(
+                    f"duplicate sku — '{row.sku}' already appeared in this payload; "
+                    "remove or rename one of the duplicates",
+                )
+            else:
+                seen_skus.add(row.sku)
+        total += 1
+        if row.valid:
+            valid_count += 1
+        else:
+            invalid_count += 1
+        return ("row", asdict(row))
+
+    payload_errors_buffer: list[str] = []
+    try:
+        if format_ == "json":
+            for row in _iter_json_rows(content, payload_errors_buffer):
+                yield _emit_row(row)
+        elif format_ == "tsv":
+            for row, blank_inc in _iter_delimited_rows(content, "\t", payload_errors_buffer):
+                blank_skipped += blank_inc
+                if row is not None:
+                    yield _emit_row(row)
+        else:
+            for row, blank_inc in _iter_delimited_rows(content, ",", payload_errors_buffer):
+                blank_skipped += blank_inc
+                if row is not None:
+                    yield _emit_row(row)
+    except Exception as exc:  # pragma: no cover — defensive
+        yield ("error", {"message": f"Unexpected parse failure: {exc}"})
+
+    for msg in payload_errors_buffer:
+        yield ("error", {"message": msg})
+
+    yield ("done", {
+        "total": total,
+        "valid": valid_count,
+        "invalid": invalid_count,
+        "blank_rows_skipped": blank_skipped,
+    })
 
 
 def _mark_duplicate_skus(rows: list[ImportRow]) -> None:
@@ -129,21 +257,21 @@ def _summary(rows: list[ImportRow], total: int) -> dict[str, int]:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# JSON path
+# JSON path — streaming iterator
 # ──────────────────────────────────────────────────────────────────────
-def _parse_json(content: str, payload_errors: list[str]) -> list[ImportRow]:
+def _iter_json_rows(content: str, payload_errors: list[str]) -> Iterator[ImportRow]:
     try:
         data = json.loads(content)
     except json.JSONDecodeError as exc:
         payload_errors.append(f"Invalid JSON: {exc.msg} (line {exc.lineno})")
-        return []
+        return
 
     if not isinstance(data, list):
         payload_errors.append(
             "JSON payload must be an array of objects, e.g. "
             '[{"sku": "...", "product_name": "...", "prior_price": 1, "approved_price": 1}].',
         )
-        return []
+        return
 
     if len(data) > MAX_ROWS:
         payload_errors.append(
@@ -151,39 +279,42 @@ def _parse_json(content: str, payload_errors: list[str]) -> list[ImportRow]:
         )
         data = data[:MAX_ROWS]
 
-    rows: list[ImportRow] = []
     for i, raw in enumerate(data, start=1):
         if not isinstance(raw, dict):
-            rows.append(
-                ImportRow(
-                    row_number=i,
-                    valid=False,
-                    errors=[f"Expected an object, got {type(raw).__name__}."],
-                ),
+            yield ImportRow(
+                row_number=i,
+                valid=False,
+                errors=[f"Expected an object, got {type(raw).__name__}."],
             )
             continue
-        rows.append(_validate_row(i, raw))
-    return rows
+        yield _validate_row(i, raw)
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Delimited (CSV / TSV) path
+# Delimited (CSV / TSV) path — streaming iterator
 # ──────────────────────────────────────────────────────────────────────
-def _parse_delimited(
+def _iter_delimited_rows(
     content: str,
     delimiter: str,
     payload_errors: list[str],
-) -> tuple[list[ImportRow], int]:
+) -> Iterator[tuple[ImportRow | None, int]]:
+    """Yields (row, blank_increment) tuples. `row` is None when the slot
+    was a blank row that should only bump the skipped counter.
+
+    Delimited parsing is split out as an iterator so the streaming
+    endpoint can emit one SSE 'row' event per parsed line instead of
+    buffering the whole payload first.
+    """
     reader = csv.reader(io.StringIO(content), delimiter=delimiter)
     try:
         all_rows = list(reader)
     except csv.Error as exc:
         payload_errors.append(f"CSV parse error: {exc}")
-        return [], 0
+        return
 
     if not all_rows:
         payload_errors.append("No rows found.")
-        return [], 0
+        return
 
     # Header detection: looks for "sku" or "product_name" or "price" in row 0.
     header_candidates = [c.strip().lower() for c in all_rows[0]]
@@ -193,9 +324,7 @@ def _parse_delimited(
     )
 
     if has_header:
-        headers = [
-            _normalize_header(c) for c in header_candidates
-        ]
+        headers = [_normalize_header(c) for c in header_candidates]
         data_rows = all_rows[1:]
     else:
         headers = list(REQUIRED_COLUMNS + OPTIONAL_COLUMNS)[: max(len(all_rows[0]), 4)]
@@ -207,19 +336,15 @@ def _parse_delimited(
         )
         data_rows = data_rows[:MAX_ROWS]
 
-    rows: list[ImportRow] = []
-    blank_skipped = 0
     base_offset = 2 if has_header else 1  # 1-indexed; row 1 is header if present
     for offset, raw in enumerate(data_rows):
         row_no = base_offset + offset - (1 if has_header else 0)
         if not raw or all(not (c or "").strip() for c in raw):
-            # Track skipped blank rows so the UI can surface them in the summary;
-            # don't error on them (Excel exports often have trailing blanks).
-            blank_skipped += 1
+            # Blank rows are not errors — track them in the summary.
+            yield (None, 1)
             continue
         record = _zip_record(headers, raw)
-        rows.append(_validate_row(row_no, record))
-    return rows, blank_skipped
+        yield (_validate_row(row_no, record), 0)
 
 
 def _normalize_header(header: str) -> str:

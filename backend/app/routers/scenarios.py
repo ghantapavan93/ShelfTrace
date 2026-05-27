@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -189,6 +192,59 @@ def load_realistic_scale(
     rich summary stats the UI uses for the "just loaded" toast.
     """
     return realistic_scale.load_realistic_scale(db, reload=reload)
+
+
+@router.post("/import/preview/stream")
+def import_preview_stream(payload: BulkImportRequest):
+    """Stream per-row validation results as Server-Sent Events.
+
+    Identical contract to /import/preview except the delivery shape is
+    progressive: the server emits one SSE event per row as it's parsed,
+    plus a 'meta' opener and 'done' closer. The frontend can render rows
+    as they arrive instead of waiting for the full preview to assemble.
+
+    Why SSE over WebSocket: this is one-way server → client, request /
+    response shaped (single POST, single stream back), and SSE works
+    through every HTTP proxy + CDN without sticky sessions or upgrade
+    headers. No reason to reach for WebSocket complexity here.
+
+    Why POST (not GET): the CSV payload can be up to 1 MiB; URLs aren't
+    the right place. Standard EventSource() doesn't support POST, so the
+    frontend uses fetch() + response.body.getReader() instead — same
+    SSE wire format, just consumed with a streaming reader.
+
+    Event protocol (text/event-stream framing):
+        event: meta\\ndata: {format, source_sha256, schema_version}\\n\\n
+        event: row\\ndata: {row_number, valid, errors, sku, ...}\\n\\n   (0..n)
+        event: error\\ndata: {message}\\n\\n                              (0..n)
+        event: done\\ndata: {total, valid, invalid, blank_rows_skipped}\\n\\n
+    """
+    fmt = payload.format.lower()
+    if fmt not in ("csv", "tsv", "json"):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported format '{payload.format}'. Use csv, tsv, or json.",
+        )
+
+    def event_stream():
+        for kind, data in bulk_import.stream_preview(fmt, payload.content):  # type: ignore[arg-type]
+            # Each event is one logical SSE frame: "event: <name>\n
+            # data: <json>\n\n". Newlines inside the JSON payload are
+            # escaped by json.dumps so they don't terminate the frame.
+            yield f"event: {kind}\ndata: {json.dumps(data)}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            # Disable nginx + Cloudflare response buffering so events
+            # reach the client in real time, not in a single batch when
+            # the generator completes.
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.post("/import/preview", response_model=BulkImportPreviewResponse)

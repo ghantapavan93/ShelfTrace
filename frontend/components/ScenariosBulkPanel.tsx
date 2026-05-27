@@ -288,29 +288,97 @@ export function ScenariosBulkPanel({
     URL.revokeObjectURL(url);
   }
 
+  // Active SSE stream — kept in a ref so a follow-up keystroke can abort
+  // an in-flight validation before kicking off a new one.
+  const activeStream = useRef<{ abort: () => void } | null>(null);
+
   const validateOnServer = useCallback(async (raw: string, fmt: Format) => {
     if (!raw.trim()) return;
+    // Cancel any in-flight stream from a prior keystroke.
+    activeStream.current?.abort();
+
     setIsValidating(true);
+    // Initialise an empty preview so the UI can show rows appearing
+    // progressively as backend events arrive.
+    const accumulated = {
+      rows: [] as BulkImportRowView[],
+      summary: { total: 0, valid: 0, invalid: 0 },
+      payload_errors: [] as string[],
+      blank_rows_skipped: 0,
+      source_sha256: "",
+      schema_version: "",
+    };
+    setPreview({ ...accumulated });
+    setValidationSource(null);
+
+    const stream = api.scenarioImportPreviewStream(fmt, raw, {
+      onMeta: (meta) => {
+        accumulated.source_sha256 = meta.source_sha256;
+        accumulated.schema_version = meta.schema_version;
+        setPreview({ ...accumulated, rows: [...accumulated.rows] });
+      },
+      onRow: (row) => {
+        // Append + flow the running counts so the badge updates in
+        // real time without waiting for the done event.
+        accumulated.rows.push(row as BulkImportRowView);
+        accumulated.summary = {
+          total: accumulated.rows.length,
+          valid: accumulated.rows.filter((r) => r.valid).length,
+          invalid: accumulated.rows.filter((r) => !r.valid).length,
+        };
+        setPreview({
+          ...accumulated,
+          rows: [...accumulated.rows],
+          summary: { ...accumulated.summary },
+        });
+      },
+      onError: (msg) => {
+        accumulated.payload_errors.push(msg);
+        setPreview({
+          ...accumulated,
+          rows: [...accumulated.rows],
+          payload_errors: [...accumulated.payload_errors],
+        });
+      },
+      onDone: (summary) => {
+        // Server-side final summary wins (handles blank_rows_skipped
+        // which only the server knows about).
+        accumulated.summary = {
+          total: summary.total,
+          valid: summary.valid,
+          invalid: summary.invalid,
+        };
+        accumulated.blank_rows_skipped = summary.blank_rows_skipped;
+        setPreview({
+          ...accumulated,
+          rows: [...accumulated.rows],
+          summary: { ...accumulated.summary },
+        });
+        setValidationSource("server");
+      },
+    });
+
+    activeStream.current = stream;
     try {
-      const res = await api.scenarioImportPreview(fmt, raw);
-      setPreview({
-        rows: res.rows,
-        summary: res.summary,
-        payload_errors: res.payload_errors,
-        blank_rows_skipped: res.blank_rows_skipped,
-        source_sha256: res.source_sha256,
-        schema_version: res.schema_version,
-      });
-      setValidationSource("server");
+      await stream.promise;
     } catch (err) {
-      setPreview({
-        rows: [],
-        summary: { total: 0, valid: 0, invalid: 0 },
-        payload_errors: [(err as Error).message || "Server validation failed"],
-      });
-      setValidationSource(null);
+      // AbortError fires when the user types again and we cancel — not
+      // an actual failure, so silence it.
+      if ((err as Error).name !== "AbortError") {
+        accumulated.payload_errors.push(
+          (err as Error).message || "Streaming validation failed",
+        );
+        setPreview({
+          ...accumulated,
+          rows: [...accumulated.rows],
+          payload_errors: [...accumulated.payload_errors],
+        });
+      }
     } finally {
-      setIsValidating(false);
+      if (activeStream.current === stream) {
+        activeStream.current = null;
+        setIsValidating(false);
+      }
     }
   }, []);
 

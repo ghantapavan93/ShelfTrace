@@ -13,6 +13,61 @@ import type {
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// ──────────────────────────────────────────────────────────────────────
+// SSE frame dispatcher — shared by scenarioImportPreviewStream
+// ──────────────────────────────────────────────────────────────────────
+//
+// One SSE frame looks like:
+//    event: row
+//    data: {"row_number": 1, ...}
+//
+// We parse the event name and the JSON payload, then route to the right
+// callback. Unknown event types are silently ignored — forward-compatible
+// in case the backend adds new event types later (e.g. "progress" for
+// large catalogs).
+function dispatchFrame(
+  frame: string,
+  callbacks: {
+    onMeta?: (m: any) => void;
+    onRow?: (r: any) => void;
+    onError?: (m: string) => void;
+    onDone?: (s: any) => void;
+  },
+) {
+  let eventName = "message";
+  let dataStr = "";
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) {
+      eventName = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      // SSE allows multi-line data; we only send single-line JSON, so
+      // concatenating with newlines is fine (json.dumps emits one line).
+      dataStr += (dataStr ? "\n" : "") + line.slice(5).trim();
+    }
+  }
+  if (!dataStr) return;
+  let payload: any;
+  try {
+    payload = JSON.parse(dataStr);
+  } catch {
+    return; // malformed frame — skip rather than blow up the stream
+  }
+  switch (eventName) {
+    case "meta":
+      callbacks.onMeta?.(payload);
+      break;
+    case "row":
+      callbacks.onRow?.(payload);
+      break;
+    case "error":
+      callbacks.onError?.(payload?.message ?? "unknown error");
+      break;
+    case "done":
+      callbacks.onDone?.(payload);
+      break;
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`GET ${path} -> ${res.status}`);
@@ -141,6 +196,88 @@ export const api = {
       format,
       content,
     }),
+  /**
+   * Stream import-preview validation events from the server as they happen.
+   *
+   * The browser's built-in EventSource() only supports GET, but our CSV
+   * payloads can be up to 1 MiB so we need POST — hence the hand-rolled
+   * fetch + ReadableStream + SSE parser. Each backend event becomes one
+   * callback invocation in order:
+   *
+   *   onMeta(meta)        — fires once at the start
+   *   onRow(row)          — fires 0..n times as rows validate
+   *   onError(message)    — fires 0..n times for payload-level problems
+   *   onDone(summary)     — fires once at the very end
+   *
+   * Returns an AbortController so the caller can cancel the stream
+   * mid-flight (e.g. user closes the upload panel).
+   */
+  scenarioImportPreviewStream: (
+    format: "csv" | "tsv" | "json",
+    content: string,
+    callbacks: {
+      onMeta?: (meta: {
+        format: string;
+        source_sha256: string;
+        schema_version: string;
+      }) => void;
+      onRow?: (row: {
+        row_number: number;
+        valid: boolean;
+        errors: string[];
+        sku: string;
+        product_name: string;
+        previous_price: number;
+        approved_price: number;
+        reason: string;
+        is_kvi: boolean;
+        deadline_at: string | null;
+      }) => void;
+      onError?: (message: string) => void;
+      onDone?: (summary: {
+        total: number;
+        valid: number;
+        invalid: number;
+        blank_rows_skipped: number;
+      }) => void;
+    },
+  ): { abort: () => void; promise: Promise<void> } => {
+    const controller = new AbortController();
+    const promise = (async () => {
+      const res = await fetch(`${BASE}/api/v1/scenarios/import/preview/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+        body: JSON.stringify({ format, content }),
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      if (!res.ok || !res.body) {
+        throw new Error(`stream preview failed: ${res.status}`);
+      }
+      // SSE wire format: `event: <name>\ndata: <json>\n\n`, possibly chunked
+      // across multiple reader yields. Buffer until we find the \n\n frame
+      // separator, then dispatch.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // Parse all complete frames currently in the buffer
+        let separatorIndex = buffer.indexOf("\n\n");
+        while (separatorIndex !== -1) {
+          const frame = buffer.slice(0, separatorIndex);
+          buffer = buffer.slice(separatorIndex + 2);
+          dispatchFrame(frame, callbacks);
+          separatorIndex = buffer.indexOf("\n\n");
+        }
+      }
+      // Flush any trailing frame that came in without a final \n\n.
+      if (buffer.trim()) dispatchFrame(buffer, callbacks);
+    })();
+    return { abort: () => controller.abort(), promise };
+  },
   scenariosLoadRealisticScale: (reload = false) =>
     post<{
       loaded: boolean;
