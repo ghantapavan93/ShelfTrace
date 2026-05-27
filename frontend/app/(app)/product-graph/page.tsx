@@ -133,7 +133,13 @@ export default function ProductGraphPage() {
   const { mode, isHydrated } = useWorkMode();
   const isLiveWorkMode = isHydrated && mode === "live";
 
-  const entities = useLive(() => api.graphEntities(100), [reloadKey]);
+  // Send ?scope=live to the backend in Live mode so the entity list comes
+  // back already filtered at the SQL layer — the legacy attribute-based
+  // frontend filter below stays as defense-in-depth.
+  const entities = useLive(
+    () => api.graphEntities(100, isLiveWorkMode ? "live" : undefined),
+    [reloadKey, isLiveWorkMode],
+  );
   const categories = useLive(() => api.graphCategories(), [reloadKey]);
 
   const [detail, setDetail] = useState<EntityDetail | null>(null);

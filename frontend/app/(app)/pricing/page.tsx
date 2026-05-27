@@ -102,9 +102,11 @@ export default function PricingPage() {
   const { mode, isHydrated } = useWorkMode();
   const isLiveWorkMode = isHydrated && mode === "live";
 
+  // Send ?scope=live to the backend in Live mode so the result excludes
+  // demo recommendations at the SQL layer, not just at render time.
   const recs = useLive<{ recommendations: Recommendation[] }>(
-    () => api.pricingRecommendations(true),
-    [reloadKey],
+    () => api.pricingRecommendations(true, isLiveWorkMode ? "live" : undefined),
+    [reloadKey, isLiveWorkMode],
   );
   const scenarios = useLive(() => api.scenarios(), [reloadKey]);
 

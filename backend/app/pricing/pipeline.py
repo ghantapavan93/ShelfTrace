@@ -348,11 +348,20 @@ def run_pricing_engine(db: Session) -> dict:
         ExternalSignal as DBExternalSignal,
         HistoricalSale,
         PriceAction,
+        PriceBatch,
         PricingRecommendation as DBPricingRecommendation,
         ProductCost,
     )
     from app.pricing.signals import ExternalSignal as PricingSignal, combined_multiplier
     import uuid
+
+    # Pre-fetch source_run_id per batch so each new PricingRecommendation
+    # inherits the same scope as its parent PriceAction's batch. Without
+    # this, engine output lands with NULL source_run_id and Live mode
+    # would surface demo recommendations as if they were user-uploaded.
+    batch_source_map: dict[str, str | None] = {
+        b.id: b.source_run_id for b in db.scalars(select(PriceBatch))
+    }
 
     cost_map: dict[str, float] = {
         c.sku: c.cost for c in db.scalars(select(ProductCost))
@@ -462,6 +471,7 @@ def run_pricing_engine(db: Session) -> dict:
                     "demand_multiplier": mult,
                 },
                 applied=False,
+                source_run_id=batch_source_map.get(action.batch_id),
                 created_at=datetime.now(timezone.utc),
             ),
         )

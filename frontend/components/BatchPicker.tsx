@@ -63,10 +63,15 @@ export function BatchPicker({ currentExternalId, onPick }: Props) {
   const [loading, setLoading] = useState(true);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Load batches once on mount, refresh when re-opened
+  // Load batches once on mount, refresh when re-opened. Request the
+  // backend Live scope when the user is in Live mode so the SQL filter
+  // does the heavy lifting; the legacy frontend exclusion below stays
+  // as belt-and-suspenders for any legacy null-source-run-id rows.
   useEffect(() => {
     let cancelled = false;
-    api.batches()
+    const liveScope = isHydrated && mode === "live" ? "live" : undefined;
+    api
+      .batches(liveScope)
       .then((bs) => {
         if (cancelled) return;
         // Sort: blocked + critical first, then newest first
@@ -83,7 +88,7 @@ export function BatchPicker({ currentExternalId, onPick }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [open]); // refetch when reopening
+  }, [open, isHydrated, mode]); // refetch when reopening or mode changes
 
   // Close on outside click
   useEffect(() => {

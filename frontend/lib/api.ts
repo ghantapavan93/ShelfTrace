@@ -45,7 +45,8 @@ export const api = {
   base: BASE,
   operations: (externalId?: string) =>
     get<OperationsOverview>(`/api/v1/operations${externalId ? `?external_id=${externalId}` : ""}`),
-  batches: () => get<BatchSummary[]>(`/api/v1/batches`),
+  batches: (scope?: "live" | "demo" | "all") =>
+    get<BatchSummary[]>(`/api/v1/batches${scope ? `?scope=${scope}` : ""}`),
   batch: (externalId: string) => get<BatchDetail>(`/api/v1/batches/${externalId}`),
   batchAudit: (externalId: string) => get<unknown[]>(`/api/v1/batches/${externalId}/audit`),
   channelHistory: (externalId: string, actionId: string, channel: "pos" | "esl" | "ecommerce") =>
@@ -207,7 +208,7 @@ export const api = {
     post<{ recommendation_id: string; scenario_config_id: string; next_step: string }>(
       `/api/v1/pricing/recommendations/${encodeURIComponent(recId)}/apply`,
     ),
-  pricingRecommendations: (onlyChanges = true) =>
+  pricingRecommendations: (onlyChanges = true, scope?: "live" | "demo" | "all") =>
     get<{
       total_returned: number;
       offset: number;
@@ -239,7 +240,9 @@ export const api = {
         superseded_by: string | null;
         created_at: string;
       }>;
-    }>(`/api/v1/pricing/recommendations?only_changes=${onlyChanges}`),
+    }>(
+      `/api/v1/pricing/recommendations?only_changes=${onlyChanges}${scope ? `&scope=${scope}` : ""}`,
+    ),
   pricingSkuHistory: (sku: string, storeId?: string) =>
     get<{
       sku: string;
@@ -281,7 +284,7 @@ export const api = {
   },
 
   // ── Product Knowledge Graph ─────────────────────────────────────────
-  graphEntities: (limit = 50) =>
+  graphEntities: (limit = 50, scope?: "live" | "demo" | "all") =>
     get<{
       total: number;
       entities: Array<{
@@ -295,11 +298,14 @@ export const api = {
         attributes: Record<string, unknown>;
         match_confidence: number;
         is_manual: boolean;
+        source_run_id?: string | null;
         linked_sku_count: number;
         competitor_observation_count: number;
         created_at: string;
       }>;
-    }>(`/api/v1/product-graph/entities?limit=${limit}`),
+    }>(
+      `/api/v1/product-graph/entities?limit=${limit}${scope ? `&scope=${scope}` : ""}`,
+    ),
   graphEntity: (id: string) =>
     get<{
       entity: {
@@ -444,7 +450,7 @@ export const api = {
       observed_price_range: { min: number; max: number; mean: number };
       observations: Array<{ price: number; units: number; on_promotion: boolean }>;
     }>(`/api/v1/pricing/sku/${encodeURIComponent(sku)}/what-if-fit?store_id=${encodeURIComponent(storeId)}`),
-  pricingMarginTargets: () =>
+  pricingMarginTargets: (scope?: "live" | "demo" | "all") =>
     get<{
       categories: Array<{
         policy: "kvi" | "perishable" | "standard";
@@ -466,8 +472,8 @@ export const api = {
         status: "above" | "at" | "near" | "below" | "no_data";
       };
       bands: { at_pp: number; near_pp: number };
-    }>(`/api/v1/pricing/margin-targets`),
-  pricingKviWatchlist: () =>
+    }>(`/api/v1/pricing/margin-targets${scope ? `?scope=${scope}` : ""}`),
+  pricingKviWatchlist: (scope?: "live" | "demo" | "all") =>
     get<{
       tolerance_pct: number;
       items: Array<{
@@ -497,7 +503,7 @@ export const api = {
         below_band: number;
         max_abs_gap_pct: number;
       };
-    }>(`/api/v1/pricing/kvi-watchlist`),
+    }>(`/api/v1/pricing/kvi-watchlist${scope ? `?scope=${scope}` : ""}`),
   pricingSuggestForSku: (sku: string, storeId?: string) =>
     get<{
       sku: string;

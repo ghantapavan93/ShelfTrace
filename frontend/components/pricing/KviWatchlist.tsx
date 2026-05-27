@@ -31,6 +31,7 @@ import { useLive } from "@/lib/useLive";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
 import { EASE } from "@/lib/motion";
+import { useWorkMode } from "@/components/ModeProvider";
 
 type WatchlistData = Awaited<ReturnType<typeof api.pricingKviWatchlist>>;
 type Item = WatchlistData["items"][number];
@@ -44,9 +45,13 @@ export function KviWatchlist({
   allowedSkus?: Set<string> | null;
   sourceLabel?: string;
 }) {
+  // Send ?scope=live so the backend filters demo rows at the SQL layer;
+  // allowedSkus stays as belt-and-suspenders for legacy frontend hides.
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
   const watchlist = useLive<WatchlistData>(
-    () => api.pricingKviWatchlist(),
-    [reloadKey],
+    () => api.pricingKviWatchlist(isLiveWorkMode ? "live" : undefined),
+    [reloadKey, isLiveWorkMode],
   );
 
   if (!watchlist.data) {

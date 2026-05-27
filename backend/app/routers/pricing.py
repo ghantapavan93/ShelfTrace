@@ -19,9 +19,11 @@ from app.models import (
     ExternalSignal,
     HistoricalSale,
     PriceAction,
+    PriceBatch,
     PricingRecommendation,
     ProductCost,
 )
+from app.scope import Scope, apply_filter, current_scope
 from app.pricing.elasticity import estimate_elasticity
 from app.pricing.models import HistoricalObservation
 from app.pricing.pipeline import run_pricing_engine
@@ -82,14 +84,25 @@ def list_recommendations(
     only_current: bool = True,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. Default all.",
+    ),
 ):
     """List recommendations. By default returns the CURRENT (non-superseded)
-    set — pass only_current=false to see the full history."""
+    set — pass only_current=false to see the full history.
+
+    The `scope` query parameter is the real Live/Demo backend boundary —
+    when scope=live the result excludes recommendations whose source_run_id
+    points at a demo seed.
+    """
+    resolved = current_scope(scope)
     stmt = select(PricingRecommendation).order_by(desc(PricingRecommendation.created_at))
     if only_changes:
         stmt = stmt.where(PricingRecommendation.recommended_price != PricingRecommendation.current_price)
     if only_current:
         stmt = stmt.where(PricingRecommendation.superseded_by.is_(None))
+    stmt = apply_filter(stmt, PricingRecommendation.source_run_id, resolved)
     rows = list(db.scalars(stmt.offset(offset).limit(limit)))
     return {
         "total_returned": len(rows),
@@ -448,7 +461,13 @@ MARGIN_TARGET_DEFAULTS = {
 
 
 @router.get("/margin-targets")
-def margin_targets(db: Session = Depends(get_db)) -> dict:
+def margin_targets(
+    db: Session = Depends(get_db),
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. Default all.",
+    ),
+) -> dict:
     """Category-level margin rollup vs targets.
 
     Classifies every latest PriceAction into one of three policy buckets —
@@ -460,13 +479,20 @@ def margin_targets(db: Session = Depends(get_db)) -> dict:
     The portfolio rollup blends the buckets weighted by their estimated
     revenue. Status is one of `above`/`at`/`near`/`below` based on the
     distance to target in percentage points.
+
+    PriceAction itself has no source_run_id (it inherits from its parent
+    batch); the scope filter therefore joins price_batches and applies
+    `apply_filter(PriceBatch.source_run_id, ...)`.
     """
+    resolved = current_scope(scope)
     # Latest PriceAction per (sku, store) — same dedup as kvi-watchlist
-    actions = list(
-        db.scalars(
-            select(PriceAction).order_by(PriceAction.id.desc())
-        )
+    action_stmt = (
+        select(PriceAction)
+        .join(PriceBatch, PriceAction.batch_id == PriceBatch.id)
+        .order_by(PriceAction.id.desc())
     )
+    action_stmt = apply_filter(action_stmt, PriceBatch.source_run_id, resolved)
+    actions = list(db.scalars(action_stmt))
     latest: dict[tuple[str, str], PriceAction] = {}
     for a in actions:
         key = (a.sku, a.store_id)
@@ -649,7 +675,13 @@ def _empty_margin_payload() -> dict:
 
 
 @router.get("/kvi-watchlist")
-def kvi_watchlist(db: Session = Depends(get_db)) -> dict:
+def kvi_watchlist(
+    db: Session = Depends(get_db),
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. Default all.",
+    ),
+) -> dict:
     """Every KVI-flagged price action with its competitor reference and gap.
 
     KVI = Key Value Item. Retailers fight for shopper loyalty on a handful
@@ -667,19 +699,20 @@ def kvi_watchlist(db: Session = Depends(get_db)) -> dict:
         watchlist can dual-purpose as a triage queue
 
     Sorted by absolute gap descending — the SKUs furthest off-strategy
-    bubble to the top.
+    bubble to the top. Scope filter joins via parent batch.
     """
     KVI_TOLERANCE_PCT = 1.5  # mirrors KVI_COMPETITOR_TOLERANCE in pipeline
+    resolved = current_scope(scope)
 
-    # Latest PriceAction per SKU·store, KVI only
-    # Group is per (sku, store_id); we pick the row with the highest id.
-    actions = list(
-        db.scalars(
-            select(PriceAction)
-            .where(PriceAction.is_kvi == True)  # noqa: E712
-            .order_by(PriceAction.id.desc())
-        )
+    # Latest KVI PriceAction per (sku, store), scoped via parent batch
+    action_stmt = (
+        select(PriceAction)
+        .join(PriceBatch, PriceAction.batch_id == PriceBatch.id)
+        .where(PriceAction.is_kvi == True)  # noqa: E712
+        .order_by(PriceAction.id.desc())
     )
+    action_stmt = apply_filter(action_stmt, PriceBatch.source_run_id, resolved)
+    actions = list(db.scalars(action_stmt))
 
     # Dedup to latest per (sku, store)
     latest: dict[tuple[str, str], PriceAction] = {}

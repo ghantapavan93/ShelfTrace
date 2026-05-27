@@ -35,6 +35,7 @@ import { useLive } from "@/lib/useLive";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
 import { EASE } from "@/lib/motion";
+import { useWorkMode } from "@/components/ModeProvider";
 
 type Data = Awaited<ReturnType<typeof api.pricingMarginTargets>>;
 type Category = Data["categories"][number];
@@ -85,24 +86,32 @@ export function MarginTargetPanel({
   liveScoped,
 }: {
   reloadKey: number;
+  /** Legacy flag — kept for backward compat. The panel now queries the
+   * backend with ?scope=live directly via useWorkMode, so the placeholder
+   * branch only fires when there is genuinely no Live data to show. */
   liveScoped?: boolean;
 }) {
-  const data = useLive<Data>(() => api.pricingMarginTargets(), [reloadKey]);
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
+  const data = useLive<Data>(
+    () => api.pricingMarginTargets(isLiveWorkMode ? "live" : undefined),
+    [reloadKey, isLiveWorkMode],
+  );
 
-  if (liveScoped) {
+  // Live-mode placeholder only when the caller still forces it AND there's
+  // no live data to show. After Phase 1 wiring this should rarely fire.
+  if (liveScoped && (!data.data || data.data.portfolio.n_skus === 0)) {
     return (
       <section className="rounded-2xl border border-sky-500/20 bg-sky-500/[.03] p-5">
         <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-sky-300">
           <Gauge className="h-4 w-4" /> Margin targets
         </div>
         <h2 className="mt-2 text-base font-semibold text-white">
-          Waiting for source-scoped margin history
+          No live margin data yet
         </h2>
         <p className="mt-1 max-w-2xl text-xs text-slate-400">
-          Demo margin rollups are hidden in Live mode because the current endpoint
-          aggregates the shared pricing table. Uploaded recommendations still show
-          below; production should add import/run provenance to historical sales and
-          costs before this panel is re-enabled for Live mode.
+          Upload a scenario via the bulk import panel — once recommendations
+          run against your SKUs, the policy-bucket rollup will populate here.
         </p>
       </section>
     );

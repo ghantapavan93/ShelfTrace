@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from app.models import (
 from app.rate_limit import limit_write
 from app.routers.common import get_batch_or_404
 from app.schemas import BatchDetail, BatchSummary, PriceBatchIn
+from app.scope import apply_filter, current_scope
 from app.security import Identity, require_operator
 from app.services import orchestrator, queries
 from app.services.ingestion import ingest_batch
@@ -38,8 +39,20 @@ def create_batch(
 
 
 @router.get("/batches", response_model=list[BatchSummary])
-def list_batches(db: Session = Depends(get_db)):
-    batches = list(db.scalars(select(PriceBatch).order_by(PriceBatch.created_at.desc())))
+def list_batches(
+    db: Session = Depends(get_db),
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. Default all.",
+    ),
+):
+    """List every batch the platform knows about. The scope filter is the
+    real Live/Demo backend boundary — `scope=live` excludes seeded showcase
+    batches (Memorial Day, Realistic Scale, certification sandbox)."""
+    resolved = current_scope(scope)
+    stmt = select(PriceBatch).order_by(PriceBatch.created_at.desc())
+    stmt = apply_filter(stmt, PriceBatch.source_run_id, resolved)
+    batches = list(db.scalars(stmt))
     return [queries.batch_summary(db, b) for b in batches]
 
 
