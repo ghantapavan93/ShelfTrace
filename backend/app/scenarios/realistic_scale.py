@@ -41,6 +41,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ids import new_id
+from app.scope import DEMO_REALISTIC_SCALE
 from app.models import (
     BatchStatus,
     CompetitorPriceObservation,
@@ -522,6 +523,7 @@ def load_realistic_scale(
             approved_by="realistic-scale-preset",
             total_store_count=len(STORE_IDS),
             status=BatchStatus.COMPLETED,  # Already verified — these are baseline prices
+            source_run_id=DEMO_REALISTIC_SCALE,
         ))
         db.flush()
         counters["batch_created"] = True
@@ -585,12 +587,12 @@ def load_realistic_scale(
                     "realistic_scale_preset": True,
                 },
                 match_confidence=1.0,
-                # is_manual=True marks this as curated demo data. Live
-                # mode hides every is_manual entity (unless it also has
-                # the bootstrapped_from_scenario flag from a user CSV
-                # upload), keeping the Realistic Scale catalog scoped to
-                # Demo mode just like the Memorial Day showcase.
+                # is_manual=True still works as a legacy demo marker, but
+                # the authoritative backend Live/Demo boundary is now
+                # source_run_id. Live mode queries filter LIKE 'user:%';
+                # this catalog is 'demo:realistic-scale'.
                 is_manual=True,
+                source_run_id=DEMO_REALISTIC_SCALE,
             )
             db.add(entity)
             db.flush()
@@ -604,6 +606,7 @@ def load_realistic_scale(
                 sku=item.sku,
                 entity_id=entity.id,
                 zone_id=ZONE,
+                source_run_id=DEMO_REALISTIC_SCALE,
             ))
             counters["sku_links_created"] += 1
 
@@ -614,6 +617,7 @@ def load_realistic_scale(
                 sku=item.sku,
                 cost=round(item.base_price * item.cost_ratio, 2),
                 effective_from=now,
+                source_run_id=DEMO_REALISTIC_SCALE,
             ))
             counters["product_costs_created"] += 1
 
@@ -658,6 +662,7 @@ def load_realistic_scale(
                 store_id=None,
                 observed_at=now - timedelta(hours=2),
                 delta_pct=offset_pct,
+                source_run_id=DEMO_REALISTIC_SCALE,
             ))
             counters["competitor_observations_created"] += 1
 
@@ -713,6 +718,7 @@ def load_realistic_scale(
                     price=round(effective_price, 2),
                     units_sold=q,
                     on_promotion=is_promo,
+                    source_run_id=DEMO_REALISTIC_SCALE,
                 ))
                 counters["historical_sales_created"] += 1
 

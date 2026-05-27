@@ -19,6 +19,7 @@ from app.models import (
     SKUProductLink,
     utcnow,
 )
+from app.scope import DEMO_MEMORIAL_DAY, Scope, apply_filter, current_scope
 from app.services import entity_matcher, product_graph
 
 router = APIRouter(prefix="/api/v1/product-graph", tags=["product-knowledge-graph"])
@@ -35,9 +36,19 @@ def list_entities(
     category_id: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    scope: Optional[str] = Query(
+        None,
+        description="Data scope filter: 'live' (user uploads only), 'demo' (seeded only), 'all'. Default all.",
+    ),
     db: Session = Depends(get_db),
 ) -> dict:
-    """List canonical product entities with optional filtering."""
+    """List canonical product entities with optional filtering.
+
+    The `scope` query parameter is the authoritative Live/Demo boundary
+    — when scope=live the result set excludes every demo-seeded entity
+    via source_run_id filter, not via attribute heuristics.
+    """
+    resolved_scope = current_scope(scope)
     stmt = select(ProductEntity)
     count_stmt = select(func.count(ProductEntity.id))
     if brand:
@@ -46,6 +57,9 @@ def list_entities(
     if category_id:
         stmt = stmt.where(ProductEntity.category_id == category_id)
         count_stmt = count_stmt.where(ProductEntity.category_id == category_id)
+    # Backend data-scope filter — replaces the prior frontend-only filter
+    stmt = apply_filter(stmt, ProductEntity.source_run_id, resolved_scope)
+    count_stmt = apply_filter(count_stmt, ProductEntity.source_run_id, resolved_scope)
 
     total = db.scalar(count_stmt) or 0
     rows = db.scalars(stmt.offset(skip).limit(limit)).all()
@@ -85,6 +99,7 @@ def list_entities(
                 "attributes": e.attributes,
                 "match_confidence": e.match_confidence,
                 "is_manual": e.is_manual,
+                "source_run_id": e.source_run_id,
                 "linked_sku_count": sku_counts.get(e.id, 0),
                 "competitor_observation_count": obs_counts.get(e.id, 0),
                 "created_at": e.created_at.isoformat(),
@@ -646,8 +661,20 @@ def seed_demo_graph(db: Session = Depends(get_db)) -> dict:
             store_id=None,
             observed_at=now - timedelta(hours=2),
             delta_pct=delta_pct,
+            source_run_id=DEMO_MEMORIAL_DAY,
         )
         db.add(obs)
+
+    # Stamp source_run_id on every row this seeder created so the Live
+    # mode backend filter (source_run_id LIKE 'user:%') hides them.
+    for ent in (eggs, strawberries, oj):
+        ent.source_run_id = DEMO_MEMORIAL_DAY
+    for link in db.scalars(
+        select(SKUProductLink).where(
+            SKUProductLink.entity_id.in_([eggs.id, strawberries.id, oj.id])
+        )
+    ):
+        link.source_run_id = DEMO_MEMORIAL_DAY
 
     db.commit()
 

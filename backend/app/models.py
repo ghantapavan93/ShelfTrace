@@ -177,6 +177,9 @@ class PriceBatch(Base):
     total_store_count: Mapped[int] = mapped_column(Integer, default=4)
     expansion_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
     block_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Real backend data-scope marker. Live mode filters source_run_id LIKE 'user:%';
+    # Demo mode includes everything. NULL = legacy unscoped data. See app/scope.py.
+    source_run_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -525,6 +528,7 @@ class HistoricalSale(Base):
     price: Mapped[float] = mapped_column(Float)
     units_sold: Mapped[int] = mapped_column(Integer)
     on_promotion: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_run_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
 
 
 class ProductCost(Base):
@@ -534,6 +538,7 @@ class ProductCost(Base):
     sku: Mapped[str] = mapped_column(String, unique=True, index=True)
     cost: Mapped[float] = mapped_column(Float)
     effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    source_run_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
 
 
 class PricingRecommendation(Base):
@@ -559,6 +564,7 @@ class PricingRecommendation(Base):
     applied: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     superseded_by: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     applied_to_scenario_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_run_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
@@ -613,6 +619,7 @@ class ProductEntity(Base):
     attributes: Mapped[dict] = mapped_column(JSONColumn, default=dict)  # {color, size, organic, etc}
     match_confidence: Mapped[float] = mapped_column(Float, default=0.0)  # 0..1, auto-match score
     is_manual: Mapped[bool] = mapped_column(Boolean, default=False)  # true if curator-approved
+    source_run_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     competitor_products: Mapped[list[CompetitorProductEntity]] = relationship(
@@ -651,6 +658,7 @@ class SKUProductLink(Base):
     sku: Mapped[str] = mapped_column(String, index=True)
     entity_id: Mapped[str] = mapped_column(ForeignKey("product_entities.id", ondelete="CASCADE"), index=True)
     zone_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)  # optional zone scope
+    source_run_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     entity: Mapped[ProductEntity] = relationship(back_populates="sku_links")
@@ -673,4 +681,5 @@ class CompetitorPriceObservation(Base):
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     delta_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     scrape_run_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_run_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
 
