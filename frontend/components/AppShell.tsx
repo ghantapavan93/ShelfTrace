@@ -27,6 +27,7 @@ import { Brand } from "./Brand";
 import { ModeBadge } from "./ModeBadge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useToast } from "./Toast";
+import { useWorkMode } from "./ModeProvider";
 import { api } from "@/lib/api";
 import { EASE } from "@/lib/motion";
 
@@ -39,7 +40,12 @@ const NAV = [
   { href: "/certification", label: "Certification Lab", sub: "Before go-live", icon: ShieldCheck, match: /^\/certification/ },
   { href: "/operations", label: "Live Operations", sub: "Command Center", icon: LayoutGrid, match: /^\/operations$/ },
   {
-    href: "/operations/batches/memorial-day-dallas-02",
+    // Batches sidebar entry points at /operations so the BatchPicker can
+    // route the user to the right batch for their current mode (most recent
+    // live upload in Live mode, Memorial Day demo in Demo mode). Avoids
+    // hard-coding a specific batch ID that would dump Live-mode users into
+    // seeded demo data on click.
+    href: "/operations",
     label: "Batches",
     sub: "Canary verification",
     icon: Boxes,
@@ -55,6 +61,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const reduced = useReducedMotion();
   const { toast } = useToast();
+  const { mode, isHydrated } = useWorkMode();
+  // The sidebar "Reset to demo state" wipes the entire DB back to the
+  // seeded Memorial Day showcase. Hiding it in Live mode prevents an
+  // accidental click from destroying uploaded scenario data. To reset
+  // the demo seed, switch back to Demo mode first.
+  const isLiveWorkMode = isHydrated && mode === "live";
   const [resetting, setResetting] = useState(false);
   const [status, setStatus] = useState<{ label: string; tone: string } | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -137,14 +149,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto space-y-3">
-          <button
-            onClick={() => setConfirmResetOpen(true)}
-            disabled={resetting}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
-          >
-            <RotateCcw className={clsx("h-3.5 w-3.5", resetting && "animate-spin")} />
-            {resetting ? "Resetting…" : "Reset to demo state"}
-          </button>
+          {!isLiveWorkMode && (
+            <button
+              onClick={() => setConfirmResetOpen(true)}
+              disabled={resetting}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
+            >
+              <RotateCcw className={clsx("h-3.5 w-3.5", resetting && "animate-spin")} />
+              {resetting ? "Resetting…" : "Reset to demo state"}
+            </button>
+          )}
           <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
             <div className="flex items-center gap-2 text-xs">
               <span className={clsx("h-2 w-2 rounded-full animate-pulse-glow", toneCls)} />
@@ -275,17 +289,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="space-y-3 border-t border-white/5 px-3 py-4">
-                <button
-                  onClick={() => {
-                    setMobileNavOpen(false);
-                    setConfirmResetOpen(true);
-                  }}
-                  disabled={resetting}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
-                >
-                  <RotateCcw className={clsx("h-3.5 w-3.5", resetting && "animate-spin")} />
-                  {resetting ? "Resetting…" : "Reset to demo state"}
-                </button>
+                {!isLiveWorkMode && (
+                  <button
+                    onClick={() => {
+                      setMobileNavOpen(false);
+                      setConfirmResetOpen(true);
+                    }}
+                    disabled={resetting}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
+                  >
+                    <RotateCcw className={clsx("h-3.5 w-3.5", resetting && "animate-spin")} />
+                    {resetting ? "Resetting…" : "Reset to demo state"}
+                  </button>
+                )}
                 <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
                   <div className="flex items-center gap-2 text-xs">
                     <span className={clsx("h-2 w-2 rounded-full animate-pulse-glow", toneCls)} />
