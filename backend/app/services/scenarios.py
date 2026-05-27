@@ -19,6 +19,7 @@ from app.models import (
     ConnectorBehaviorProfile,
     Environment,
     PriceBatch,
+    ProductCost,
     RunMode,
     TestRunAction,
     TestRunConfig,
@@ -29,6 +30,37 @@ from app.services import orchestrator
 from app.services.ingestion import ingest_batch
 
 MEMORIAL_DAY_NAME = "Memorial Day Dallas Zone 2"
+
+# When a SKU lands via CSV upload it carries no cost — the upload format is
+# intentionally minimal. Without a cost row the margin-target rollup excludes
+# the SKU from its bucket and surfaces an "N missing cost" caveat. Seed a
+# synthetic cost at 60% of approved_price so the policy buckets become
+# meaningful immediately. The 0.60 factor implies a 40% gross-margin baseline
+# which lines up with the pricing engine's constraint defaults (KVI runs
+# tighter, perishables higher) — operators can override per-SKU later.
+_DEFAULT_COST_RATIO = 0.60
+
+
+def _ensure_cost_for_action(db: Session, sku: str, approved_price: float) -> None:
+    """Idempotently seed ProductCost for `sku` from approved_price.
+
+    No-op if a cost row already exists or the input price is non-positive.
+    Called from every scenario-creation path so a CSV upload populates the
+    cost catalog inline.
+    """
+    if not sku or approved_price <= 0:
+        return
+    existing = db.scalar(select(ProductCost).where(ProductCost.sku == sku))
+    if existing is not None:
+        return
+    db.add(
+        ProductCost(
+            id=new_id("cost"),
+            sku=sku,
+            cost=round(approved_price * _DEFAULT_COST_RATIO, 2),
+            effective_from=datetime.now(timezone.utc),
+        )
+    )
 
 
 def _markdown_deadline() -> datetime:
@@ -228,6 +260,9 @@ def create_config(db: Session, payload: ScenarioIn, actor: str | None = None) ->
             previous_price=a.previous_price, approved_price=a.approved_price, reason=a.reason,
             is_kvi=a.is_kvi, deadline_at=a.deadline_at,
         ))
+        # Auto-seed cost catalog so margin-target dashboards work for
+        # CSV-uploaded SKUs without a manual ProductCost step.
+        _ensure_cost_for_action(db, a.sku, a.approved_price)
     for b in payload.behaviors:
         db.add(ConnectorBehaviorProfile(
             id=new_id("beh"), test_run_config_id=cfg.id, store_id=b.store_id, sku=b.sku,
@@ -295,6 +330,7 @@ def clone_config(db: Session, config: TestRunConfig, new_name: str | None = None
             previous_price=a.previous_price, approved_price=a.approved_price, reason=a.reason,
             is_kvi=a.is_kvi, deadline_at=a.deadline_at,
         ))
+        _ensure_cost_for_action(db, a.sku, a.approved_price)
     for b in config.behaviors:
         db.add(ConnectorBehaviorProfile(
             id=new_id("beh"), test_run_config_id=clone.id, store_id=b.store_id, sku=b.sku,
