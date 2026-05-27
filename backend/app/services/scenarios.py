@@ -137,6 +137,29 @@ def execute_live(db: Session, config: TestRunConfig) -> PriceBatch:
     payload = build_payload(config, "live_rollout", external_id, f"idem-{external_id}")
     result = ingest_batch(db, payload)
     orchestrator.drain(db)
+
+    # The scenario UI may pre-enrich uploaded SKUs before execution so graph
+    # and competitor hints appear quickly. Pricing recommendations, however,
+    # need the PriceAction rows created by ingestion. Re-run enrichment here:
+    # it is idempotent for graph/cost/history and makes pricing current for
+    # the just-executed uploaded batch.
+    if not config.is_seeded:
+        from app.services.scenario_enrichment import auto_enrich_for_actions
+
+        auto_enrich_for_actions(
+            db,
+            [
+                {
+                    "sku": action.sku,
+                    "product_name": action.product_name,
+                    "approved_price": action.approved_price,
+                }
+                for action in config.actions
+            ],
+            config.store_ids,
+            zone_id=config.zone_name,
+        )
+
     db.refresh(result.batch)
     return result.batch
 
@@ -181,7 +204,7 @@ def validate_scenario(payload: ScenarioIn) -> None:
             raise ScenarioValidationError(f"'stale_price' on {b.sku}/{b.channel_type} needs an observed price.")
 
 
-def create_config(db: Session, payload: ScenarioIn) -> TestRunConfig:
+def create_config(db: Session, payload: ScenarioIn, actor: str | None = None) -> TestRunConfig:
     validate_scenario(payload)
     cfg = TestRunConfig(
         id=new_id("cfg"),
@@ -192,6 +215,10 @@ def create_config(db: Session, payload: ScenarioIn) -> TestRunConfig:
         store_ids_csv=",".join(payload.store_ids),
         canary_store_ids_csv=",".join(payload.canary_store_ids),
         is_seeded=False,
+        import_source_hash=payload.import_source_hash,
+        import_source_name=payload.import_source_name,
+        import_summary_json=payload.import_summary,
+        created_by=actor,
     )
     db.add(cfg)
     db.flush()

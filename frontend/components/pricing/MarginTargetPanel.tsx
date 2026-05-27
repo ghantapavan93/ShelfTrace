@@ -80,8 +80,33 @@ const STATUS_META: Record<
   },
 };
 
-export function MarginTargetPanel({ reloadKey }: { reloadKey: number }) {
+export function MarginTargetPanel({
+  reloadKey,
+  liveScoped,
+}: {
+  reloadKey: number;
+  liveScoped?: boolean;
+}) {
   const data = useLive<Data>(() => api.pricingMarginTargets(), [reloadKey]);
+
+  if (liveScoped) {
+    return (
+      <section className="rounded-2xl border border-sky-500/20 bg-sky-500/[.03] p-5">
+        <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-sky-300">
+          <Gauge className="h-4 w-4" /> Margin targets
+        </div>
+        <h2 className="mt-2 text-base font-semibold text-white">
+          Waiting for source-scoped margin history
+        </h2>
+        <p className="mt-1 max-w-2xl text-xs text-slate-400">
+          Demo margin rollups are hidden in Live mode because the current endpoint
+          aggregates the shared pricing table. Uploaded recommendations still show
+          below; production should add import/run provenance to historical sales and
+          costs before this panel is re-enabled for Live mode.
+        </p>
+      </section>
+    );
+  }
 
   if (!data.data) {
     return (

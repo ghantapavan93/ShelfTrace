@@ -19,6 +19,7 @@ Flow:
 from __future__ import annotations
 
 import math
+from datetime import datetime, timezone
 from typing import Iterable
 
 from sqlalchemy import select
@@ -46,6 +47,19 @@ from app.pricing.optimizer import (
     expected_revenue,
     unconstrained_optimal_price,
 )
+
+
+def _as_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _days_until(deadline: datetime | None, now: datetime | None = None) -> int | None:
+    if deadline is None:
+        return None
+    current = _as_utc(now or datetime.now(timezone.utc))
+    return (_as_utc(deadline) - current).days
 
 
 def recommend_for_sku(features: PricingFeatures) -> PricingRecommendation:
@@ -338,7 +352,6 @@ def run_pricing_engine(db: Session) -> dict:
         ProductCost,
     )
     from app.pricing.signals import ExternalSignal as PricingSignal, combined_multiplier
-    from datetime import datetime, timezone
     import uuid
 
     cost_map: dict[str, float] = {
@@ -413,10 +426,7 @@ def run_pricing_engine(db: Session) -> dict:
             competitor_price=competitor_map.get(action.product_name.lower()[:32]),
             is_kvi=action.is_kvi,
             is_perishable=action.markdown_deadline is not None,
-            days_to_deadline=(
-                (action.markdown_deadline - datetime.now(timezone.utc)).days
-                if action.markdown_deadline else None
-            ),
+            days_to_deadline=_days_until(action.markdown_deadline),
             category=category,
             external_demand_multiplier=mult,
             matched_signals=matched,

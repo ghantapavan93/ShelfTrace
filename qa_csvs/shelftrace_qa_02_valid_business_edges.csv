@@ -1,0 +1,7 @@
+Item ID,Product,Old Price,New Price,reason,is_kvi,deadline_at
+qa-edge-eggs-12,"Cage-Free Large Brown Eggs, 12 Count",$3.79,$4.19,"Quoted comma product, KVI check",true,
+qa-edge-strawberry-1lb,"Fresh Strawberries, 1 lb",$3.49,$2.99,"Perishable markdown with deadline",false,2026-05-28T18:00:00Z
+qa-edge-bulk-rice-25lb,"Bulk Jasmine Rice, 25 lb","$1,299.99","$999.99","Currency and comma price parse",false,
+qa-edge-maple-12oz,"Pure Maple Syrup, 12.5 fl oz",9.79,10.49,"Decimal unit size and cost pressure",false,
+,,,
+qa-edge-buns-8ct,"Classic Hot Dog Buns, 8 Count",2.49,1.99,"Blank row above should be skipped",false,

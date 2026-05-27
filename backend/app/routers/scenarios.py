@@ -31,6 +31,10 @@ def _view(config: TestRunConfig) -> ScenarioView:
         store_ids=config.store_ids,
         canary_store_ids=config.canary_store_ids,
         is_seeded=config.is_seeded,
+        import_source_hash=config.import_source_hash,
+        import_source_name=config.import_source_name,
+        import_summary=config.import_summary_json,
+        created_by=config.created_by,
         created_at=config.created_at,
         actions=[
             ScenarioActionView(
@@ -64,7 +68,7 @@ def create_scenario(
     identity: Identity = Depends(require_operator),
 ):
     try:
-        return _view(scenarios.create_config(db, payload))
+        return _view(scenarios.create_config(db, payload, actor=identity.actor))
     except scenarios.ScenarioValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -186,6 +190,8 @@ def import_preview(payload: BulkImportRequest):
         summary=result.summary,
         payload_errors=result.payload_errors,
         blank_rows_skipped=result.blank_rows_skipped,
+        source_sha256=result.source_sha256,
+        schema_version=result.schema_version,
         rows=[
             BulkImportRowView(
                 row_number=r.row_number,

@@ -26,6 +26,18 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 
+def _as_utc(dt: datetime) -> datetime:
+    """Normalize DB datetimes before comparing.
+
+    SQLite can round-trip timezone-aware columns as naive datetimes, while
+    Postgres preserves tzinfo. Treat naive values as UTC so the pricing engine
+    behaves the same across local QA, tests, and production.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 @dataclass
 class ExternalSignal:
     """Demand multiplier active during a window for a category or SKU set."""
@@ -39,8 +51,8 @@ class ExternalSignal:
     sku_pattern: str | None = None       # match by sku prefix
 
     def is_active(self, now: datetime | None = None) -> bool:
-        now = now or datetime.now(timezone.utc)
-        return self.effective_from <= now <= self.effective_until
+        current = _as_utc(now or datetime.now(timezone.utc))
+        return _as_utc(self.effective_from) <= current <= _as_utc(self.effective_until)
 
     def applies_to(self, sku: str, category: str | None) -> bool:
         if self.sku_pattern and sku.startswith(self.sku_pattern):

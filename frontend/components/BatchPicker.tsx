@@ -27,8 +27,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
-import { api } from "@/lib/api";
+import { api, DEMO_BATCH } from "@/lib/api";
 import { timeOf } from "@/lib/format";
+import { useWorkMode } from "@/components/ModeProvider";
 import type { BatchSummary } from "@/lib/types";
 
 interface Props {
@@ -56,6 +57,7 @@ function isFreshRun(createdAt: string): boolean {
 export function BatchPicker({ currentExternalId, onPick }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { mode, isHydrated } = useWorkMode();
   const [open, setOpen] = useState(false);
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,9 +97,22 @@ export function BatchPicker({ currentExternalId, onPick }: Props) {
     return () => window.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  // Resolve current batch (or fall back to first)
+  // In live mode, hide every demo-seeded batch: the Memorial Day showcase
+  // AND certification-sandbox runs that the backend boots on first start.
+  // Anything else (live-cfg_*, scenario-*, user-uploaded) is honest "your data".
+  const visibleBatches =
+    isHydrated && mode === "live"
+      ? batches.filter(
+          (b) =>
+            b.external_id !== DEMO_BATCH &&
+            !b.external_id.startsWith("certification-"),
+        )
+      : batches;
+
+  // Resolve current batch (or fall back to first visible batch)
   const current =
-    batches.find((b) => b.external_id === currentExternalId) ?? batches[0];
+    visibleBatches.find((b) => b.external_id === currentExternalId) ??
+    visibleBatches[0];
 
   function pick(externalId: string) {
     setOpen(false);
@@ -111,11 +126,20 @@ export function BatchPicker({ currentExternalId, onPick }: Props) {
     }
   }
 
-  if (loading || !current) {
+  if (loading) {
     return (
       <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.04] px-3 py-2 text-xs text-slate-500">
         <span className="h-2 w-2 animate-pulse rounded-full bg-slate-500" />
         Loading batches…
+      </div>
+    );
+  }
+
+  if (!current) {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-xl border border-violet-500/20 bg-violet-500/[.04] px-3 py-2 text-xs text-violet-200">
+        <CircleDot className="h-3.5 w-3.5" />
+        No live batches yet
       </div>
     );
   }
@@ -178,10 +202,10 @@ export function BatchPicker({ currentExternalId, onPick }: Props) {
             className="absolute left-0 top-full z-50 mt-1.5 max-h-[460px] w-[420px] overflow-y-auto rounded-xl border border-white/10 bg-[#0b0e15] shadow-2xl"
           >
             <div className="sticky top-0 border-b border-white/10 bg-[#0b0e15]/95 px-3 py-2 text-[10px] font-semibold uppercase tracking-[.22em] text-slate-500 backdrop-blur">
-              {batches.length} batch{batches.length === 1 ? "" : "es"} ·
-              newest first
+              {visibleBatches.length} batch{visibleBatches.length === 1 ? "" : "es"} ·{" "}
+              {isHydrated && mode === "live" ? "live uploads only" : "newest first"}
             </div>
-            {batches.map((b) => {
+            {visibleBatches.map((b) => {
               const isCurrent = b.external_id === current.external_id;
               const badge = statusBadge(b.status);
               const Icon = badge.Icon;

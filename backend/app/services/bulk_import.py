@@ -19,6 +19,7 @@ Design choices:
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 from dataclasses import dataclass, field
@@ -26,6 +27,7 @@ from typing import Any, Literal
 
 MAX_BYTES = 1_048_576  # 1 MiB — generous for a paste/upload preview
 MAX_ROWS = 5_000  # hard cap on rows to keep the round-trip snappy
+IMPORT_SCHEMA_VERSION = "bulk-import-v1"
 
 ImportFormat = Literal["csv", "tsv", "json"]
 
@@ -54,6 +56,8 @@ class ImportPreview:
     summary: dict[str, int]
     payload_errors: list[str] = field(default_factory=list)
     blank_rows_skipped: int = 0  # count of fully-empty rows quietly dropped
+    source_sha256: str = ""
+    schema_version: str = IMPORT_SCHEMA_VERSION
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -62,17 +66,18 @@ class ImportPreview:
 def preview(format_: ImportFormat, content: str) -> ImportPreview:
     """Parse `content` as `format_` and return a per-row preview."""
     payload_errors: list[str] = []
+    source_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
     if not content or not content.strip():
         payload_errors.append("Payload is empty.")
-        return ImportPreview(format_, [], _summary([], 0), payload_errors)
+        return ImportPreview(format_, [], _summary([], 0), payload_errors, source_sha256=source_sha256)
 
     if len(content.encode("utf-8")) > MAX_BYTES:
         payload_errors.append(
             f"Payload exceeds {MAX_BYTES // 1024} KiB. "
             "Split into smaller files or remove unused columns.",
         )
-        return ImportPreview(format_, [], _summary([], 0), payload_errors)
+        return ImportPreview(format_, [], _summary([], 0), payload_errors, source_sha256=source_sha256)
 
     blank_skipped = 0
     if format_ == "json":
@@ -90,6 +95,7 @@ def preview(format_: ImportFormat, content: str) -> ImportPreview:
         _summary(rows, len(rows)),
         payload_errors,
         blank_rows_skipped=blank_skipped,
+        source_sha256=source_sha256,
     )
 
 

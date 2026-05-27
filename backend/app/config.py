@@ -31,12 +31,16 @@ Rate limiting:
 """
 from __future__ import annotations
 
+import json
+from urllib.parse import urlparse
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    app_env: str = "demo"  # demo | development | staging | production
     database_url: str = "postgresql+psycopg2://shelftrace:shelftrace@localhost:5432/shelftrace_db"
     redis_url: str = "redis://localhost:6379/0"
     # Skip the Redis liveness probe and any optional Redis features when false.
@@ -77,6 +81,60 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def normalized_app_env(self) -> str:
+        env = self.app_env.strip().lower()
+        return "production" if env == "prod" else env
+
+    @property
+    def is_production(self) -> bool:
+        return self.normalized_app_env == "production"
+
+
+def production_startup_errors(config: Settings) -> list[str]:
+    """Return blocking config errors for production boots."""
+    if not config.is_production:
+        return []
+
+    errors: list[str] = []
+    parsed_db = urlparse(config.database_url.strip())
+
+    if config.demo_mode:
+        errors.append("DEMO_MODE must be false when APP_ENV=production")
+    if not parsed_db.scheme.startswith("postgresql"):
+        errors.append("DATABASE_URL must use PostgreSQL in production")
+    if not config.use_alembic:
+        errors.append("USE_ALEMBIC must be true in production")
+    if config.log_format.lower() != "json":
+        errors.append("LOG_FORMAT must be json in production")
+    if not config.rate_limit_enabled:
+        errors.append("RATE_LIMIT_ENABLED must be true in production")
+
+    raw_keys = (config.api_keys_json or "").strip()
+    if not raw_keys:
+        errors.append("API_KEYS_JSON must configure at least one API key in production")
+    else:
+        try:
+            parsed_keys = json.loads(raw_keys)
+        except json.JSONDecodeError:
+            errors.append("API_KEYS_JSON must be valid JSON in production")
+        else:
+            if not isinstance(parsed_keys, dict) or not parsed_keys:
+                errors.append("API_KEYS_JSON must be a non-empty object in production")
+            elif not any(v.get("role") == "operator" for v in parsed_keys.values() if isinstance(v, dict)):
+                errors.append("API_KEYS_JSON must include at least one operator key in production")
+
+    origins = config.cors_origin_list
+    if not origins:
+        errors.append("CORS_ORIGINS must include at least one production origin")
+    if "*" in origins:
+        errors.append("CORS_ORIGINS cannot contain '*' in production")
+    local_markers = ("localhost", "127.0.0.1", "::1")
+    if any(any(marker in origin for marker in local_markers) for origin in origins):
+        errors.append("CORS_ORIGINS cannot use localhost origins in production")
+
+    return errors
 
 
 settings = Settings()

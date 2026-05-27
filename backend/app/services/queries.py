@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     ActionDecision,
     AuditEvent,
+    BatchStatus,
     Incident,
     IncidentSeverity,
     IncidentStatus,
@@ -142,15 +143,22 @@ def batch_summary(db: Session, batch: PriceBatch) -> BatchSummary:
 def batch_detail(db: Session, batch: PriceBatch) -> BatchDetail:
     summary = batch_summary(db, batch)
     canary = set(_canary_ids(batch))
-    canary_actions = sorted(
-        [a for a in batch.actions if a.store_id in canary],
+    expansion_active = (
+        batch.status in {BatchStatus.EXPANDING, BatchStatus.COMPLETED}
+        or any(g.kind == "expansion" and g.active for g in batch.rollout_groups)
+    )
+    scoped_actions = list(batch.actions) if expansion_active else [
+        a for a in batch.actions if a.store_id in canary
+    ]
+    actions = sorted(
+        scoped_actions,
         key=lambda a: (a.product_name, a.store_id),
     )
     # Two bounded queries, then in-memory lookup per action — no N+1.
     eligibility_map = measurement.derive_eligibility_for_batch(db, batch)
     return BatchDetail(
         **summary.model_dump(),
-        actions=[action_view(a, eligibility_map.get(a.id)) for a in canary_actions],
+        actions=[action_view(a, eligibility_map.get(a.id)) for a in actions],
     )
 
 

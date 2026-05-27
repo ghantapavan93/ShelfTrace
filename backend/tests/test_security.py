@@ -97,3 +97,45 @@ def test_cors_origin_allowlist_replaces_wildcard():
 
     assert "*" not in live_settings.cors_origin_list
     assert live_settings.cors_origin_list  # non-empty
+
+
+def test_production_startup_rejects_demo_defaults(monkeypatch):
+    from app.config import production_startup_errors, settings as live_settings
+
+    monkeypatch.setattr(live_settings, "app_env", "production")
+    monkeypatch.setattr(live_settings, "demo_mode", True)
+    monkeypatch.setattr(live_settings, "database_url", "sqlite:///demo.db")
+    monkeypatch.setattr(live_settings, "use_alembic", False)
+    monkeypatch.setattr(live_settings, "log_format", "text")
+    monkeypatch.setattr(live_settings, "rate_limit_enabled", False)
+    monkeypatch.setattr(live_settings, "api_keys_json", "")
+    monkeypatch.setattr(live_settings, "cors_origins", "http://localhost:3000")
+
+    errors = production_startup_errors(live_settings)
+    assert "DEMO_MODE must be false when APP_ENV=production" in errors
+    assert "DATABASE_URL must use PostgreSQL in production" in errors
+    assert "API_KEYS_JSON must configure at least one API key in production" in errors
+    assert "CORS_ORIGINS cannot use localhost origins in production" in errors
+
+
+def test_production_startup_accepts_hardened_config(monkeypatch):
+    from app.config import production_startup_errors, settings as live_settings
+
+    monkeypatch.setattr(live_settings, "app_env", "production")
+    monkeypatch.setattr(live_settings, "demo_mode", False)
+    monkeypatch.setattr(
+        live_settings,
+        "database_url",
+        "postgresql+psycopg2://shelftrace:secret@db.internal:5432/shelftrace",
+    )
+    monkeypatch.setattr(live_settings, "use_alembic", True)
+    monkeypatch.setattr(live_settings, "log_format", "json")
+    monkeypatch.setattr(live_settings, "rate_limit_enabled", True)
+    monkeypatch.setattr(
+        live_settings,
+        "api_keys_json",
+        json.dumps({"op-key": {"role": "operator", "actor": "Ops"}}),
+    )
+    monkeypatch.setattr(live_settings, "cors_origins", "https://app.shelftrace.example")
+
+    assert production_startup_errors(live_settings) == []

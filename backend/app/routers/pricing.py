@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
+import json
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -27,6 +30,12 @@ from app.security import Identity, require_operator
 from app.services import product_graph
 
 router = APIRouter(prefix="/api/v1/pricing", tags=["pricing"])
+
+
+class ApplyRecommendationRequest(BaseModel):
+    approval_note: str | None = None
+    approval_policy: str = "operator_review"
+    approved_by: str | None = None
 
 
 @router.post("/seed-history", status_code=201)
@@ -158,6 +167,7 @@ def get_recommendation(rec_id: str, db: Session = Depends(get_db)):
 @router.post("/recommendations/{rec_id}/apply", status_code=201)
 def apply_recommendation_to_shelftrace(
     rec_id: str,
+    request: ApplyRecommendationRequest | None = None,
     db: Session = Depends(get_db),
     identity: Identity = Depends(require_operator),
 ):
@@ -182,6 +192,32 @@ def apply_recommendation_to_shelftrace(
             detail="Recommendation is a no-change — nothing to apply.",
         )
 
+    approval = request or ApplyRecommendationRequest()
+    approved_by = approval.approved_by or identity.actor
+    approval_record = {
+        "source": "pricing_recommendation",
+        "recommendation_id": rec.id,
+        "approved_by": approved_by,
+        "approval_policy": approval.approval_policy,
+        "approval_note": approval.approval_note,
+        "approved_at": datetime.now(timezone.utc).isoformat(),
+        "pricing_snapshot": {
+            "sku": rec.sku,
+            "store_id": rec.store_id,
+            "product_name": rec.product_name,
+            "current_price": rec.current_price,
+            "recommended_price": rec.recommended_price,
+            "confidence": rec.confidence,
+            "elasticity_beta": rec.elasticity_beta,
+            "expected_revenue_lift": rec.expected_revenue_lift,
+            "expected_profit_lift": rec.expected_profit_lift,
+            "reasons": (rec.reasons_json or {}).get("reasons", []),
+            "constraints": (rec.reasons_json or {}).get("constraints", []),
+        },
+    }
+    source_hash = hashlib.sha256(
+        json.dumps(approval_record, sort_keys=True).encode("utf-8")
+    ).hexdigest()
     config_id = f"cfg_{uuid.uuid4().hex[:12]}"
     config = TestRunConfig(
         id=config_id,
@@ -192,6 +228,10 @@ def apply_recommendation_to_shelftrace(
         store_ids_csv=rec.store_id,
         canary_store_ids_csv=rec.store_id,
         is_seeded=False,
+        import_source_hash=source_hash,
+        import_source_name=f"pricing_recommendation:{rec.id}",
+        import_summary_json=approval_record,
+        created_by=identity.actor,
     )
     db.add(config)
     db.add(
@@ -215,6 +255,11 @@ def apply_recommendation_to_shelftrace(
     return {
         "recommendation_id": rec_id,
         "scenario_config_id": config_id,
+        "approval": {
+            "approved_by": approved_by,
+            "approval_policy": approval.approval_policy,
+            "source_hash": source_hash,
+        },
         "next_step": f"/scenarios — load and execute scenario {config_id} to push this price through the canary → verification → expansion loop.",
     }
 

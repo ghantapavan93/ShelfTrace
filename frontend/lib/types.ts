@@ -196,6 +196,10 @@ export interface Scenario {
   store_ids: string[];
   canary_store_ids: string[];
   is_seeded: boolean;
+  import_source_hash: string | null;
+  import_source_name: string | null;
+  import_summary: Record<string, unknown> | null;
+  created_by: string | null;
   created_at: string;
   actions: ScenarioAction[];
   behaviors: ConnectorBehavior[];
@@ -233,6 +237,8 @@ export interface BulkImportPreviewResponse {
   payload_errors: string[];
   rows: BulkImportRowView[];
   blank_rows_skipped: number;
+  source_sha256: string;
+  schema_version: string;
 }
 
 export interface EngineeringTrace {

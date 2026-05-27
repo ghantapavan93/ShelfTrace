@@ -1,0 +1,8 @@
+sku,product_name,previous_price,approved_price,reason
+qa-dup-milk-1gal,Original Milk Row,6.49,5.99,First duplicate should pass
+qa-dup-milk-1gal,Duplicate Milk Row,6.49,5.99,Second duplicate should fail
+,,,
+qa-dup-eggs-12,Original Eggs Row,3.79,4.19,Valid separate SKU
+,,,
+,,5.99,4.99
+qa-dup-soda-12pk,Cola Soda 12 Pack,8.99,7.49,Valid promo row

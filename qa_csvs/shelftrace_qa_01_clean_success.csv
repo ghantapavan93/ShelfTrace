@@ -1,0 +1,7 @@
+sku,product_name,previous_price,approved_price,reason
+qa-clean-eggs-12,Cage-Free Large Brown Eggs 12 Count,3.79,4.19,Cost change clean rollout
+qa-clean-strawberry-1lb,Fresh Strawberries 1 lb,3.49,2.99,Weekend markdown clean rollout
+qa-clean-oj-52oz,Premium Orange Juice 52 oz,8.99,9.49,Supply pressure clean rollout
+qa-clean-milk-1gal,Organic Whole Milk 1 Gallon,6.49,5.99,Competitive staple clean rollout
+qa-clean-avocado-4ct,Hass Avocados 4 Count,4.99,5.49,Imported staple clean rollout
+qa-clean-soda-12pk,Cola Soda 12 Pack,8.99,7.49,Event promotion clean rollout

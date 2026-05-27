@@ -515,6 +515,31 @@ def test_signal_multiplier_active_within_window():
     assert combined_multiplier([s], "any-sku", None, now) == 1.5
 
 
+def test_signal_multiplier_accepts_naive_sqlite_datetimes():
+    from datetime import datetime, timezone, timedelta
+    from app.pricing.signals import ExternalSignal, combined_multiplier
+
+    now = datetime.now(timezone.utc)
+    naive_now = now.replace(tzinfo=None)
+    s = ExternalSignal(
+        name="SQLite round-trip",
+        signal_type="holiday",
+        multiplier=1.25,
+        effective_from=naive_now - timedelta(days=1),
+        effective_until=naive_now + timedelta(days=1),
+    )
+    assert combined_multiplier([s], "any-sku", None, now) == 1.25
+
+
+def test_days_until_accepts_naive_sqlite_deadline():
+    from datetime import datetime, timezone, timedelta
+    from app.pricing.pipeline import _days_until
+
+    now = datetime.now(timezone.utc)
+    naive_deadline = (now + timedelta(days=3)).replace(tzinfo=None)
+    assert _days_until(naive_deadline, now) == 3
+
+
 def test_signal_multiplier_excluded_when_outside_window():
     from datetime import datetime, timezone, timedelta
     from app.pricing.signals import ExternalSignal, combined_multiplier

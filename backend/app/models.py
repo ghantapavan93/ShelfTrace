@@ -386,6 +386,10 @@ class TestRunConfig(Base):
     store_ids_csv: Mapped[str] = mapped_column(Text, default="")
     canary_store_ids_csv: Mapped[str] = mapped_column(Text, default="")
     is_seeded: Mapped[bool] = mapped_column(Boolean, default=False)
+    import_source_hash: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    import_source_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    import_summary_json: Mapped[dict | None] = mapped_column(JSONColumn, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     actions: Mapped[list[TestRunAction]] = relationship(back_populates="config", cascade="all, delete-orphan")

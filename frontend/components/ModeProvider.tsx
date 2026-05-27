@@ -3,9 +3,9 @@
 /**
  * ModeProvider — client-side toggle between DEMO and LIVE work modes.
  *
- * This is purely a UX choice (not a backend security boundary). The backend
- * always runs in the same simulated mode; this toggle changes how the UI
- * presents itself:
+ * This is a presentation/data-filtering choice (not a backend security
+ * boundary). The backend always runs in the same simulated connector mode;
+ * this toggle changes what the UI surfaces:
  *
  *   DEMO — show "Load Memorial Day" button, pre-seeded scenarios, sample
  *          data hints. Optimised for first-time reviewers who want a guided

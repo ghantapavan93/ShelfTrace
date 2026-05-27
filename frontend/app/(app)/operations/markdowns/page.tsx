@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { motion, useReducedMotion } from "framer-motion";
-import { Clock, Tag, ScanLine, Globe, CheckCircle2, AlertCircle, AlertTriangle } from "lucide-react";
+import { Clock, Tag, ScanLine, Globe, CheckCircle2, AlertCircle, AlertTriangle, FlaskConical, ArrowRight } from "lucide-react";
 import { api, DEMO_BATCH } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { money, timeOf } from "@/lib/format";
 import { ListSkeleton } from "@/components/Skeleton";
+import { useWorkMode } from "@/components/ModeProvider";
 import type { ActionView, ChannelView } from "@/lib/types";
 
 const CH = {
@@ -159,7 +160,12 @@ function CountdownBadge({ deadlineIso }: { deadlineIso: string }) {
 // Page
 // ────────────────────────────────────────────────────────────────────────
 export default function MarkdownsPage() {
-  const { data, error } = useLive(() => api.markdowns(DEMO_BATCH));
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
+  // In Live mode the markdowns query is demo-bound and would either
+  // surface seeded strawberry data or 404; short-circuit before we even
+  // try the fetch so the page never flashes an error state.
+  const { data, error } = useLive(() => api.markdowns(DEMO_BATCH), [isLiveWorkMode]);
 
   // Sort by deadline ascending — most urgent floats to the top
   const sortedMarkdowns = useMemo(() => {
@@ -170,6 +176,54 @@ export default function MarkdownsPage() {
       return da - db;
     });
   }, [data]);
+
+  // Live mode: show clean-slate notice BEFORE any loading/error states.
+  // The underlying batch query is hard-bound to the seeded demo, so even
+  // a successful fetch would leak demo SLA data into Live mode.
+  if (isLiveWorkMode) {
+    return (
+      <div className="space-y-5">
+        <div className="glass-strong rounded-3xl border border-violet-500/25 bg-gradient-to-br from-violet-500/[.04] via-ink-900 to-black p-7 sm:p-10">
+          <div className="flex items-start gap-4">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-violet-500/30 bg-violet-500/10 text-violet-200">
+              <FlaskConical className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-[.22em] text-violet-300">
+                Live mode clean slate
+              </div>
+              <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
+                Perishable markdowns are demo-scoped today.
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm text-slate-400">
+                The markdown reliability SLA page is currently bound to the seeded
+                Memorial Day demo batch (strawberries). Once uploaded batches expose
+                their own perishable deadlines through the markdowns endpoint, this
+                surface will show your live batch instead. Switch to Demo mode to
+                inspect the strawberry SLA timeline, or open the live batch directly
+                from /operations.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Link
+                  href="/operations"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110"
+                >
+                  Back to live operations
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/scenarios"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                >
+                  Upload a perishable scenario
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (error)
     return (

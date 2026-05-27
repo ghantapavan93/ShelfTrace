@@ -10,6 +10,7 @@ from app.models import (
     IncidentStatus,
     IncidentType,
     PriceAction,
+    PricingRecommendation,
     ReceiptStatus,
     TestRunConfig,
 )
@@ -60,6 +61,37 @@ def test_success_only_scenario_completes_without_incidents(db):
     # All canary actions verified -> ready to expand.
     assert batch.status == BatchStatus.READY_FOR_EXPANSION
     assert batch.expansion_blocked is False
+
+
+def test_execute_live_refreshes_pricing_for_uploaded_skus(db):
+    payload = _milk_scenario([])
+    payload.import_source_hash = "b" * 64
+    payload.import_source_name = "uploaded-price-actions.csv"
+    cfg = scenarios.create_config(db, payload)
+
+    scenarios.execute_live(db, cfg)
+
+    recs = (
+        db.query(PricingRecommendation)
+        .filter(PricingRecommendation.sku == "milk-1gal")
+        .all()
+    )
+    assert recs
+    assert {r.store_id for r in recs} == {"s1", "s2"}
+
+
+def test_scenario_persists_import_provenance(db):
+    payload = _milk_scenario([])
+    payload.import_source_hash = "a" * 64
+    payload.import_source_name = "official-price-actions.csv"
+    payload.import_summary = {"total": 1, "valid": 1, "invalid": 0}
+
+    cfg = scenarios.create_config(db, payload, actor="QA Operator")
+
+    assert cfg.import_source_hash == "a" * 64
+    assert cfg.import_source_name == "official-price-actions.csv"
+    assert cfg.import_summary_json == {"total": 1, "valid": 1, "invalid": 0}
+    assert cfg.created_by == "QA Operator"
 
 
 def test_timeout_then_success_resolves_after_retry(db):

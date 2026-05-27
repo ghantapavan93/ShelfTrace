@@ -53,7 +53,15 @@ interface Props {
   storesCsv: string;
   canaryCsv: string;
   actions: ScenarioAction[];
-  onImportProducts: (next: ScenarioAction[]) => void;
+  onImportProducts: (
+    next: ScenarioAction[],
+    provenance?: {
+      sourceHash: string;
+      sourceName: string | null;
+      summary: { total: number; valid: number; invalid: number };
+      schemaVersion: string;
+    },
+  ) => void;
   onGenerateBehaviors: (next: ConnectorBehavior[]) => void;
 }
 
@@ -221,6 +229,8 @@ export function ScenariosBulkPanel({
     summary: { total: number; valid: number; invalid: number };
     payload_errors: string[];
     blank_rows_skipped?: number;
+    source_sha256?: string;
+    schema_version?: string;
   } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [validationSource, setValidationSource] = useState<"server" | null>(null);
@@ -288,6 +298,8 @@ export function ScenariosBulkPanel({
         summary: res.summary,
         payload_errors: res.payload_errors,
         blank_rows_skipped: res.blank_rows_skipped,
+        source_sha256: res.source_sha256,
+        schema_version: res.schema_version,
       });
       setValidationSource("server");
     } catch (err) {
@@ -372,7 +384,14 @@ export function ScenariosBulkPanel({
       is_kvi: r.is_kvi,
       deadline_at: r.deadline_at,
     }));
-    if (next.length > 0) onImportProducts(next);
+    if (next.length > 0) {
+      onImportProducts(next, preview.source_sha256 ? {
+        sourceHash: preview.source_sha256,
+        sourceName: fileName,
+        summary: preview.summary,
+        schemaVersion: preview.schema_version ?? "bulk-import-v1",
+      } : undefined);
+    }
   }
 
   function handlePreset(presetId: string, label: string) {
@@ -600,6 +619,14 @@ export function ScenariosBulkPanel({
                   {validationSource === "server" && !isValidating && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-black/30 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-400">
                       <ShieldCheck className="h-2.5 w-2.5" /> server-validated
+                    </span>
+                  )}
+                  {preview?.source_sha256 && !isValidating && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full bg-black/30 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-slate-400"
+                      title={`Import source SHA-256: ${preview.source_sha256}`}
+                    >
+                      sha {preview.source_sha256.slice(0, 10)}
                     </span>
                   )}
                 </div>

@@ -14,8 +14,16 @@ build/
 out/
 *.egg-info/
 .venv/
+.venv-qa/
 venv/
 env/
+
+# Local Next.js env (developer machine-specific backend URL)
+.env.local
+.env.*.local
+
+# Per-machine Claude Code config (launch.json, settings.local.json)
+.claude/
 coverage/
 *.log
 .idea/

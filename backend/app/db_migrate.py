@@ -32,6 +32,20 @@ _OUTBOX_COLUMNS = [
     ("last_error", "TEXT"),
 ]
 
+_TEST_RUN_CONFIG_COLUMNS = [
+    ("import_source_hash", "VARCHAR(64)"),
+    ("import_source_name", "VARCHAR(256)"),
+    ("import_summary_json", "JSONB"),
+    ("created_by", "VARCHAR(128)"),
+]
+
+_SQLITE_TEST_RUN_CONFIG_COLUMNS = [
+    ("import_source_hash", "VARCHAR(64)"),
+    ("import_source_name", "VARCHAR(256)"),
+    ("import_summary_json", "JSON"),
+    ("created_by", "VARCHAR(128)"),
+]
+
 # JSONB upgrade for payload columns. Idempotent: the USING clause is a no-op
 # when the column is already JSONB. Skipped silently if the table is missing.
 _JSONB_TARGETS = [
@@ -69,7 +83,40 @@ def _upgrade_to_jsonb(conn, table: str, column: str) -> None:
         )
 
 
+def _sqlite_table_exists(conn, table: str) -> bool:
+    row = conn.execute(
+        text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table"),
+        {"table": table},
+    ).fetchone()
+    return row is not None
+
+
+def _sqlite_columns(conn, table: str) -> set[str]:
+    rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+    return {row[1] for row in rows}
+
+
+def _run_sqlite_migrations() -> None:
+    with engine.begin() as conn:
+        if not _sqlite_table_exists(conn, "test_run_configs"):
+            return
+        existing = _sqlite_columns(conn, "test_run_configs")
+        for name, ddl in _SQLITE_TEST_RUN_CONFIG_COLUMNS:
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE test_run_configs ADD COLUMN {name} {ddl}"))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_test_run_configs_import_source_hash "
+                "ON test_run_configs (import_source_hash)"
+            )
+        )
+    logger.info("SQLite additive migrations applied (import provenance columns)")
+
+
 def run_migrations() -> None:
+    if engine.dialect.name == "sqlite":
+        _run_sqlite_migrations()
+        return
     if engine.dialect.name != "postgresql":
         return
     with engine.begin() as conn:
@@ -77,6 +124,14 @@ def run_migrations() -> None:
             conn.execute(text(f"ALTER TABLE price_batches ADD COLUMN IF NOT EXISTS {name} {ddl}"))
         for name, ddl in _OUTBOX_COLUMNS:
             conn.execute(text(f"ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS {name} {ddl}"))
+        for name, ddl in _TEST_RUN_CONFIG_COLUMNS:
+            conn.execute(text(f"ALTER TABLE test_run_configs ADD COLUMN IF NOT EXISTS {name} {ddl}"))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_test_run_configs_import_source_hash "
+                "ON test_run_configs (import_source_hash)"
+            )
+        )
         for table, column in _JSONB_TARGETS:
             _upgrade_to_jsonb(conn, table, column)
     logger.info("Additive migrations applied (run_mode/env, outbox backoff, JSONB upgrade)")

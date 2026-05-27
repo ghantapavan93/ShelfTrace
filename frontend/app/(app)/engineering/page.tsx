@@ -9,6 +9,8 @@ import { timeOf } from "@/lib/format";
 import { EligibilityPanel } from "@/components/EligibilityPanel";
 import { BlurTextAnimation } from "@/components/text/BlurTextAnimation";
 import { DetailSkeleton } from "@/components/Skeleton";
+import { useWorkMode } from "@/components/ModeProvider";
+import { SandboxStrip } from "@/components/LiveModeNotice";
 import type { EngineeringTrace } from "@/lib/types";
 
 function Json({ value }: { value: unknown }) {
@@ -23,6 +25,8 @@ type Mode = "live_rollout" | "certification";
 
 export default function EngineeringPage() {
   const [mode, setMode] = useState<Mode>("live_rollout");
+  const { mode: workMode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && workMode === "live";
 
   // Honor ?mode=certification deep link from the Certification Lab.
   useEffect(() => {
@@ -33,11 +37,39 @@ export default function EngineeringPage() {
 
   const { data, error } = useLive<EngineeringTrace>(() => api.engineering({ runMode: mode }), [mode]);
 
-  if (error) return <div className="glass rounded-2xl p-6 text-slate-300">Could not load engineering trace.</div>;
-  if (!data) return <DetailSkeleton />;
+  if (error)
+    return (
+      <div className="space-y-6">
+        {isLiveWorkMode && (
+          <SandboxStrip
+            surfaceName="Pipeline trace"
+            missingForLive="Events here aggregate across all batches the backend has run, including the seeded Memorial Day demo. Production would scope the trace to a specific tenant / source run."
+          />
+        )}
+        <div className="glass rounded-2xl p-6 text-slate-300">Could not load engineering trace.</div>
+      </div>
+    );
+  if (!data)
+    return (
+      <div className="space-y-6">
+        {isLiveWorkMode && (
+          <SandboxStrip
+            surfaceName="Pipeline trace"
+            missingForLive="Events here aggregate across all batches the backend has run, including the seeded Memorial Day demo. Production would scope the trace to a specific tenant / source run."
+          />
+        )}
+        <DetailSkeleton />
+      </div>
+    );
 
   return (
     <div className="space-y-6">
+      {isLiveWorkMode && (
+        <SandboxStrip
+          surfaceName="Pipeline trace"
+          missingForLive="Events here aggregate across all batches the backend has run, including the seeded Memorial Day demo. Production would scope the trace to a specific tenant / source run."
+        />
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Engineering Execution Trace</h1>

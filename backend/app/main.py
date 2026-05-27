@@ -7,7 +7,7 @@ from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
 
-from app.config import settings
+from app.config import production_startup_errors, settings
 from app.database import Base, SessionLocal, engine
 from app.db_migrate import run_migrations
 from app.logging_config import configure_logging
@@ -56,6 +56,11 @@ def _provision_schema() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    startup_errors = production_startup_errors(settings)
+    if startup_errors:
+        raise RuntimeError(
+            "Invalid production configuration: " + "; ".join(startup_errors)
+        )
     _provision_schema()
     setup_tracing(app)
     if auth_enabled():
@@ -170,6 +175,7 @@ def health(response: Response):
     return {
         "status": "healthy" if ok else "degraded",
         "service": "shelftrace-control-plane",
+        "app_env": settings.normalized_app_env,
         "demo_mode": settings.demo_mode,
         "auth_enabled": auth_enabled(),
         "otel_enabled": settings.otel_enabled,

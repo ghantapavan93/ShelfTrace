@@ -24,6 +24,8 @@ import { StatusPill } from "@/components/StatusPill";
 import { DetailSkeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
 import { EASE } from "@/lib/motion";
+import { useWorkMode } from "@/components/ModeProvider";
+import { SandboxStrip } from "@/components/LiveModeNotice";
 import type { CertificationCheck, CertificationReport } from "@/lib/types";
 
 // Canonical check order — what the page renders top-to-bottom regardless
@@ -100,6 +102,8 @@ export default function CertificationPage() {
   const { data, error, reload } = useLive<CertificationReport>(() => api.certificationCurrent());
   const [busy, setBusy] = useState<string | null>(null);
   const reduced = useReducedMotion();
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
 
   // Progressive reveal state machine — drives the card grid below.
   // When the user explicitly clicks Reset or Rerun, we animate each
@@ -168,16 +172,35 @@ export default function CertificationPage() {
 
   if (error)
     return (
-      <div className="glass rounded-2xl p-6 text-slate-300">
-        Could not load certification. Try{" "}
-        <button onClick={reset} className="text-brand-400 underline">
-          Reset Certification Demo
-        </button>
-        .
-        <div className="mt-1 text-xs text-slate-500">{error}</div>
+      <div className="space-y-6">
+        {isLiveWorkMode && (
+          <SandboxStrip
+            surfaceName="Certification runs"
+            missingForLive="Conformance gates run against a built-in sandbox connector profile. Production would scope to your real POS/ESL/ecommerce credentials and signed receipts."
+          />
+        )}
+        <div className="glass rounded-2xl p-6 text-slate-300">
+          Could not load certification. Try{" "}
+          <button onClick={reset} className="text-brand-400 underline">
+            Reset Certification Demo
+          </button>
+          .
+          <div className="mt-1 text-xs text-slate-500">{error}</div>
+        </div>
       </div>
     );
-  if (!data) return <DetailSkeleton />;
+  if (!data)
+    return (
+      <div className="space-y-6">
+        {isLiveWorkMode && (
+          <SandboxStrip
+            surfaceName="Certification runs"
+            missingForLive="Conformance gates run against a built-in sandbox connector profile. Production would scope to your real POS/ESL/ecommerce credentials and signed receipts."
+          />
+        )}
+        <DetailSkeleton />
+      </div>
+    );
 
   const failed = data.status === "failed_pending_remediation";
   const passed = data.status === "passed";
@@ -190,6 +213,13 @@ export default function CertificationPage() {
           Validate store-system reliability before automated price execution is enabled.
         </p>
       </div>
+
+      {isLiveWorkMode && (
+        <SandboxStrip
+          surfaceName="Certification runs"
+          missingForLive="Conformance gates run against a built-in sandbox connector profile. Production would scope to your real POS/ESL/ecommerce credentials and signed receipts."
+        />
+      )}
 
       {/* Status hero */}
       <motion.section

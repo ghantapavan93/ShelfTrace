@@ -41,6 +41,7 @@ import { useLive } from "@/lib/useLive";
 import { money } from "@/lib/format";
 import { ListSkeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
+import { useWorkMode } from "@/components/ModeProvider";
 import { EntityGraphVisualization } from "@/components/product-graph/EntityGraphVisualization";
 import { SubstitutesPanel } from "@/components/product-graph/SubstitutesPanel";
 import { TierLadder } from "@/components/product-graph/TierLadder";
@@ -110,11 +111,27 @@ type CategoryNode = {
   children: unknown[];
 };
 
+function filterCategoryTree(nodes: CategoryNode[], allowedIds: Set<string>): CategoryNode[] {
+  const filtered: CategoryNode[] = [];
+  for (const node of nodes) {
+    const children = filterCategoryTree(
+      ((node.children as CategoryNode[]) || []),
+      allowedIds,
+    );
+    if (allowedIds.has(node.id) || children.length > 0) {
+      filtered.push({ ...node, children });
+    }
+  }
+  return filtered;
+}
+
 export default function ProductGraphPage() {
   const [busy, setBusy] = useState<"seed" | "match" | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
 
   const entities = useLive(() => api.graphEntities(100), [reloadKey]);
   const categories = useLive(() => api.graphCategories(), [reloadKey]);
@@ -180,25 +197,56 @@ export default function ProductGraphPage() {
     }
   }, [toast]);
 
-  const totalEntities = entities.data?.total ?? 0;
+  const visibleEntities = useMemo(() => {
+    const list = entities.data?.entities ?? [];
+    if (!isLiveWorkMode) return list;
+    // In Live mode, hide entities that came from the seed-demo endpoint
+    // (the 3 Memorial Day canonical products: eggs, strawberries, OJ).
+    // Those are flagged is_manual=true on the seeded rows AND carry no
+    // bootstrap attribute. Manually-created entities via POST /entities
+    // are NOT hidden — only the demo seed is.
+    return list.filter((e) => {
+      const seededDemo =
+        e.is_manual === true &&
+        e.attributes?.bootstrapped_from_scenario !== true;
+      return !seededDemo;
+    });
+  }, [entities.data, isLiveWorkMode]);
+
+  useEffect(() => {
+    if (selectedEntityId && !visibleEntities.some((e) => e.id === selectedEntityId)) {
+      setSelectedEntityId(null);
+    }
+  }, [selectedEntityId, visibleEntities]);
+
+  const totalEntities = visibleEntities.length;
   const totalSkus = useMemo(
-    () =>
-      (entities.data?.entities ?? []).reduce((s, e) => s + e.linked_sku_count, 0),
-    [entities.data],
+    () => visibleEntities.reduce((s, e) => s + e.linked_sku_count, 0),
+    [visibleEntities],
   );
   const totalObservations = useMemo(
     () =>
-      (entities.data?.entities ?? []).reduce(
-        (s, e) => s + e.competitor_observation_count,
-        0,
-      ),
-    [entities.data],
+      visibleEntities.reduce((s, e) => s + e.competitor_observation_count, 0),
+    [visibleEntities],
   );
+  const visibleCategoryIds = useMemo(
+    () =>
+      new Set(
+        visibleEntities
+          .map((entity) => entity.category_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    [visibleEntities],
+  );
+  const visibleCategories = useMemo(() => {
+    const all = (categories.data?.categories as CategoryNode[]) ?? [];
+    return isLiveWorkMode ? filterCategoryTree(all, visibleCategoryIds) : all;
+  }, [categories.data, isLiveWorkMode, visibleCategoryIds]);
   const totalCategories = useMemo(() => {
     const count = (nodes: CategoryNode[]): number =>
       nodes.reduce((s, n) => s + 1 + count((n.children as CategoryNode[]) || []), 0);
-    return count((categories.data?.categories as CategoryNode[]) ?? []);
-  }, [categories.data]);
+    return count(visibleCategories);
+  }, [visibleCategories]);
 
   return (
     <div className="space-y-6">
@@ -228,31 +276,49 @@ export default function ProductGraphPage() {
           </p>
 
           <div className="mt-6 flex flex-wrap gap-2">
-            <button
-              onClick={handleSeed}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:shadow-violet-500/40 disabled:opacity-50"
-            >
-              {busy === "seed" ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-              Seed Memorial Day graph
-            </button>
-            <button
-              onClick={handleBulkMatch}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
-            >
-              {busy === "match" ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <Zap className="h-4 w-4" />
-              )}
-              Auto-match competitors
-            </button>
+            {!isLiveWorkMode ? (
+              <button
+                onClick={handleSeed}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:shadow-violet-500/40 disabled:opacity-50"
+              >
+                {busy === "seed" ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Seed Memorial Day graph
+              </button>
+            ) : (
+              <Link
+                href="/scenarios"
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:shadow-violet-500/40"
+              >
+                <Database className="h-4 w-4" />
+                Upload scenario data
+              </Link>
+            )}
+            {!isLiveWorkMode && (
+              <button
+                onClick={handleBulkMatch}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
+              >
+                {busy === "match" ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Zap className="h-4 w-4" />
+                )}
+                Auto-match competitors
+              </button>
+            )}
           </div>
+          {isLiveWorkMode && (
+            <p className="relative mt-3 max-w-2xl text-xs text-violet-200/80">
+              Live mode shows only entities bootstrapped from uploaded or manually-created
+              scenarios. Memorial Day demo entities stay hidden here unless you switch back to Demo.
+            </p>
+          )}
         </div>
       </motion.section>
 
@@ -297,11 +363,17 @@ export default function ProductGraphPage() {
             Category hierarchy
           </div>
           {categories.data ? (
-            categories.data.categories.length === 0 ? (
-              <EmptyHint message="No categories yet — seed the demo graph to populate." />
+            visibleCategories.length === 0 ? (
+              <EmptyHint
+                message={
+                  isLiveWorkMode
+                    ? "No uploaded categories yet - import or build a scenario to populate."
+                    : "No categories yet - seed the demo graph to populate."
+                }
+              />
             ) : (
               <ul className="space-y-1.5">
-                {(categories.data.categories as CategoryNode[]).map((cat) => (
+                {visibleCategories.map((cat) => (
                   <CategoryRow key={cat.id} node={cat} depth={0} />
                 ))}
               </ul>
@@ -329,11 +401,17 @@ export default function ProductGraphPage() {
               )}
             </div>
             {entities.data ? (
-              entities.data.entities.length === 0 ? (
-                <EmptyHint message="No entities yet — click 'Seed Memorial Day graph' above to populate." />
+              visibleEntities.length === 0 ? (
+                <EmptyHint
+                  message={
+                    isLiveWorkMode
+                      ? "No uploaded-product graph yet - import a CSV or build a scenario, then run auto-enrichment."
+                      : "No entities yet - click 'Seed Memorial Day graph' above to populate."
+                  }
+                />
               ) : (
                 <div className="space-y-2">
-                  {entities.data.entities.map((e) => (
+                  {visibleEntities.map((e) => (
                     <EntityRow
                       key={e.id}
                       entity={e}
@@ -386,7 +464,9 @@ export default function ProductGraphPage() {
               <Link href="/scenarios" className="text-brand-400 hover:underline">
                 /scenarios
               </Link>{" "}
-              after seeding to see competitor price hints alongside each action row.
+              {isLiveWorkMode
+                ? "after uploading data to see competitor price hints alongside each action row."
+                : "after seeding to see competitor price hints alongside each action row."}
             </p>
           </div>
         </div>

@@ -1,0 +1,8 @@
+sku,product_name,previous_price,approved_price,reason
+,Missing SKU Product,5.99,4.99,Missing SKU should fail
+qa-invalid-no-name,,5.99,4.99,Missing product name should fail
+qa-invalid-nonnumeric,Non Numeric Prior,abc,4.99,Nonnumeric prior should fail
+qa-invalid-zero,Zero Approved Price,1.99,0,Zero approved should fail
+qa-invalid-negative,Negative Approved Price,2.99,-1.00,Negative approved should fail
+qa-invalid-jump,Missing Decimal Typo,5.99,599,Five times jump should fail
+qa-invalid-good,Valid Row Survives,4.99,4.49,Valid row should still apply

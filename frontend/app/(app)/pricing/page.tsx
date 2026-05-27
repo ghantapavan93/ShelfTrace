@@ -44,6 +44,7 @@ import { useLive } from "@/lib/useLive";
 import { money } from "@/lib/format";
 import { ListSkeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
+import { useWorkMode } from "@/components/ModeProvider";
 import { WhatIfSimulator } from "@/components/pricing/WhatIfSimulator";
 import { KviWatchlist } from "@/components/pricing/KviWatchlist";
 import { MarginTargetPanel } from "@/components/pricing/MarginTargetPanel";
@@ -98,11 +99,14 @@ export default function PricingPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const { toast } = useToast();
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
 
   const recs = useLive<{ recommendations: Recommendation[] }>(
     () => api.pricingRecommendations(true),
     [reloadKey],
   );
+  const scenarios = useLive(() => api.scenarios(), [reloadKey]);
 
   const seedAndRun = useCallback(async () => {
     setBusy("seed");
@@ -149,8 +153,25 @@ export default function PricingPage() {
     }
   }, [toast]);
 
-  const totals = useMemo(() => {
+  const liveScenarioSkus = useMemo(() => {
+    const skus = new Set<string>();
+    for (const scenario of scenarios.data ?? []) {
+      if (scenario.is_seeded) continue;
+      for (const action of scenario.actions) {
+        skus.add(action.sku);
+      }
+    }
+    return skus;
+  }, [scenarios.data]);
+
+  const visibleRecommendations = useMemo(() => {
     const list = recs.data?.recommendations ?? [];
+    if (!isLiveWorkMode) return list;
+    return list.filter((rec) => liveScenarioSkus.has(rec.sku));
+  }, [isLiveWorkMode, liveScenarioSkus, recs.data]);
+
+  const totals = useMemo(() => {
+    const list = visibleRecommendations;
     return {
       n: list.length,
       revenue: list.reduce((s, r) => s + r.expected_revenue_lift, 0),
@@ -159,7 +180,7 @@ export default function PricingPage() {
         ? list.reduce((s, r) => s + r.confidence, 0) / list.length
         : 0,
     };
-  }, [recs.data]);
+  }, [visibleRecommendations]);
 
   return (
     <div className="space-y-6">
@@ -201,6 +222,14 @@ export default function PricingPage() {
         synthetic data with KNOWN β so the recovery error is provable.
       </div>
 
+      {isLiveWorkMode && (
+        <div className="rounded-2xl border border-violet-500/25 bg-violet-500/[.04] px-4 py-3 text-sm text-violet-200">
+          <span className="font-semibold">Live scope:</span> recommendations are
+          filtered to SKUs from non-demo scenarios. Demo margin rollups stay
+          hidden here until historical sales and costs carry import/run provenance.
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[.02] px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -210,6 +239,7 @@ export default function PricingPage() {
             disabled={busy !== null}
             className={clsx(
               "inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition",
+              isLiveWorkMode && "hidden",
               busy === "seed"
                 ? "cursor-wait bg-white/10 text-slate-400"
                 : "bg-gradient-to-r from-brand to-brand-600 text-white shadow-glow-brand hover:brightness-110",
@@ -236,11 +266,23 @@ export default function PricingPage() {
             disabled={busy !== null}
             className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-40"
           >
-            <Play className="h-3.5 w-3.5" /> Re-run engine only
+            <Play className="h-3.5 w-3.5" /> {isLiveWorkMode ? "Re-run for live SKUs" : "Re-run engine only"}
           </button>
         </div>
         <div className="text-[11px] text-slate-500">
-          First time? Click <span className="text-slate-300">Seed + Run</span>.
+          {isLiveWorkMode ? (
+            <>
+              Live mode uses uploaded scenario SKUs. Add data in{" "}
+              <Link href="/scenarios" className="text-violet-300 underline">
+                Scenarios
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              First time? Click <span className="text-slate-300">Seed + Run</span>.
+            </>
+          )}
         </div>
       </div>
 
@@ -272,10 +314,14 @@ export default function PricingPage() {
       )}
 
       {/* Margin target policy rollup */}
-      <MarginTargetPanel reloadKey={reloadKey} />
+      <MarginTargetPanel reloadKey={reloadKey} liveScoped={isLiveWorkMode} />
 
       {/* KVI watchlist — traffic-driver alignment */}
-      <KviWatchlist reloadKey={reloadKey} />
+      <KviWatchlist
+        reloadKey={reloadKey}
+        allowedSkus={isLiveWorkMode ? liveScenarioSkus : null}
+        sourceLabel={isLiveWorkMode ? "uploaded SKUs only" : undefined}
+      />
 
       {/* Recommendations table */}
       <section className="glass rounded-2xl p-5">
@@ -284,11 +330,11 @@ export default function PricingPage() {
             Recommendations
             {recs.data && (
               <span className="ml-2 font-normal text-slate-500">
-                · {recs.data.recommendations.length}
+                · {visibleRecommendations.length}
               </span>
             )}
           </h2>
-          {recs.data && recs.data.recommendations.length > 0 && (
+          {recs.data && visibleRecommendations.length > 0 && (
             <a
               href={`${api.base}/api/v1/pricing/recommendations/export.csv`}
               target="_blank"
@@ -303,11 +349,11 @@ export default function PricingPage() {
 
         {!recs.data ? (
           <ListSkeleton rows={4} />
-        ) : recs.data.recommendations.length === 0 ? (
-          <EmptyState onSeed={seedAndRun} />
+        ) : visibleRecommendations.length === 0 ? (
+          <EmptyState onSeed={seedAndRun} liveMode={isLiveWorkMode} />
         ) : (
           <div className="space-y-2">
-            {recs.data.recommendations.map((r) => (
+            {visibleRecommendations.map((r) => (
               <RecommendationRow
                 key={r.id}
                 rec={r}
@@ -694,22 +740,46 @@ function ConfidencePill({ v }: { v: number }) {
   );
 }
 
-function EmptyState({ onSeed }: { onSeed: () => void }) {
+function EmptyState({
+  onSeed,
+  liveMode,
+}: {
+  onSeed: () => void;
+  liveMode?: boolean;
+}) {
   return (
     <div className="rounded-xl border border-dashed border-white/15 bg-white/[.02] px-6 py-8 text-center">
       <Brain className="mx-auto h-6 w-6 text-slate-500" />
       <p className="mt-2 text-sm text-slate-300">No recommendations yet</p>
       <p className="mt-1 text-xs text-slate-500">
-        Click <span className="text-slate-300">Seed + Run engine</span> to
-        generate 90 days of history and compute recommendations.
+        {liveMode ? (
+          <>
+            Import or build a scenario first, then re-run the engine to show only
+            uploaded SKU recommendations.
+          </>
+        ) : (
+          <>
+            Click <span className="text-slate-300">Seed + Run engine</span> to
+            generate 90 days of history and compute recommendations.
+          </>
+        )}
       </p>
-      <button
-        type="button"
-        onClick={onSeed}
-        className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-medium text-brand-400 hover:bg-brand/15"
-      >
-        <Database className="h-3 w-3" /> Seed + Run now
-      </button>
+      {liveMode ? (
+        <Link
+          href="/scenarios"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/15"
+        >
+          <Database className="h-3 w-3" /> Open Scenarios
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={onSeed}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-medium text-brand-400 hover:bg-brand/15"
+        >
+          <Database className="h-3 w-3" /> Seed + Run now
+        </button>
+      )}
     </div>
   );
 }

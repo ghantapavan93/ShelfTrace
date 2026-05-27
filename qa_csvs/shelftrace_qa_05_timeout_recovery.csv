@@ -1,0 +1,4 @@
+sku,product_name,previous_price,approved_price,reason,is_kvi,deadline_at
+qa-timeout-strawberry-1lb,"Fresh Strawberries, 1 lb",3.49,2.49,"Perishable ESL timeout recovery",false,2026-05-28T18:00:00Z
+qa-timeout-oj-52oz,"Premium Orange Juice, 52 oz",8.99,9.49,"Ecommerce timeout recovery",false,
+qa-timeout-eggs-12,"Cage-Free Large Brown Eggs, 12 Count",3.79,4.19,"POS duplicate acknowledgement check",true,

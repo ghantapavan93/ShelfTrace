@@ -258,6 +258,8 @@ class BulkImportPreviewResponse(BaseModel):
     payload_errors: list[str] = []
     rows: list[BulkImportRowView]
     blank_rows_skipped: int = 0
+    source_sha256: str = ""
+    schema_version: str = "bulk-import-v1"
 
 
 class ScenarioIn(BaseModel):
@@ -269,6 +271,9 @@ class ScenarioIn(BaseModel):
     canary_store_ids: list[str]
     actions: list[ScenarioActionIn]
     behaviors: list[ConnectorBehaviorIn] = []
+    import_source_hash: str | None = None
+    import_source_name: str | None = None
+    import_summary: dict | None = None
 
 
 class ConnectorBehaviorView(ConnectorBehaviorIn):
@@ -288,6 +293,10 @@ class ScenarioView(BaseModel):
     store_ids: list[str]
     canary_store_ids: list[str]
     is_seeded: bool
+    import_source_hash: str | None = None
+    import_source_name: str | None = None
+    import_summary: dict | None = None
+    created_by: str | None = None
     created_at: datetime
     actions: list[ScenarioActionView]
     behaviors: list[ConnectorBehaviorView]

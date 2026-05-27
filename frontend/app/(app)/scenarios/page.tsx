@@ -46,6 +46,12 @@ export default function ScenarioBuilder() {
   const [saved, setSaved] = useState<Scenario[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<Scenario | null>(null);
   const [hintRefreshToken, setHintRefreshToken] = useState(0);
+  const [importProvenance, setImportProvenance] = useState<{
+    sourceHash: string;
+    sourceName: string | null;
+    summary: { total: number; valid: number; invalid: number };
+    schemaVersion: string;
+  } | null>(null);
   const { toast } = useToast();
 
   async function refreshList() {
@@ -72,6 +78,20 @@ export default function ScenarioBuilder() {
     setCanary(s.canary_store_ids.join(","));
     setActions(s.actions.map((a) => ({ ...a, id: undefined })));
     setBehaviors(s.behaviors.map((b) => ({ ...b, id: undefined })));
+    setImportProvenance(
+      s.import_source_hash
+        ? {
+            sourceHash: s.import_source_hash,
+            sourceName: s.import_source_name,
+            summary: (s.import_summary as { total: number; valid: number; invalid: number }) ?? {
+              total: s.actions.length,
+              valid: s.actions.length,
+              invalid: 0,
+            },
+            schemaVersion: "bulk-import-v1",
+          }
+        : null,
+    );
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -146,6 +166,11 @@ export default function ScenarioBuilder() {
             configured_observed_price: b.configured_observed_price === null || (b.configured_observed_price as unknown) === "" ? null : Number(b.configured_observed_price),
             retry_success_price: b.retry_success_price === null || (b.retry_success_price as unknown) === "" ? null : Number(b.retry_success_price),
           })),
+        import_source_hash: importProvenance?.sourceHash ?? null,
+        import_source_name: importProvenance?.sourceName ?? null,
+        import_summary: importProvenance
+          ? { ...importProvenance.summary, schema_version: importProvenance.schemaVersion }
+          : null,
       };
       const created: Scenario = await api.createScenario(payload);
       const res = await api.executeScenario(created.id, mode);
@@ -324,8 +349,9 @@ export default function ScenarioBuilder() {
           storesCsv={stores}
           canaryCsv={canary}
           actions={actions}
-          onImportProducts={(next) => {
+          onImportProducts={(next, provenance) => {
             setActions(next);
+            setImportProvenance(provenance ?? null);
             // Auto-enrich: bootstrap the graph + seed history + run pricing engine
             // for the imported SKUs, so the 🌐 Competitor and 🧠 Pricing hint
             // pills populate without the founder navigating to /product-graph

@@ -19,7 +19,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import clsx from "clsx";
-import { api } from "@/lib/api";
+import { api, DEMO_BATCH } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { money, timeOf, dateTimeOf } from "@/lib/format";
 import { MetricCard } from "@/components/MetricCard";
@@ -29,6 +29,7 @@ import { BatchPicker } from "@/components/BatchPicker";
 import { OperationsSkeleton } from "@/components/Skeleton";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
+import { useWorkMode } from "@/components/ModeProvider";
 import type { ChannelView } from "@/lib/types";
 
 const CH_ICON = { esl: Tag, pos: ScanLine, ecommerce: Globe } as const;
@@ -75,6 +76,14 @@ function adaptiveHero(b: {
   verified_actions: number;
   total_actions: number;
 }) {
+  if (b.status === "completed") {
+    return {
+      title: "Rollout complete",
+      sub: "every store verified across all channels.",
+      line: "Completed",
+      tone: "verified" as const,
+    };
+  }
   // All-clear path (no incidents, all verified) gets its own celebratory hero
   if (
     !b.expansion_blocked &&
@@ -121,12 +130,6 @@ function adaptiveHero(b: {
       line: "Expanding",
       tone: "neutral",
     },
-    completed: {
-      title: "Rollout complete",
-      sub: "every store verified across all channels.",
-      line: "Completed",
-      tone: "verified",
-    },
   };
   return map[b.status] ?? map.canary_verifying;
 }
@@ -145,6 +148,7 @@ function OperationsContent() {
   const searchParams = useSearchParams();
   const externalId = searchParams?.get("external_id") || undefined;
   const fromScenario = searchParams?.get("from") === "scenario";
+  const { mode, isHydrated } = useWorkMode();
   const { data, error, reload } = useLive(() => api.operations(externalId), [externalId]);
   const [resetting, setResetting] = useState(false);
   const [coldStartHint, setColdStartHint] = useState(false);
@@ -229,6 +233,51 @@ function OperationsContent() {
   if (!data) return <OperationsSkeleton coldStart={coldStartHint} />;
 
   const b = data.batch;
+  const isLiveWorkMode = isHydrated && mode === "live";
+  const showingDefaultDemoBatch = !externalId && b.external_id === DEMO_BATCH;
+
+  if (isLiveWorkMode && showingDefaultDemoBatch) {
+    return (
+      <div className="space-y-4">
+        <div className="glass-strong rounded-3xl border border-violet-500/25 bg-gradient-to-br from-violet-500/[.04] via-ink-900 to-black p-7 sm:p-10">
+          <div className="flex items-start gap-4">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-violet-500/30 bg-violet-500/10 text-violet-200">
+              <FlaskConical className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-[.22em] text-violet-300">
+                Live mode clean slate
+              </div>
+              <h2 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
+                Demo rollout hidden. Upload or run a scenario to populate Live mode.
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm text-slate-400">
+                The backend still has the Memorial Day sample batch for Demo mode, but Live mode
+                now keeps it out of the command center unless you open that exact demo batch.
+                Your uploaded CSV or manually-created scenario will land here after execution.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Link
+                  href="/scenarios"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110"
+                >
+                  Upload or build scenario
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href={`/operations?external_id=${DEMO_BATCH}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                >
+                  Inspect demo batch explicitly
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const crit = data.critical_incident;
   const hero = adaptiveHero(b);
   const danger = hero.tone === "danger";
@@ -257,13 +306,15 @@ function OperationsContent() {
             </Link>
           )}
         </div>
-        <button
-          onClick={() => setConfirmReset(true)}
-          disabled={resetting}
-          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
-        >
-          <RotateCcw className={clsx("h-3.5 w-3.5", resetting && "animate-spin")} /> Reset demo seed
-        </button>
+        {!isLiveWorkMode && (
+          <button
+            onClick={() => setConfirmReset(true)}
+            disabled={resetting}
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
+          >
+            <RotateCcw className={clsx("h-3.5 w-3.5", resetting && "animate-spin")} /> Reset demo seed
+          </button>
+        )}
         <ConfirmDialog
           open={confirmReset}
           title="Reset the demo state?"
@@ -370,12 +421,12 @@ function OperationsContent() {
           tone="warn"
           progress={b.canary_store_ids.length / Math.max(1, b.total_store_count)}
         />
-        <MetricCard
+            <MetricCard
           value={b.verified_actions}
           label="Verified actions"
-          sub={`${data.rollout_progress.verified_pct}% of canary`}
+          sub={`${data.rollout_progress.verified_pct}% of active scope`}
           tone="verified"
-          progress={data.rollout_progress.verified / (b.canary_action_count || 1)}
+          progress={data.rollout_progress.verified / (data.rollout_progress.total || 1)}
         />
         <MetricCard value={b.critical_incidents} label="Critical incident" sub="Requires attention" tone="danger" />
         <MetricCard value={b.deadline_risks} label="Deadline risk" sub="Needs resolution" tone="warn" />
@@ -444,7 +495,9 @@ function OperationsContent() {
             </div>
             <p className="mt-3 max-w-xl text-sm text-slate-400">
               Every action in this batch was acknowledged by POS, shelf label,
-              and ecommerce at the approved price. {b.expansion_store_ids.length > 0
+              and ecommerce at the approved price. {b.status === "completed"
+                ? "Rollout is complete."
+                : b.expansion_store_ids.length > 0
                 ? `Safe to expand to ${b.expansion_store_ids.length} remaining store${b.expansion_store_ids.length === 1 ? "" : "s"}.`
                 : "Rollout is complete."}
             </p>

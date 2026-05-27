@@ -6,6 +6,8 @@ The endpoint sits on top of these so endpoint behaviour is also pinned.
 """
 from __future__ import annotations
 
+import hashlib
+
 from app.services import bulk_import
 
 
@@ -24,6 +26,13 @@ eggs-12,Cage-Free Eggs Dozen,4.19,3.49,KVI
     assert result.rows[0].previous_price == 5.99
     assert result.rows[0].approved_price == 4.99
     assert result.rows[1].reason == "KVI"
+
+
+def test_preview_returns_source_hash_and_schema_version():
+    csv = "sku,product_name,prior_price,approved_price\nmilk,Milk,5.99,4.99\n"
+    result = bulk_import.preview("csv", csv)
+    assert result.source_sha256 == hashlib.sha256(csv.encode("utf-8")).hexdigest()
+    assert result.schema_version == "bulk-import-v1"
 
 
 def test_csv_without_header_uses_positional_defaults():

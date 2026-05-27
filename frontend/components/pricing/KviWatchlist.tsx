@@ -35,7 +35,15 @@ import { EASE } from "@/lib/motion";
 type WatchlistData = Awaited<ReturnType<typeof api.pricingKviWatchlist>>;
 type Item = WatchlistData["items"][number];
 
-export function KviWatchlist({ reloadKey }: { reloadKey: number }) {
+export function KviWatchlist({
+  reloadKey,
+  allowedSkus,
+  sourceLabel,
+}: {
+  reloadKey: number;
+  allowedSkus?: Set<string> | null;
+  sourceLabel?: string;
+}) {
   const watchlist = useLive<WatchlistData>(
     () => api.pricingKviWatchlist(),
     [reloadKey],
@@ -52,12 +60,25 @@ export function KviWatchlist({ reloadKey }: { reloadKey: number }) {
     );
   }
 
-  const { items, summary, tolerance_pct } = watchlist.data;
+  const { tolerance_pct } = watchlist.data;
+  const items = allowedSkus
+    ? watchlist.data.items.filter((item) => allowedSkus.has(item.sku))
+    : watchlist.data.items;
+  const summary = {
+    total: items.length,
+    within_band: items.filter((item) => item.band === "within").length,
+    above_band: items.filter((item) => item.band === "above").length,
+    below_band: items.filter((item) => item.band === "below").length,
+    max_abs_gap_pct: items.reduce(
+      (max, item) => Math.max(max, item.abs_gap_pct ?? 0),
+      0,
+    ),
+  };
 
   if (items.length === 0) {
     return (
       <section className="rounded-2xl border border-violet-500/20 bg-violet-500/[.03] p-5">
-        <Header tolerancePct={tolerance_pct} summary={summary} />
+        <Header tolerancePct={tolerance_pct} summary={summary} sourceLabel={sourceLabel} />
         <p className="mt-3 text-xs text-slate-500">
           No KVI-flagged actions in the current price book — flag traffic-driver SKUs (eggs, milk, OJ&hellip;) in your scenarios to populate this watchlist.
         </p>
@@ -72,7 +93,7 @@ export function KviWatchlist({ reloadKey }: { reloadKey: number }) {
       transition={{ duration: 0.45, ease: EASE.outQuart }}
       className="rounded-2xl border border-violet-500/20 bg-violet-500/[.03] p-5"
     >
-      <Header tolerancePct={tolerance_pct} summary={summary} />
+      <Header tolerancePct={tolerance_pct} summary={summary} sourceLabel={sourceLabel} />
 
       <div className="mt-4 space-y-2">
         {items.map((item) => (
@@ -86,9 +107,11 @@ export function KviWatchlist({ reloadKey }: { reloadKey: number }) {
 function Header({
   tolerancePct,
   summary,
+  sourceLabel,
 }: {
   tolerancePct: number;
   summary: WatchlistData["summary"];
+  sourceLabel?: string;
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -101,6 +124,11 @@ function Header({
           <span className="ml-2 font-normal text-slate-500">
             · ±{tolerancePct.toFixed(1)}% tolerance to competitor
           </span>
+          {sourceLabel && (
+            <span className="ml-2 rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[10px] font-normal text-violet-200">
+              {sourceLabel}
+            </span>
+          )}
         </h2>
         <p className="mt-1 max-w-2xl text-xs text-slate-400">
           Key Value Items — the SKUs shoppers price-check. We track each

@@ -36,6 +36,8 @@ import {
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { ListSkeleton } from "@/components/Skeleton";
+import { useWorkMode } from "@/components/ModeProvider";
+import { SandboxStrip } from "@/components/LiveModeNotice";
 
 type Source = {
   source_id: string;
@@ -67,6 +69,8 @@ export default function ScrapersPage() {
   const [running, setRunning] = useState(false);
   const [lastRun, setLastRun] = useState<RunSummary | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
 
   // Debounce search → API
   useEffect(() => {
@@ -120,6 +124,13 @@ export default function ScrapersPage() {
 
   return (
     <div className="space-y-6">
+      {isLiveWorkMode && (
+        <SandboxStrip
+          surfaceName="Scraper runs"
+          missingForLive="The reference source extracts from a policy-safe book catalog. Production would point at retailer-specific sources with credentials, rendering and grocery-specific normalization."
+        />
+      )}
+
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
