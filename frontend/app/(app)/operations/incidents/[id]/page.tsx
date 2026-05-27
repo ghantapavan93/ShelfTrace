@@ -14,7 +14,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import clsx from "clsx";
-import { api } from "@/lib/api";
+import { api, DEMO_BATCH } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { money } from "@/lib/format";
 import { StatusPill } from "@/components/StatusPill";
@@ -24,6 +24,8 @@ import { EligibilityPanel } from "@/components/EligibilityPanel";
 import { DetailSkeleton } from "@/components/Skeleton";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
+import { useWorkMode } from "@/components/ModeProvider";
+import { FlaskConical } from "lucide-react";
 import type { AuditEventView, IncidentExplanation, IncidentView } from "@/lib/types";
 
 export default function IncidentPage({ params }: { params: { id: string } }) {
@@ -31,6 +33,8 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmRollback, setConfirmRollback] = useState(false);
   const { toast } = useToast();
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
 
   const inc = useLive<IncidentView>(() => api.incident(id), [id]);
   const exp = useLive<IncidentExplanation>(() => api.explanation(id), [id]);
@@ -68,6 +72,12 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
   const offending = i.channels.find((c) => c.channel === i.offending_channel);
   const variance = offending?.observed_price != null ? offending.observed_price - i.approved_price : null;
   const resolved = i.status === "resolved" || i.status === "rolled_back";
+  // Surface a small chip when a Live-mode user opens an incident that
+  // belongs to a demo or certification batch — explicit escape hatch.
+  const viewingDemoFromLive =
+    isLiveWorkMode &&
+    (i.batch_external_id === DEMO_BATCH ||
+      i.batch_external_id.startsWith("certification-"));
 
   return (
     <div className="space-y-6">
@@ -87,6 +97,13 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
               </span>
             ) : (
               <StatusPill value={i.severity} />
+            )}
+            {viewingDemoFromLive && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.18em] text-violet-200">
+                <FlaskConical className="h-2.5 w-2.5" />
+                {i.batch_external_id === DEMO_BATCH ? "Demo incident" : "Cert sandbox"}
+                <span className="text-violet-300/70">· Live mode</span>
+              </span>
             )}
           </div>
           <p className="mt-1 text-slate-400">

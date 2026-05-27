@@ -11,12 +11,14 @@ import {
   Store,
   ShieldCheck,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, DEMO_BATCH } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { money } from "@/lib/format";
 import { StatusPill } from "@/components/StatusPill";
 import { DetailSkeleton } from "@/components/Skeleton";
 import { CellHistoryDrawer } from "@/components/batches/CellHistoryDrawer";
+import { useWorkMode } from "@/components/ModeProvider";
+import { FlaskConical } from "lucide-react";
 import type { BatchDetail, ChannelView } from "@/lib/types";
 
 function Cell({
@@ -78,6 +80,8 @@ export default function BatchPage({ params }: { params: { id: string } }) {
   const [expanding, setExpanding] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
 
   // Cell-history drawer state — populated when a user clicks any matrix cell
   const [selectedCell, setSelectedCell] = useState<{
@@ -137,6 +141,13 @@ export default function BatchPage({ params }: { params: { id: string } }) {
   if (!b) return <DetailSkeleton />;
 
   const isLarge = b.actions.length >= 12;
+  // When a Live-mode user explicitly opens the demo batch (or a certification
+  // sandbox run), surface a small chip so they know exactly what they're
+  // viewing — this is the documented "explicit escape hatch" path.
+  const viewingDemoFromLive =
+    isLiveWorkMode &&
+    (b.external_id === DEMO_BATCH ||
+      b.external_id.startsWith("certification-"));
 
   return (
     <div className="space-y-6">
@@ -150,9 +161,18 @@ export default function BatchPage({ params }: { params: { id: string } }) {
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-white">
-              {b.name} — {b.zone}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold text-white">
+                {b.name} — {b.zone}
+              </h1>
+              {viewingDemoFromLive && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.18em] text-violet-200">
+                  <FlaskConical className="h-2.5 w-2.5" />
+                  {b.external_id === DEMO_BATCH ? "Demo batch" : "Cert sandbox"}
+                  <span className="text-violet-300/70">· Live mode</span>
+                </span>
+              )}
+            </div>
             <p className="mt-0.5 text-sm text-slate-400">
               External ID{" "}
               <span className="mono text-slate-300">{b.external_id}</span> ·
