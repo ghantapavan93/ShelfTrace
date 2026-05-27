@@ -234,7 +234,14 @@ function OperationsContent() {
 
   const b = data.batch;
   const isLiveWorkMode = isHydrated && mode === "live";
-  const showingDefaultDemoBatch = !externalId && b.external_id === DEMO_BATCH;
+  // Fire the Live-mode clean-slate banner when the user landed here with
+  // no explicit external_id AND the backend's default batch is one of
+  // the seeded surfaces (Memorial Day demo OR a certification sandbox
+  // run). If they have any live batches, the backend returns the newest
+  // of those instead and the banner stays hidden.
+  const isSeededBatch =
+    b.external_id === DEMO_BATCH || b.external_id.startsWith("certification-");
+  const showingDefaultDemoBatch = !externalId && isSeededBatch;
 
   if (isLiveWorkMode && showingDefaultDemoBatch) {
     return (
