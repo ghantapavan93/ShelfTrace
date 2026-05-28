@@ -140,7 +140,7 @@ function Hero({ onScroll }: { onScroll: () => void }) {
 function PredictiveVisual() {
   const reduced = useReducedMotion();
   return (
-    <Stage accent="orange">
+    <Stage accent="orange" live liveLabel="LIVE · FORECAST">
       {/* forecast chart card top */}
       <div className="absolute inset-x-6 top-6 rounded-2xl border border-white/10 bg-[#0b1220]/90 p-4">
         <div className="flex items-center justify-between">
@@ -204,7 +204,7 @@ function PredictiveVisual() {
 function ScenarioVisual() {
   const reduced = useReducedMotion();
   return (
-    <Stage accent="violet">
+    <Stage accent="violet" live liveLabel="LIVE · SIM">
       {/* central "what if" hub */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div className="flex h-20 w-20 items-center justify-center rounded-full border border-violet-500/50 bg-violet-500/[.12] backdrop-blur">
@@ -287,7 +287,7 @@ function ScenarioVisual() {
 /* 03 — Sustainability */
 function SustainabilityVisual() {
   return (
-    <Stage accent="emerald">
+    <Stage accent="emerald" live liveLabel="LIVE · SHELF-LIFE">
       {/* top: title strip */}
       <div className="absolute inset-x-6 top-6 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/[.06] px-4 py-2.5 backdrop-blur">
         <span className="flex items-center gap-2 text-[10px] uppercase tracking-[.22em] text-emerald-200">
@@ -353,7 +353,7 @@ function SustainabilityVisual() {
 function CompetitorVisual() {
   const reduced = useReducedMotion();
   return (
-    <Stage accent="sky">
+    <Stage accent="sky" live liveLabel="LIVE · TRACKING">
       {/* top: ticker tape */}
       <div className="absolute inset-x-0 top-6 overflow-hidden border-y border-white/10 bg-[#0b1220]/95">
         <motion.div
@@ -446,7 +446,7 @@ function FairnessVisual() {
     { name: "Sweet Cream Butter", price: "$4.49", glyph: <ButterGlyph />, ok: true },
   ];
   return (
-    <Stage accent="rose">
+    <Stage accent="rose" live liveLabel="LIVE · AUDIT" liveTone="rose">
       {/* top: fairness check header */}
       <div className="absolute inset-x-6 top-6 rounded-xl border border-white/10 bg-[#0b1220]/95 px-4 py-3 backdrop-blur">
         <div className="flex items-center justify-between">
@@ -508,7 +508,7 @@ function FairnessVisual() {
 function ARVisual() {
   const reduced = useReducedMotion();
   return (
-    <Stage accent="amber">
+    <Stage accent="amber" live liveLabel="LIVE · AR" liveTone="sky">
       {/* phone-in-3D shell */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ perspective: 900 }}>
         <motion.div
@@ -590,7 +590,7 @@ function ARVisual() {
 function SupplyVisual() {
   const reduced = useReducedMotion();
   return (
-    <Stage accent="emerald">
+    <Stage accent="emerald" live liveLabel="LIVE · SUPPLY">
       {/* three-panel flow */}
       <div className="absolute inset-0 flex items-center justify-center gap-8 px-8">
         {/* Inventory card */}

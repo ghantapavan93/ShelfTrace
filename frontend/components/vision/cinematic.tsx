@@ -265,6 +265,61 @@ export function Particles({
   );
 }
 
+/* ─────────────────────────────── live indicator + phase hook ─────────────── */
+/* A pulsing "● LIVE / REC" chip + a reusable phase-cycling hook. Together they
+   turn the static mockups into feeds that read as a working system: the badge
+   signals "this is live," the hook drives state machines (reconciliation
+   sweeps, canary verify→unlock loops) that keep moving instead of freezing
+   after the entrance animation. Both honor prefers-reduced-motion.            */
+
+export function LiveBadge({
+  label = "LIVE",
+  tone = "emerald",
+  className = "",
+}: {
+  label?: string;
+  tone?: "emerald" | "rose" | "sky";
+  className?: string;
+}) {
+  const reduced = useReducedMotion();
+  const toneCls =
+    tone === "rose"
+      ? "border-rose-500/30 bg-rose-500/[.08] text-rose-200"
+      : tone === "sky"
+        ? "border-sky-500/30 bg-sky-500/[.08] text-sky-200"
+        : "border-emerald-500/30 bg-emerald-500/[.08] text-emerald-200";
+  const dot = tone === "rose" ? "bg-rose-400" : tone === "sky" ? "bg-sky-400" : "bg-emerald-400";
+  const glow =
+    tone === "rose" ? "rgba(251,113,133,.85)" : tone === "sky" ? "rgba(56,189,248,.85)" : "rgba(52,211,153,.85)";
+  return (
+    <span
+      className={`pointer-events-none inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[9px] font-mono uppercase tracking-[.22em] backdrop-blur ${toneCls} ${className}`}
+    >
+      <motion.span
+        className={`h-1.5 w-1.5 rounded-full ${dot}`}
+        style={{ boxShadow: `0 0 8px ${glow}` }}
+        animate={reduced ? undefined : { opacity: [1, 0.3, 1], scale: [1, 0.78, 1] }}
+        transition={reduced ? undefined : { duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+      />
+      {label}
+    </span>
+  );
+}
+
+/** Cycle an index 0..phaseCount-1 on an interval. Returns the last phase when
+ *  reduced-motion is set (so the mockup shows its resolved/final state) or when
+ *  disabled. */
+export function useCyclePhase(phaseCount: number, intervalMs = 1400, enabled = true): number {
+  const reduced = useReducedMotion();
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    if (!enabled || reduced || phaseCount <= 1) return;
+    const id = setInterval(() => setPhase((p) => (p + 1) % phaseCount), intervalMs);
+    return () => clearInterval(id);
+  }, [phaseCount, intervalMs, enabled, reduced]);
+  return reduced ? phaseCount - 1 : phase;
+}
+
 /* ─────────────────────────────── chapter marker ──────────────────────────── */
 
 export function ChapterMarker({ n, label }: { n: string; label: string }) {
@@ -391,10 +446,17 @@ export function Stage({
   children,
   accent = "orange",
   height = 440,
+  live = false,
+  liveLabel = "LIVE",
+  liveTone = "emerald",
 }: {
   children: ReactNode;
   accent?: StageAccent;
   height?: number;
+  /** Show a pulsing LIVE chip in the corner so the mockup reads as a real feed. */
+  live?: boolean;
+  liveLabel?: string;
+  liveTone?: "emerald" | "rose" | "sky";
 }) {
   const tint = STAGE_TINT[accent];
   const particleColor = tint.replace(".10", ".5");
@@ -409,6 +471,11 @@ export function Stage({
       />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
       <Particles count={6} color={particleColor} />
+      {live && (
+        <div className="absolute right-3 top-3 z-20">
+          <LiveBadge label={liveLabel} tone={liveTone} />
+        </div>
+      )}
       <div className="relative h-full w-full">{children}</div>
     </div>
   );
@@ -668,36 +735,56 @@ export function YogurtGlyph() {
 export function ChannelAgreementPanel({
   channels,
   className = "",
+  live = false,
 }: {
   channels: { name: string; status: "ok" | "fail" | "wait" }[];
   className?: string;
+  /** Run a live reconciliation sweep: channels start "checking", then resolve
+   *  one-by-one to their real status, hold, and re-scan — so the panel reads as
+   *  a reconciliation loop, not a frozen result. */
+  live?: boolean;
 }) {
+  const reduced = useReducedMotion();
+  // Phases: 0 = all checking, 1..len = resolve k channels, len+1 = hold, repeat.
+  const phase = useCyclePhase(channels.length + 2, 900, live);
+  const revealed = !live || reduced ? channels.length : Math.min(phase, channels.length);
+
   return (
     <div
       className={`flex items-center gap-2 rounded-2xl border border-white/10 bg-[#0b1220]/95 px-3 py-2.5 backdrop-blur ${className}`}
     >
       <span className="font-mono text-[9px] uppercase tracking-[.22em] text-white/55">channels</span>
-      {channels.map((c) => (
-        <span
-          key={c.name}
-          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-mono uppercase tracking-[.18em] ${
-            c.status === "ok"
-              ? "border-emerald-500/35 bg-emerald-500/[.08] text-emerald-200"
-              : c.status === "fail"
-                ? "border-rose-500/40 bg-rose-500/[.10] text-rose-200"
-                : "border-amber-500/35 bg-amber-500/[.08] text-amber-200"
-          }`}
-        >
-          {c.status === "ok" ? (
-            <CheckCircle2 className="h-2.5 w-2.5" />
-          ) : c.status === "fail" ? (
-            <CircleX className="h-2.5 w-2.5" />
-          ) : (
-            <Hourglass className="h-2.5 w-2.5" />
-          )}
-          {c.name}
-        </span>
-      ))}
+      {channels.map((c, i) => {
+        const resolved = i < revealed;
+        const status = resolved ? c.status : ("wait" as const);
+        return (
+          <span
+            key={c.name}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-mono uppercase tracking-[.18em] transition-colors duration-300 ${
+              status === "ok"
+                ? "border-emerald-500/35 bg-emerald-500/[.08] text-emerald-200"
+                : status === "fail"
+                  ? "border-rose-500/40 bg-rose-500/[.10] text-rose-200"
+                  : "border-amber-500/35 bg-amber-500/[.08] text-amber-200"
+            }`}
+          >
+            {status === "ok" ? (
+              <CheckCircle2 className="h-2.5 w-2.5" />
+            ) : status === "fail" ? (
+              <CircleX className="h-2.5 w-2.5" />
+            ) : (
+              <motion.span
+                animate={reduced ? undefined : { rotate: 360 }}
+                transition={reduced ? undefined : { duration: 1.4, repeat: Infinity, ease: "linear" }}
+                className="inline-flex"
+              >
+                <Hourglass className="h-2.5 w-2.5" />
+              </motion.span>
+            )}
+            {c.name}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -708,33 +795,76 @@ export function ChannelAgreementPanel({
 export function AuditLogStream({
   rows,
   className = "",
+  live = false,
 }: {
   rows: { t: string; event: string; actor?: string; tone?: "ok" | "warn" | "err" | "info" }[];
   className?: string;
+  /** Stream rows in one-by-one (append-only) with a REC dot + blinking cursor,
+   *  so the log reads as a live tail rather than a block that faded in once. */
+  live?: boolean;
 }) {
   const reduced = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-15%" });
+  const stream = live && !reduced;
+  const [count, setCount] = useState(stream ? 0 : rows.length);
+
+  useEffect(() => {
+    if (!stream) {
+      setCount(rows.length);
+      return;
+    }
+    if (!inView) return;
+    setCount(0);
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      setCount(i);
+      if (i >= rows.length) clearInterval(id);
+    }, 620);
+    return () => clearInterval(id);
+  }, [stream, inView, rows.length]);
+
   const palette = {
     ok: "text-emerald-300",
     warn: "text-amber-300",
     err: "text-rose-300",
     info: "text-sky-300",
   } as const;
+  const shown = stream ? rows.slice(0, count) : rows;
+  const streaming = stream && count < rows.length;
+
   return (
-    <div className={`rounded-2xl border border-white/10 bg-[#04070b] p-3 ${className}`}>
+    <div ref={ref} className={`rounded-2xl border border-white/10 bg-[#04070b] p-3 ${className}`}>
       <div className="flex items-center justify-between border-b border-white/[.06] pb-2">
         <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[.22em] text-white/55">
           <Database className="h-3 w-3 text-orange-300" /> audit.log
+          {stream && (
+            <span className="ml-1 inline-flex items-center gap-1 text-rose-300">
+              <motion.span
+                className="h-1.5 w-1.5 rounded-full bg-rose-400"
+                style={{ boxShadow: "0 0 8px rgba(251,113,133,.85)" }}
+                animate={{ opacity: [1, 0.25, 1] }}
+                transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
+              />
+              REC
+            </span>
+          )}
         </span>
         <span className="font-mono text-[9px] text-white/35">tamper-evident · causal</span>
       </div>
       <div className="mt-2 space-y-1.5 font-mono text-[11px] leading-snug">
-        {rows.map((r, i) => (
+        {shown.map((r, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={
-              reduced ? undefined : { duration: 0.4, delay: 0.15 + i * 0.18, ease: EASE.outQuart }
+              reduced
+                ? undefined
+                : stream
+                  ? { duration: 0.35, ease: EASE.outQuart }
+                  : { duration: 0.4, delay: 0.15 + i * 0.18, ease: EASE.outQuart }
             }
             className="flex items-baseline gap-2"
           >
@@ -743,6 +873,18 @@ export function AuditLogStream({
             {r.actor && <span className="ml-auto text-white/35">· {r.actor}</span>}
           </motion.div>
         ))}
+        {stream && (
+          <div className="flex items-baseline gap-2 text-white/40">
+            <span className="text-white/30">{streaming ? "T+……" : "T+02.91"}</span>
+            <span className="text-white/40">{streaming ? "streaming" : "tail · sealed"}</span>
+            <motion.span
+              aria-hidden
+              className="ml-1 inline-block h-3 w-[7px] rounded-[1px] bg-emerald-400/80"
+              animate={{ opacity: [1, 0, 1] }}
+              transition={{ duration: 1, repeat: Infinity, ease: "steps(1)" }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -821,7 +963,7 @@ export function LanePipe() {
   const reduced = useReducedMotion();
   const safePackets = [0, 0.2, 0.4, 0.6, 0.8];
   return (
-    <Stage accent="emerald" height={420}>
+    <Stage accent="emerald" height={420} live liveLabel="LIVE · ENGINE">
       <div className="absolute inset-0 flex flex-col justify-center gap-12 px-8">
         {/* FAST LANE — safe */}
         <div className="relative">
@@ -898,8 +1040,15 @@ export function LanePipe() {
 
 export function OperatorDashboard() {
   const reduced = useReducedMotion();
+  // Live ack counter — ticks up to convey acknowledgements landing in real time.
+  const [acks, setAcks] = useState(reduced ? 11 : 7);
+  useEffect(() => {
+    if (reduced) return;
+    const id = setInterval(() => setAcks((a) => (a >= 11 ? 7 : a + 1)), 1200);
+    return () => clearInterval(id);
+  }, [reduced]);
   return (
-    <Stage accent="violet" height={460}>
+    <Stage accent="violet" height={460} live liveLabel="LIVE · CONSOLE">
       <div className="absolute inset-0 flex flex-col gap-3 p-5">
         {/* header */}
         <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0b1220]/95 px-4 py-2.5 backdrop-blur">
@@ -943,7 +1092,8 @@ export function OperatorDashboard() {
             <p className="text-[10px] uppercase tracking-[.22em] text-emerald-300">ready to expand</p>
             <p className="mt-1 text-lg font-semibold text-white">memorial-day-dallas-02</p>
             <p className="mt-0.5 text-xs text-white/55">
-              All canary actions verified · 2 stores · 11 acks
+              All canary actions verified · 2 stores ·{" "}
+              <span className="font-mono tabular-nums text-white/75">{acks}</span> acks
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]">
               <span className="rounded-full border border-emerald-500/30 bg-emerald-500/[.08] px-2 py-0.5 text-emerald-200">

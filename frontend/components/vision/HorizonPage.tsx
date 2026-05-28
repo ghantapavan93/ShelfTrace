@@ -23,6 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 import { BackgroundOrbits, Pill } from "./Shell";
+import { LiveBadge, useCyclePhase } from "./cinematic";
 import { BlurRevealHeading } from "@/components/narrative/BlurRevealHeading";
 
 type HorizonConcept = "impact" | "replay" | "regression" | "blast";
@@ -139,29 +140,117 @@ function FlowArrow() {
   );
 }
 
+/* Regression checklist that "applies" each guard in sequence on a loop — reads
+   as the engine re-running the captured case, not a static list of ticks. */
+function RegressionVisual() {
+  const reduced = useReducedMotion();
+  const guards = [
+    "Block zone expansion",
+    "Require POS acknowledgement",
+    "Enforce audit causality",
+    "Replay before new connector activation",
+  ];
+  // active index cycles 0..len (len = "all applied" hold), then repeats
+  const phase = useCyclePhase(guards.length + 1, 900, true);
+  return (
+    <div className="border-t border-white/[.06] p-6 lg:border-l lg:border-t-0 sm:p-8">
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[.04] p-5">
+        <div className="flex items-center justify-between">
+          <Pill tone="orange">Regression Case #017</Pill>
+          <LiveBadge label="LIVE · REPLAY" />
+        </div>
+        <h3 className="mt-5 text-xl font-semibold text-white">
+          Stale checkout price after shelf confirmation
+        </h3>
+        <div className="mt-6 space-y-3">
+          {guards.map((item, i) => {
+            const applied = reduced ? true : i < phase;
+            const active = !reduced && i === phase;
+            return (
+              <div
+                key={item}
+                className={`flex items-center gap-2 rounded-xl border p-3 text-sm transition-colors duration-300 ${
+                  active
+                    ? "border-orange-500/40 bg-orange-500/[.08] text-white"
+                    : applied
+                      ? "border-emerald-500/25 bg-emerald-500/[.05] text-white/72"
+                      : "border-white/10 bg-white/[.025] text-white/45"
+                }`}
+              >
+                {active ? (
+                  <motion.span
+                    className="inline-flex h-4 w-4 items-center justify-center"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <span className="h-3 w-3 rounded-full border-2 border-orange-300 border-t-transparent" />
+                  </motion.span>
+                ) : (
+                  <CheckCircle2
+                    className={`h-4 w-4 ${applied ? "text-emerald-400" : "text-white/25"}`}
+                  />
+                )}
+                {item}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ConceptVisual({ concept }: { concept: HorizonConcept }) {
   const reduced = useReducedMotion();
   if (concept === "impact") {
     return (
       <div className="relative flex flex-col justify-center border-t border-white/[.06] bg-[radial-gradient(circle_at_60%_32%,rgba(249,115,22,.12),transparent_42%)] p-6 lg:border-l lg:border-t-0 sm:p-8">
-        <div className="rounded-2xl border border-white/10 bg-[#0b1018] p-6">
-          <p className="text-[10px] font-semibold tracking-[.22em] text-white/38">
-            REVENUE IMPACT · LAST 7 DAYS
-          </p>
-          <div className="mt-6 flex h-44 items-end gap-3 border-b border-white/10 pb-3">
+        <div className="relative rounded-2xl border border-white/10 bg-[#0b1018] p-6">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold tracking-[.22em] text-white/38">
+              REVENUE IMPACT · LAST 7 DAYS
+            </p>
+            <LiveBadge label="LIVE" />
+          </div>
+          <div className="relative mt-6 flex h-44 items-end gap-3 overflow-hidden border-b border-white/10 pb-3">
             {[22, 35, 30, 48, 43, 68, 78, 70].map((height, index) => (
               <motion.div
+                key={`${height}-${index}`}
                 initial={{ height: 0 }}
                 animate={{ height: `${height}%` }}
                 transition={{ delay: reduced ? 0 : index * 0.06 }}
-                key={`${height}-${index}`}
-                className="flex-1 rounded-t bg-gradient-to-t from-orange-500/20 to-orange-400"
-              />
+                className="relative flex-1 origin-bottom rounded-t bg-gradient-to-t from-orange-500/20 to-orange-400"
+              >
+                {/* held bars (last two — unverified) breathe to read as "pending attribution" */}
+                {!reduced && index >= 6 && (
+                  <motion.span
+                    aria-hidden
+                    className="absolute inset-0 origin-bottom rounded-t bg-rose-400/30"
+                    animate={{ opacity: [0, 0.6, 0] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: (index - 6) * 0.3 }}
+                  />
+                )}
+              </motion.div>
             ))}
+            {/* live scan sweep across the chart */}
+            {!reduced && (
+              <motion.span
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 w-1/4 bg-gradient-to-r from-transparent via-orange-300/15 to-transparent"
+                animate={{ left: ["-25%", "125%"] }}
+                transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
+              />
+            )}
           </div>
-          <div className="mt-5 rounded-xl border border-rose-500/32 bg-rose-500/[.07] p-4">
+          <div className="relative mt-5 overflow-hidden rounded-xl border border-rose-500/32 bg-rose-500/[.07] p-4">
             <div className="flex items-center gap-2 text-rose-300">
-              <CircleAlert className="h-4 w-4" />
+              <motion.span
+                className="inline-flex"
+                animate={reduced ? undefined : { opacity: [1, 0.4, 1] }}
+                transition={reduced ? undefined : { duration: 1.2, repeat: Infinity }}
+              >
+                <CircleAlert className="h-4 w-4" />
+              </motion.span>
               <span className="text-sm font-semibold">Execution not verified at Store 214</span>
             </div>
             <p className="mt-2 text-xs text-white/48">Do not attribute outcome yet.</p>
@@ -196,60 +285,56 @@ function ConceptVisual({ concept }: { concept: HorizonConcept }) {
     );
   }
   if (concept === "regression") {
-    return (
-      <div className="border-t border-white/[.06] p-6 lg:border-l lg:border-t-0 sm:p-8">
-        <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[.04] p-5">
-          <Pill tone="orange">Regression Case #017</Pill>
-          <h3 className="mt-5 text-xl font-semibold text-white">
-            Stale checkout price after shelf confirmation
-          </h3>
-          <div className="mt-6 space-y-3">
-            {[
-              "Block zone expansion",
-              "Require POS acknowledgement",
-              "Enforce audit causality",
-              "Replay before new connector activation",
-            ].map((item) => (
-              <div
-                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.025] p-3 text-sm text-white/68"
-                key={item}
-              >
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                {item}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <RegressionVisual />;
   }
   return (
     <div className="relative border-t border-white/[.06] p-6 lg:border-l lg:border-t-0 sm:p-8">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_55%_50%,rgba(244,63,94,.15),transparent_32%)]" />
       <div className="relative rounded-2xl border border-white/10 bg-[#090e17]/80 p-5">
-        <p className="text-[10px] font-semibold tracking-[.22em] text-orange-300">
-          POTENTIAL IMPACT PREVIEW
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-semibold tracking-[.22em] text-orange-300">
+            POTENTIAL IMPACT PREVIEW
+          </p>
+          <LiveBadge label="LIVE · SCAN" tone="rose" />
+        </div>
         <div className="mt-7 grid grid-cols-2 gap-3">
           {[
             ["18", "Stores held"],
             ["7", "Markdown SKUs"],
             ["$24.3K", "Potential exposure"],
             ["1", "Issue isolated"],
-          ].map(([number, label]) => (
-            <div key={label} className="rounded-xl border border-white/10 bg-white/[.03] p-4">
+          ].map(([number, label], i) => (
+            <motion.div
+              key={label}
+              className="rounded-xl border border-white/10 bg-white/[.03] p-4"
+              animate={reduced ? undefined : { borderColor: ["rgba(255,255,255,.1)", "rgba(251,146,60,.3)", "rgba(255,255,255,.1)"] }}
+              transition={reduced ? undefined : { duration: 2.4, repeat: Infinity, delay: i * 0.5, ease: "easeInOut" }}
+            >
               <p className="text-2xl font-semibold text-white">{number}</p>
               <p className="mt-1 text-xs text-white/44">{label}</p>
-            </div>
+            </motion.div>
           ))}
         </div>
         <div className="mt-7 flex justify-center">
           <motion.div
             animate={reduced ? undefined : { scale: [1, 1.06, 1] }}
             transition={reduced ? undefined : { duration: 2, repeat: Infinity }}
-            className="flex h-32 w-32 items-center justify-center rounded-full border border-rose-500/32 bg-rose-500/[.06]"
+            className="relative flex h-32 w-32 items-center justify-center rounded-full border border-rose-500/32 bg-rose-500/[.06]"
           >
-            <div className="flex h-20 w-20 items-center justify-center rounded-full border border-orange-500/34 bg-orange-500/[.12]">
+            {/* rotating radar scan line — reads as live blast-radius sweep */}
+            {!reduced && (
+              <motion.span
+                aria-hidden
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background:
+                    "conic-gradient(from 0deg, rgba(251,146,60,.35), transparent 80deg, transparent 360deg)",
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 3.2, repeat: Infinity, ease: "linear" }}
+              />
+            )}
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-orange-500/34 bg-orange-500/[.12]">
               <CircleAlert className="h-7 w-7 text-orange-300" />
             </div>
           </motion.div>

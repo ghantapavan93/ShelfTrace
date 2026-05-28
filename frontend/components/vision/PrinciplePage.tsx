@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import type { ElementType } from "react";
 import {
@@ -37,6 +37,7 @@ import {
   PHOTOS,
   ProductCard,
   Stage,
+  useCyclePhase,
 } from "./cinematic";
 import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
 import { BlurTextAnimation } from "@/components/text/BlurTextAnimation";
@@ -128,7 +129,7 @@ function Hero({ onScroll }: { onScroll: () => void }) {
 /* 01 — Guides decisions: product card + 3-channel agreement panel */
 function GuidesVisual() {
   return (
-    <Stage accent="sky">
+    <Stage accent="sky" live liveLabel="LIVE · RECONCILE">
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-4">
         <ProductCard
           name="Organic Whole Milk"
@@ -140,6 +141,7 @@ function GuidesVisual() {
           badge={{ label: "canonical", tone: "primary" }}
         />
         <ChannelAgreementPanel
+          live
           channels={[
             { name: "POS", status: "fail" },
             { name: "ESL", status: "ok" },
@@ -161,48 +163,91 @@ function GuidesVisual() {
   );
 }
 
-/* 02 — Evaluates risk: canary in front, expansion behind a gate */
+/* 02 — Evaluates risk: canary verifies live, then the gate decides.
+   Live loop (4 phases): verifying → both verified → gate evaluates →
+   gate HOLDS expansion (the safety property). Re-runs so it reads as a
+   working engine continuously checking, never auto-opening the gate. */
 function EvaluatesVisual() {
   const reduced = useReducedMotion();
   const canary = ["Store 214", "Store 302"];
   const expansion = ["Store 317", "Store 401"];
+  // phase 0: canary verifying · 1: canary 1 verified · 2: both verified ·
+  // 3: gate evaluates + pulses (still holds). Then loops.
+  const phase = useCyclePhase(4, 1500, true);
+  const verifiedCount = phase === 0 ? 0 : phase === 1 ? 1 : 2;
+  const gateActive = phase >= 2; // gate "live-checking" once canary is green
   return (
-    <Stage accent="orange">
+    <Stage accent="orange" live liveLabel="LIVE · CANARY">
       <div className="absolute inset-0 flex flex-col justify-center px-8">
         <div className="mb-4 flex items-center justify-between text-[10px] uppercase tracking-[.22em]">
           <span className="text-orange-200">canary corridor · first</span>
           <span className="text-white/45">expansion · after verified</span>
         </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-          {/* canary stores */}
+          {/* canary stores — flip verifying → verified live */}
           <div className="space-y-3">
-            {canary.map((s, i) => (
-              <motion.div
-                key={s}
-                initial={{ opacity: 0, x: -10 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.1 + i * 0.1, ease: EASE.outQuart }}
-                className="rounded-xl border border-orange-500/40 bg-orange-500/[.06] px-4 py-3 backdrop-blur"
-              >
-                <p className="text-[10px] uppercase tracking-[.22em] text-orange-300">canary</p>
-                <p className="mt-1 text-sm font-semibold text-white">{s}</p>
-                <p className="mt-1 font-mono text-[10px] text-emerald-300">verified ✓</p>
-              </motion.div>
-            ))}
+            {canary.map((s, i) => {
+              const isVerified = i < verifiedCount;
+              return (
+                <motion.div
+                  key={s}
+                  initial={{ opacity: 0, x: -10 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.1 + i * 0.1, ease: EASE.outQuart }}
+                  className={`rounded-xl border px-4 py-3 backdrop-blur transition-colors duration-500 ${
+                    isVerified
+                      ? "border-emerald-500/40 bg-emerald-500/[.07]"
+                      : "border-orange-500/40 bg-orange-500/[.06]"
+                  }`}
+                >
+                  <p className="text-[10px] uppercase tracking-[.22em] text-orange-300">canary</p>
+                  <p className="mt-1 text-sm font-semibold text-white">{s}</p>
+                  {isVerified ? (
+                    <p className="mt-1 font-mono text-[10px] text-emerald-300">verified ✓</p>
+                  ) : (
+                    <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-amber-300/90">
+                      <motion.span
+                        className="inline-block h-1.5 w-1.5 rounded-full bg-amber-300"
+                        animate={reduced ? undefined : { opacity: [1, 0.2, 1] }}
+                        transition={reduced ? undefined : { duration: 0.9, repeat: Infinity }}
+                      />
+                      verifying…
+                    </p>
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
-          {/* the gate */}
+          {/* the gate — brightens + emits a checking pulse once canary is green */}
           <div className="relative flex h-[160px] flex-col items-center justify-center">
             <motion.div
-              animate={reduced ? undefined : { scaleY: [1, 1.05, 1], opacity: [0.7, 1, 0.7] }}
-              transition={reduced ? undefined : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+              animate={
+                reduced
+                  ? undefined
+                  : gateActive
+                    ? { opacity: [0.8, 1, 0.8], scaleY: [1, 1.06, 1] }
+                    : { opacity: 0.4 }
+              }
+              transition={
+                reduced ? undefined : { duration: 1.4, repeat: gateActive ? Infinity : 0, ease: "easeInOut" }
+              }
               className="h-full w-[3px] bg-gradient-to-b from-orange-400/0 via-orange-400 to-orange-400/0 shadow-[0_0_18px_rgba(251,146,60,.6)]"
             />
+            {/* evaluating pulse traveling up the gate */}
+            {gateActive && !reduced && (
+              <motion.span
+                aria-hidden
+                className="absolute left-1/2 h-6 w-6 -translate-x-1/2 rounded-full bg-orange-400/30 blur-md"
+                animate={{ top: ["80%", "10%"], opacity: [0, 0.9, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
+              />
+            )}
             <span className="absolute top-1/2 -translate-y-1/2 rounded-full border border-orange-500/50 bg-[#04070b] px-3 py-1 text-[9px] uppercase tracking-[.22em] text-orange-200">
-              gate
+              {gateActive ? "gate · eval" : "gate"}
             </span>
           </div>
-          {/* expansion (waiting) */}
+          {/* expansion — stays HELD (the safety property the loop proves) */}
           <div className="space-y-3">
             {expansion.map((s, i) => (
               <motion.div
@@ -215,7 +260,14 @@ function EvaluatesVisual() {
               >
                 <p className="text-[10px] uppercase tracking-[.22em] text-white/45">expansion</p>
                 <p className="mt-1 text-sm font-semibold text-white/70">{s}</p>
-                <p className="mt-1 font-mono text-[10px] text-amber-300/80">waiting · held</p>
+                <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-amber-300/80">
+                  <motion.span
+                    className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400/70"
+                    animate={reduced ? undefined : { opacity: [0.4, 1, 0.4] }}
+                    transition={reduced ? undefined : { duration: 1.8, repeat: Infinity, delay: i * 0.3 }}
+                  />
+                  waiting · held
+                </p>
               </motion.div>
             ))}
           </div>
@@ -228,9 +280,10 @@ function EvaluatesVisual() {
 /* 03 — Remembers policy: rolling audit log */
 function RemembersVisual() {
   return (
-    <Stage accent="orange">
+    <Stage accent="orange" live liveLabel="LIVE · TAIL">
       <div className="absolute inset-x-8 top-1/2 -translate-y-1/2">
         <AuditLogStream
+          live
           rows={[
             { t: "T+02.30", event: "incident.open · INC-2147 · drift +$0.50", tone: "err", actor: "system" },
             { t: "T+02.34", event: "containment.hold · downstream paused", tone: "warn", actor: "system" },
@@ -250,11 +303,20 @@ function RemembersVisual() {
   );
 }
 
-/* 04 — Highlights problems: incident card with mismatch */
+/* 04 — Highlights problems: incident card with a live monitoring feel.
+   The POS price re-reads (shimmer) and a monitoring dot ticks, so the card
+   reads as a system actively watching the drift, not a frozen screenshot. */
 function HighlightsVisual() {
   const reduced = useReducedMotion();
+  // Tiny live "seconds since surfaced" counter for the in-card monitor line.
+  const [secs, setSecs] = useState(reduced ? 3 : 0);
+  useEffect(() => {
+    if (reduced) return;
+    const id = setInterval(() => setSecs((s) => (s >= 9 ? 2 : s + 1)), 1000);
+    return () => clearInterval(id);
+  }, [reduced]);
   return (
-    <Stage accent="rose">
+    <Stage accent="rose" live liveLabel="LIVE · MONITOR" liveTone="rose">
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <motion.div
           initial={{ opacity: 0, x: 40 }}
@@ -275,15 +337,33 @@ function HighlightsVisual() {
               <p className="text-[10px] uppercase tracking-[.18em] text-emerald-200">canonical</p>
               <p className="mt-0.5 font-mono text-base text-emerald-100">$5.99</p>
             </div>
-            <div className="rounded-lg border border-rose-500/40 bg-rose-500/[.10] p-2.5">
+            <div className="relative overflow-hidden rounded-lg border border-rose-500/40 bg-rose-500/[.10] p-2.5">
               <p className="text-[10px] uppercase tracking-[.18em] text-rose-200">POS rang</p>
               <p className="mt-0.5 font-mono text-base text-rose-100">$6.49</p>
+              {/* live re-read shimmer sweeping the disagreeing channel */}
+              {!reduced && (
+                <motion.span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-rose-300/25 to-transparent"
+                  animate={{ left: ["-33%", "133%"] }}
+                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                />
+              )}
             </div>
           </div>
           <p className="mt-3 text-[11px] text-white/55">
             <span className="font-medium text-amber-200">Drift +$0.50.</span> Downstream rollout paused
             pending acknowledgement.
           </p>
+          {/* live monitor line */}
+          <div className="mt-3 flex items-center gap-1.5 border-t border-white/[.06] pt-2.5 font-mono text-[10px] text-rose-300/80">
+            <motion.span
+              className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400"
+              animate={reduced ? undefined : { opacity: [1, 0.2, 1] }}
+              transition={reduced ? undefined : { duration: 1, repeat: Infinity }}
+            />
+            monitoring · drift open {secs}s · re-reading POS…
+          </div>
           {!reduced && (
             <motion.span
               aria-hidden
@@ -306,7 +386,7 @@ function HighlightsVisual() {
 /* 05 — Supports approvals: 3 operator action buttons */
 function SupportsVisual() {
   return (
-    <Stage accent="emerald">
+    <Stage accent="emerald" live liveLabel="LIVE · TRIAGE">
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px]">
         <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[.22em] text-white/55">
           <span>operator actions · INC-2147</span>
