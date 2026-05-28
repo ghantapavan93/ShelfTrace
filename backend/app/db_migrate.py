@@ -143,6 +143,89 @@ def _apply_source_run_id_backfill(conn) -> None:
             "WHERE source_run_id IS NULL"
         )
     )
+    # Correct seed rows the blanket 'user:legacy' fallback mislabeled.
+    _reclassify_demo_rows(conn)
+
+
+# Memorial Day demo SKUs — the seed_history catalog (seed.py PROFILES) and the
+# create_memorial_day scenario actions. Stable + small, so safe to hardcode as
+# a fallback if the import below fails (e.g. during a partial deploy).
+_MEMORIAL_DAY_SKUS_FALLBACK = [
+    "milk-organic-1gal",
+    "egg-cage-free-brown-12",
+    "strawberry-1lb",
+    "oj-nfc-premium-52oz",
+]
+
+
+def _reclassify_demo_rows(conn) -> None:
+    """Re-tag demo seed rows that the blanket NULL→'user:legacy' backfill
+    mislabeled, so Live mode (which includes user:legacy) stays free of seeded
+    data.
+
+    The seed_history / realistic_scale loaders now stamp source_run_id at
+    creation, but rows written BEFORE that shipped were left NULL and then
+    blanket-mapped to 'user:legacy'. Those rows are demo data — this corrects
+    their scope to 'demo:*'.
+
+    Safety: only touches rows whose scope is NULL or exactly 'user:legacy'.
+    Genuine user uploads always carry a 'user:<hash>' / 'user:scenario-*' tag,
+    so they are never reclassified. Keyed by the known demo SKU sets (costs /
+    history / recs) and by demo-entity lineage (competitor observations / SKU
+    links). Idempotent — re-running is a no-op once rows are already demo:*.
+    """
+    # Memorial Day SKUs — prefer the live PROFILES list, fall back to the
+    # hardcoded set if the import isn't available.
+    try:
+        from app.pricing.seed import PROFILES as _MD_PROFILES
+
+        md_skus = sorted({p["sku"] for p in _MD_PROFILES})
+    except Exception:  # pragma: no cover - defensive
+        md_skus = list(_MEMORIAL_DAY_SKUS_FALLBACK)
+
+    # Realistic Scale SKUs — best-effort; these are already demo-stamped at
+    # load time, so this is just belt-and-suspenders for any legacy rows.
+    try:
+        from app.scenarios.realistic_scale import CATALOG as _RS_CATALOG
+
+        rs_skus = sorted({item.sku for item in _RS_CATALOG})
+    except Exception:  # pragma: no cover - defensive
+        rs_skus = []
+
+    from sqlalchemy import bindparam
+
+    sku_tables = ("product_costs", "historical_sales", "pricing_recommendations")
+    for table, skus, scope_id in (
+        *[(t, md_skus, "demo:memorial-day") for t in sku_tables],
+        *[(t, rs_skus, "demo:realistic-scale") for t in sku_tables],
+    ):
+        if not skus:
+            continue
+        conn.execute(
+            text(
+                f"UPDATE {table} SET source_run_id = :scope "
+                f"WHERE (source_run_id IS NULL OR source_run_id = 'user:legacy') "
+                f"AND sku IN :skus"
+            ).bindparams(bindparam("skus", expanding=True)),
+            {"scope": scope_id, "skus": skus},
+        )
+
+    # Graph rows carry no SKU on the row itself — inherit the linked entity's
+    # demo scope. Cross-dialect correlated UPDATE (no table alias).
+    for table in ("competitor_price_observations", "sku_product_links"):
+        conn.execute(
+            text(
+                f"UPDATE {table} "
+                f"SET source_run_id = ("
+                f"  SELECT e.source_run_id FROM product_entities e "
+                f"  WHERE e.id = {table}.entity_id"
+                f") "
+                f"WHERE (source_run_id IS NULL OR source_run_id = 'user:legacy') "
+                f"AND entity_id IN ("
+                f"  SELECT id FROM product_entities WHERE source_run_id LIKE 'demo:%'"
+                f")"
+            )
+        )
 
 
 def _upgrade_to_jsonb(conn, table: str, column: str) -> None:
