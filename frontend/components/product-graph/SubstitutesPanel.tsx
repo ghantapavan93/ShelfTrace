@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { EASE } from "@/lib/motion";
+import { useWorkMode } from "@/components/ModeProvider";
 
 type Data = Awaited<ReturnType<typeof api.graphEntitySubstitutes>>;
 type Row = Data["substitutes"][number];
@@ -66,19 +67,23 @@ export function SubstitutesPanel({ entityId }: { entityId: string }) {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
 
   useEffect(() => {
     let alive = true;
     setData(null);
     setError(null);
     api
-      .graphEntitySubstitutes(entityId)
+      // Keep the candidate set on the same Live/Demo side as the entity, so
+      // a live product doesn't surface demo-seeded substitutes.
+      .graphEntitySubstitutes(entityId, isLiveWorkMode ? "live" : undefined)
       .then((d) => alive && setData(d))
       .catch((e) => alive && setError((e as Error).message));
     return () => {
       alive = false;
     };
-  }, [entityId]);
+  }, [entityId, isLiveWorkMode]);
 
   if (error) {
     return (

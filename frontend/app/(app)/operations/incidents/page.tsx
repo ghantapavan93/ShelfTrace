@@ -23,10 +23,17 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
 ];
 
 export default function IncidentsPage() {
-  const { data, error } = useLive<IncidentView[]>(() => api.incidents());
   const [filter, setFilter] = useState<Filter>("all");
   const { mode, isHydrated } = useWorkMode();
   const isLiveWorkMode = isHydrated && mode === "live";
+  // Pass scope=live to the backend so the source_run_id filter runs there
+  // (not just the client-side denylist below) — keeps demo incidents off the
+  // wire entirely and survives any future seeded batch id.
+  const workScope = isLiveWorkMode ? "live" : undefined;
+  const { data, error } = useLive<IncidentView[]>(
+    () => api.incidents(workScope),
+    [workScope],
+  );
 
   // In Live mode, drop incidents that come from the seeded Memorial Day
   // batch, the Realistic Scale catalog, or certification sandbox runs —

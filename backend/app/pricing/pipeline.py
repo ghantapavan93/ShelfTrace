@@ -25,6 +25,7 @@ from typing import Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.scope import is_demo, same_scope_side
 from app.pricing.constraints import (
     apply_competitor_ceiling,
     apply_cost_floor,
@@ -369,32 +370,44 @@ def run_pricing_engine(db: Session) -> dict:
         for row in db.execute(select(PriceBatch.id, PriceBatch.source_run_id))
     }
 
-    cost_map: dict[str, float] = {
-        c.sku: c.cost for c in db.scalars(select(ProductCost))
+    # Cost catalog keyed by (sku, demo-side) so a demo cost can't set the
+    # cost basis for a user rec (and vice versa) when a SKU exists in both
+    # scopes. The engine processes the whole catalog in one pass, so every
+    # input map must be scope-disambiguated, not just sku-keyed.
+    cost_map: dict[tuple[str, bool], float] = {
+        (c.sku, is_demo(c.source_run_id)): c.cost for c in db.scalars(select(ProductCost))
     }
     competitor_map: dict[str, float] = {}
     for cp in db.scalars(select(CompetitorProduct)):
         competitor_map.setdefault(cp.title.lower()[:32], cp.price)
 
-    # Load active external signals from DB
-    active_signals: list[PricingSignal] = [
-        PricingSignal(
-            name=s.name,
-            signal_type=s.signal_type,
-            multiplier=s.multiplier,
-            effective_from=s.effective_from,
-            effective_until=s.effective_until,
-            category_pattern=s.category_pattern,
-            sku_pattern=s.sku_pattern,
+    # Load active external signals WITH their scope tag. A signal may only
+    # influence recommendations on the same side of the Live/Demo boundary —
+    # otherwise the seeded Memorial Day demand-boost would silently inflate
+    # every user-scoped rec's expected lift.
+    active_signals_scoped: list[tuple[PricingSignal, str | None]] = [
+        (
+            PricingSignal(
+                name=s.name,
+                signal_type=s.signal_type,
+                multiplier=s.multiplier,
+                effective_from=s.effective_from,
+                effective_until=s.effective_until,
+                category_pattern=s.category_pattern,
+                sku_pattern=s.sku_pattern,
+            ),
+            s.source_run_id,
         )
         for s in db.scalars(select(DBExternalSignal))
     ]
 
-    history_buckets: dict[tuple[str, str], list[HistoricalObservation]] = {}
+    # History buckets keyed by (sku, store, demo-side) so demo and user
+    # observations for the same SKU·store never merge into one elasticity fit.
+    history_buckets: dict[tuple[str, str, bool], list[HistoricalObservation]] = {}
     for sale in db.scalars(
         select(HistoricalSale).order_by(HistoricalSale.date.asc()),
     ):
-        key = (sale.sku, sale.store_id)
+        key = (sale.sku, sale.store_id, is_demo(sale.source_run_id))
         history_buckets.setdefault(key, []).append(
             HistoricalObservation(
                 date=sale.date.date() if hasattr(sale.date, "date") else sale.date,
@@ -404,16 +417,19 @@ def run_pricing_engine(db: Session) -> dict:
             ),
         )
 
-    latest_action_per_sku: dict[tuple[str, str], PriceAction] = {}
+    # Latest action per (sku, store, demo-side) — the action's parent batch
+    # scope decides which side it's on.
+    latest_action_per_sku: dict[tuple[str, str, bool], PriceAction] = {}
     for a in db.scalars(select(PriceAction).order_by(PriceAction.id.asc())):
-        latest_action_per_sku[(a.sku, a.store_id)] = a
+        side = is_demo(batch_source_map.get(a.batch_id))
+        latest_action_per_sku[(a.sku, a.store_id, side)] = a
 
     new_recs: list[DBPricingRecommendation] = []
     summary = {"scanned": 0, "recommended": 0, "skipped": 0, "superseded": 0}
 
-    for (sku, store_id), history in history_buckets.items():
+    for (sku, store_id, side), history in history_buckets.items():
         summary["scanned"] += 1
-        action = latest_action_per_sku.get((sku, store_id))
+        action = latest_action_per_sku.get((sku, store_id, side))
         if not action:
             summary["skipped"] += 1
             continue
@@ -425,10 +441,15 @@ def run_pricing_engine(db: Session) -> dict:
             else None
         )
 
-        # Apply active signals
-        mult = combined_multiplier(active_signals, sku, category)
+        # Apply only the signals on this rec's side of the Live/Demo boundary.
+        rec_scope = batch_source_map.get(action.batch_id)
+        applicable_signals = [
+            sig for sig, srid in active_signals_scoped
+            if same_scope_side(srid, rec_scope)
+        ]
+        mult = combined_multiplier(applicable_signals, sku, category)
         matched = [
-            s.name for s in active_signals
+            s.name for s in applicable_signals
             if s.is_active() and s.applies_to(sku, category)
         ]
 
@@ -437,7 +458,7 @@ def run_pricing_engine(db: Session) -> dict:
             store_id=store_id,
             product_name=action.product_name,
             current_price=action.approved_price,
-            cost=cost_map.get(sku, action.approved_price * 0.6),
+            cost=cost_map.get((sku, side), action.approved_price * 0.6),
             competitor_price=competitor_map.get(action.product_name.lower()[:32]),
             is_kvi=action.is_kvi,
             is_perishable=action.markdown_deadline is not None,

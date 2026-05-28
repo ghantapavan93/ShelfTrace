@@ -20,6 +20,7 @@ import clsx from "clsx";
 import { Globe, Brain, TrendingDown, TrendingUp, Check, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
+import { useWorkMode } from "@/components/ModeProvider";
 
 interface Props {
   sku: string;
@@ -55,6 +56,8 @@ export function ScenarioActionHints({
   const [competitor, setCompetitor] = useState<CompetitorObservation | null>(null);
   const [recommendation, setRecommendation] = useState<PricingRec | null>(null);
   const [fetched, setFetched] = useState(false);
+  const { mode, isHydrated } = useWorkMode();
+  const workScope = isHydrated && mode === "live" ? "live" : undefined;
 
   useEffect(() => {
     if (!sku || sku.trim() === "") {
@@ -66,8 +69,10 @@ export function ScenarioActionHints({
     let alive = true;
     setLoading(true);
     Promise.all([
-      api.graphCompetitorPricesForSku(sku).catch(() => null),
-      api.pricingSuggestForSku(sku).catch(() => null),
+      // Scope the competitor + recommendation hints so a live scenario's
+      // SKU doesn't pick up a demo-seeded observation/rec on a key collision.
+      api.graphCompetitorPricesForSku(sku, workScope).catch(() => null),
+      api.pricingSuggestForSku(sku, undefined, workScope).catch(() => null),
     ])
       .then(([competitorData, pricingData]) => {
         if (!alive) return;
@@ -102,7 +107,7 @@ export function ScenarioActionHints({
     return () => {
       alive = false;
     };
-  }, [sku, refreshToken]);
+  }, [sku, refreshToken, workScope]);
 
   if (!sku || sku.trim() === "") return null;
 

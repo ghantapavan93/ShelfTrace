@@ -583,6 +583,10 @@ class ExternalSignal(Base):
     effective_until: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     category_pattern: Mapped[str | None] = mapped_column(String(128), nullable=True)
     sku_pattern: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Data-scope tag so the pricing engine applies a signal only to
+    # recommendations on the SAME side of the Live/Demo boundary — a seeded
+    # demo signal must not silently multiply a user-scoped rec's demand.
+    source_run_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

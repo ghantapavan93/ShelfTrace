@@ -68,6 +68,18 @@ function dispatchFrame(
   }
 }
 
+/**
+ * Build a `?a=1&b=2` query string from an object, skipping null/undefined/empty
+ * values and URL-encoding each value. Returns "" when nothing is set, so it's
+ * safe to append directly to a path.
+ */
+function qs(params: Record<string, string | number | undefined | null>): string {
+  const pairs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
+  return pairs.length ? `?${pairs.join("&")}` : "";
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`GET ${path} -> ${res.status}`);
@@ -151,7 +163,8 @@ export const api = {
       note?: string;
     }>(`/api/v1/batches/${encodeURIComponent(externalId)}/actions/${encodeURIComponent(actionId)}/channels/${channel}/history`),
   expand: (externalId: string) => post<BatchSummary>(`/api/v1/batches/${externalId}/expand`),
-  incidents: () => get<IncidentView[]>(`/api/v1/incidents`),
+  incidents: (scope?: "live" | "demo" | "all") =>
+    get<IncidentView[]>(`/api/v1/incidents${scope ? `?scope=${scope}` : ""}`),
   incident: (id: string) => get<IncidentView>(`/api/v1/incidents/${id}`),
   explanation: (id: string) => get<IncidentExplanation>(`/api/v1/incidents/${id}/explanation`),
   incidentAudit: (id: string) =>
@@ -389,7 +402,7 @@ export const api = {
     }>(
       `/api/v1/pricing/recommendations?only_changes=${onlyChanges}${scope ? `&scope=${scope}` : ""}`,
     ),
-  pricingSkuHistory: (sku: string, storeId?: string) =>
+  pricingSkuHistory: (sku: string, storeId?: string, scope?: "live" | "demo" | "all") =>
     get<{
       sku: string;
       observations: Array<{
@@ -399,7 +412,12 @@ export const api = {
         units_sold: number;
         on_promotion: boolean;
       }>;
-    }>(`/api/v1/pricing/sku/${encodeURIComponent(sku)}/history${storeId ? `?store_id=${storeId}` : ""}`),
+    }>(
+      `/api/v1/pricing/sku/${encodeURIComponent(sku)}/history${qs({
+        store_id: storeId,
+        scope,
+      })}`,
+    ),
 
   scrapingProducts: (params: { source_id?: string; q?: string; limit?: number; offset?: number } = {}) => {
     const qs = new URLSearchParams();
@@ -452,7 +470,7 @@ export const api = {
     }>(
       `/api/v1/product-graph/entities?limit=${limit}${scope ? `&scope=${scope}` : ""}`,
     ),
-  graphEntity: (id: string) =>
+  graphEntity: (id: string, scope?: "live" | "demo" | "all") =>
     get<{
       entity: {
         id: string;
@@ -477,7 +495,7 @@ export const api = {
         observed_at: string;
         delta_pct: number | null;
       }>;
-    }>(`/api/v1/product-graph/entities/${encodeURIComponent(id)}`),
+    }>(`/api/v1/product-graph/entities/${encodeURIComponent(id)}${scope ? `?scope=${scope}` : ""}`),
   graphCategories: () =>
     get<{
       categories: Array<{
@@ -497,7 +515,7 @@ export const api = {
       observations?: number;
       note: string;
     }>(`/api/v1/product-graph/seed-demo`),
-  graphEntitySubstitutes: (entityId: string) =>
+  graphEntitySubstitutes: (entityId: string, scope?: "live" | "demo" | "all") =>
     get<{
       entity: {
         id: string;
@@ -516,12 +534,20 @@ export const api = {
         same_category: boolean;
       }>;
       note: string;
-    }>(`/api/v1/product-graph/entities/${encodeURIComponent(entityId)}/substitutes`),
+    }>(
+      `/api/v1/product-graph/entities/${encodeURIComponent(entityId)}/substitutes${
+        scope ? `?scope=${scope}` : ""
+      }`,
+    ),
   graphBulkMatch: (minScore = 0.7) =>
     post<{ matched_count: number; skipped_count: number; min_score: number }>(
       `/api/v1/product-graph/bulk-match?min_score=${minScore}`,
     ),
-  graphBootstrapFromScenario: (actions: Array<{ sku: string; product_name: string; approved_price: number; category?: string }>, zoneId?: string) =>
+  graphBootstrapFromScenario: (
+    actions: Array<{ sku: string; product_name: string; approved_price: number; category?: string }>,
+    zoneId?: string,
+    sourceRunId?: string,
+  ) =>
     post<{
       bootstrapped_entities: number;
       skipped_already_linked: number;
@@ -531,11 +557,15 @@ export const api = {
     }>(`/api/v1/product-graph/bootstrap-from-scenario`, {
       actions,
       zone_id: zoneId,
+      // Forward the live run id so bootstrap rows are scoped to the user's
+      // batch instead of the 'user:bootstrap-anonymous' fallback.
+      source_run_id: sourceRunId,
     }),
   scenarioAutoEnrich: (
     actions: Array<{ sku: string; product_name: string; approved_price: number }>,
     storeIds: string[],
     zoneId?: string,
+    sourceRunId?: string,
   ) =>
     post<{
       bootstrapped_entities: number;
@@ -551,8 +581,9 @@ export const api = {
       actions,
       store_ids: storeIds,
       zone_id: zoneId,
+      source_run_id: sourceRunId,
     }),
-  graphCompetitorPricesForSku: (sku: string) =>
+  graphCompetitorPricesForSku: (sku: string, scope?: "live" | "demo" | "all") =>
     get<{
       sku: string;
       entity_id: string | null;
@@ -565,8 +596,12 @@ export const api = {
         delta_pct: number | null;
         observed_at: string;
       }>;
-    }>(`/api/v1/product-graph/sku/${encodeURIComponent(sku)}/competitor-prices`),
-  pricingWhatIfFit: (sku: string, storeId: string) =>
+    }>(
+      `/api/v1/product-graph/sku/${encodeURIComponent(sku)}/competitor-prices${
+        scope ? `?scope=${scope}` : ""
+      }`,
+    ),
+  pricingWhatIfFit: (sku: string, storeId: string, scope?: "live" | "demo" | "all") =>
     get<{
       sku: string;
       store_id: string;
@@ -595,7 +630,12 @@ export const api = {
       };
       observed_price_range: { min: number; max: number; mean: number };
       observations: Array<{ price: number; units: number; on_promotion: boolean }>;
-    }>(`/api/v1/pricing/sku/${encodeURIComponent(sku)}/what-if-fit?store_id=${encodeURIComponent(storeId)}`),
+    }>(
+      `/api/v1/pricing/sku/${encodeURIComponent(sku)}/what-if-fit${qs({
+        store_id: storeId,
+        scope,
+      })}`,
+    ),
   pricingMarginTargets: (scope?: "live" | "demo" | "all") =>
     get<{
       categories: Array<{
@@ -650,7 +690,7 @@ export const api = {
         max_abs_gap_pct: number;
       };
     }>(`/api/v1/pricing/kvi-watchlist${scope ? `?scope=${scope}` : ""}`),
-  pricingSuggestForSku: (sku: string, storeId?: string) =>
+  pricingSuggestForSku: (sku: string, storeId?: string, scope?: "live" | "demo" | "all") =>
     get<{
       sku: string;
       store_id: string | null;
@@ -665,7 +705,12 @@ export const api = {
         confidence: number;
         reasons: Array<{ code: string; message: string }>;
       } | null;
-    }>(`/api/v1/pricing/sku/${encodeURIComponent(sku)}/suggest${storeId ? `?store_id=${storeId}` : ""}`),
+    }>(
+      `/api/v1/pricing/sku/${encodeURIComponent(sku)}/suggest${qs({
+        store_id: storeId,
+        scope,
+      })}`,
+    ),
 };
 
 export const DEMO_BATCH = "memorial-day-dallas-02";

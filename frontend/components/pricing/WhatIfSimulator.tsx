@@ -43,6 +43,7 @@ import { EASE } from "@/lib/motion";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
 import { ElasticityScatter } from "@/components/pricing/ElasticityScatter";
+import { useWorkMode } from "@/components/ModeProvider";
 
 // Constraint tuning — kept in sync with backend/app/pricing/constraints.py.
 // These are the same numbers the production engine enforces. Duplicating
@@ -77,6 +78,8 @@ export function WhatIfSimulator({ sku, storeId, recommendedPrice, onClose }: Pro
   const [fit, setFit] = useState<Fit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<number | null>(null);
+  const { mode, isHydrated } = useWorkMode();
+  const isLiveWorkMode = isHydrated && mode === "live";
 
   // ── 1. Fetch the fit once on mount ────────────────────────────────────
   useEffect(() => {
@@ -84,7 +87,9 @@ export function WhatIfSimulator({ sku, storeId, recommendedPrice, onClose }: Pro
     setFit(null);
     setError(null);
     api
-      .pricingWhatIfFit(sku, storeId)
+      // Scope the elasticity fit + cost + competitor reference so a live
+      // what-if isn't computed over demo-seeded history.
+      .pricingWhatIfFit(sku, storeId, isLiveWorkMode ? "live" : undefined)
       .then((f) => {
         if (!alive) return;
         setFit(f);
@@ -96,7 +101,7 @@ export function WhatIfSimulator({ sku, storeId, recommendedPrice, onClose }: Pro
     return () => {
       alive = false;
     };
-  }, [sku, storeId]);
+  }, [sku, storeId, isLiveWorkMode]);
 
   // ── 2. Loading / empty / error states ─────────────────────────────────
   if (error) {

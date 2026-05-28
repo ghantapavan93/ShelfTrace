@@ -16,6 +16,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from app.models import HistoricalSale, ProductEntity, SKUProductLink
+from app.scope import Scope, apply_filter
 from app.services.product_graph import get_internal_history_for_entity
 
 
@@ -73,11 +74,16 @@ def find_substitute_products(
     db: Session,
     primary_entity_id: str,
     same_category_only: bool = False,
+    scope: Scope = Scope.ALL,
 ) -> list[SubstituteProduct]:
     """Find products that compete with the primary entity.
 
     Heuristic: products in the same category with non-zero cross-elasticity.
     Real systems use learned embeddings to find substitutes regardless of category.
+
+    `scope` keeps the candidate set on the same side of the Live/Demo
+    boundary — a Live-mode entity shouldn't surface demo-seeded products as
+    its substitutes. Defaults to ALL so non-scoped callers are unaffected.
     """
     primary = db.scalar(select(ProductEntity).where(ProductEntity.id == primary_entity_id))
     if not primary:
@@ -93,6 +99,7 @@ def find_substitute_products(
             (ProductEntity.category_id == primary.category_id)
             | (ProductEntity.category_id == None)  # noqa: E712
         )
+    query = apply_filter(query, ProductEntity.source_run_id, scope)
 
     candidates = db.scalars(query).all()
 

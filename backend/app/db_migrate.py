@@ -65,6 +65,9 @@ _SOURCE_RUN_ID_TABLES = [
     ("pricing_recommendations", "ix_pricing_recommendations_source_run_id"),
     ("competitor_price_observations", "ix_competitor_price_observations_source_run_id"),
     ("sku_product_links", "ix_sku_product_links_source_run_id"),
+    # Added in the round-3 engine fix: signals carry scope so the pricing
+    # engine only applies them to recs on the same Live/Demo side.
+    ("external_signals", "ix_external_signals_source_run_id"),
 ]
 
 
@@ -131,6 +134,15 @@ def _apply_source_run_id_backfill(conn) -> None:
                 f"WHERE source_run_id IS NULL"
             )
         )
+    # External signals: the only seeded signal is the Memorial Day demand
+    # boost, so any pre-column NULL row is demo data. Stamping it demo keeps
+    # the engine from applying it to user recs.
+    conn.execute(
+        text(
+            "UPDATE external_signals SET source_run_id = 'demo:memorial-day' "
+            "WHERE source_run_id IS NULL"
+        )
+    )
 
 
 def _upgrade_to_jsonb(conn, table: str, column: str) -> None:

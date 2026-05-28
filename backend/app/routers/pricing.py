@@ -23,7 +23,7 @@ from app.models import (
     PricingRecommendation,
     ProductCost,
 )
-from app.scope import Scope, apply_filter, current_scope
+from app.scope import DEMO_MEMORIAL_DAY, Scope, apply_filter, current_scope
 from app.pricing.elasticity import estimate_elasticity
 from app.pricing.models import HistoricalObservation
 from app.pricing.pipeline import run_pricing_engine
@@ -66,6 +66,9 @@ def seed_signals(db: Session = Depends(get_db), identity: Identity = Depends(req
         .replace(day=min(28, now.day + 7)),
         category_pattern=None,
         sku_pattern=None,  # zone-wide for the demo
+        # Demo-scoped: the engine will only apply this to demo recs, never to
+        # a user-uploaded scenario's recommendations.
+        source_run_id=DEMO_MEMORIAL_DAY,
     )
     db.add(signal)
     db.commit()
@@ -289,6 +292,11 @@ def apply_recommendation_to_shelftrace(
 def suggest_for_sku(
     sku: str,
     store_id: str | None = Query(None, description="Optional store filter; returns best rec across stores if omitted"),
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. Default all. "
+        "Keeps a demo recommendation from surfacing as the suggestion for a Live-mode SKU.",
+    ),
     db: Session = Depends(get_db),
 ):
     """Get the latest non-superseded pricing recommendation for a SKU.
@@ -296,6 +304,7 @@ def suggest_for_sku(
     Used by the Scenarios builder to show 'Pricing engine suggests $X.XX'
     next to each action — connecting the pricing brain to the canary loop.
     """
+    resolved = current_scope(scope)
     stmt = (
         select(PricingRecommendation)
         .where(PricingRecommendation.sku == sku)
@@ -304,6 +313,7 @@ def suggest_for_sku(
     )
     if store_id:
         stmt = stmt.where(PricingRecommendation.store_id == store_id)
+    stmt = apply_filter(stmt, PricingRecommendation.source_run_id, resolved)
 
     rec = db.scalar(stmt.limit(1))
     if rec is None:
@@ -320,6 +330,11 @@ def suggest_for_sku(
 def get_what_if_fit(
     sku: str,
     store_id: str = Query(..., description="Required: store the what-if simulates against"),
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. Default all. "
+        "Keeps the elasticity fit, cost, and competitor reference from mixing demo + user rows.",
+    ),
     db: Session = Depends(get_db),
 ):
     """One-shot fetch of the inputs the client needs to run a live what-if
@@ -331,13 +346,18 @@ def get_what_if_fit(
     The frontend uses this to render an interactive slider with instant
     feedback — no per-keystroke API round-trip.
     """
-    # Latest PriceAction = source of truth for the current/approved price
-    action = db.scalar(
+    resolved = current_scope(scope)
+    # Latest PriceAction = source of truth for the current/approved price.
+    # Scope via parent batch so a demo action can't answer a Live what-if.
+    action_stmt = (
         select(PriceAction)
+        .join(PriceBatch, PriceAction.batch_id == PriceBatch.id)
         .where(PriceAction.sku == sku)
         .where(PriceAction.store_id == store_id)
         .order_by(PriceAction.id.desc())
     )
+    action_stmt = apply_filter(action_stmt, PriceBatch.source_run_id, resolved)
+    action = db.scalar(action_stmt)
     if action is None:
         raise HTTPException(
             status_code=404,
@@ -345,18 +365,25 @@ def get_what_if_fit(
         )
 
     # Cost catalog (optional — engine produces a less-actionable result without it)
-    cost_row = db.scalar(select(ProductCost).where(ProductCost.sku == sku))
+    cost_stmt = apply_filter(
+        select(ProductCost).where(ProductCost.sku == sku),
+        ProductCost.source_run_id,
+        resolved,
+    )
+    cost_row = db.scalar(cost_stmt)
     cost = cost_row.cost if cost_row else None
 
-    # Historical sales → fit elasticity in-process
-    history_rows = list(
-        db.scalars(
-            select(HistoricalSale)
-            .where(HistoricalSale.sku == sku)
-            .where(HistoricalSale.store_id == store_id)
-            .order_by(HistoricalSale.date.asc())
-        )
+    # Historical sales → fit elasticity in-process (scope-filtered so the
+    # fitted beta isn't computed over a mix of demo + user observations).
+    hist_stmt = apply_filter(
+        select(HistoricalSale)
+        .where(HistoricalSale.sku == sku)
+        .where(HistoricalSale.store_id == store_id)
+        .order_by(HistoricalSale.date.asc()),
+        HistoricalSale.source_run_id,
+        resolved,
     )
+    history_rows = list(db.scalars(hist_stmt))
     observations = [
         HistoricalObservation(
             date=row.date.date() if hasattr(row.date, "date") else row.date,
@@ -395,7 +422,9 @@ def get_what_if_fit(
     competitor_price: float | None = None
     competitor_source: str | None = None
     if entity:
-        observations_for_entity = product_graph.get_competitor_prices_for_entity(db, entity.id)
+        observations_for_entity = product_graph.get_competitor_prices_for_entity(
+            db, entity.id, scope=resolved
+        )
         if observations_for_entity:
             latest = max(observations_for_entity, key=lambda o: o.observed_at)
             competitor_price = latest.price
@@ -859,10 +888,16 @@ def sku_history(
     db: Session = Depends(get_db),
     store_id: str | None = None,
     limit: int = Query(120, ge=1, le=500),
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. Default all.",
+    ),
 ):
+    resolved = current_scope(scope)
     stmt = select(HistoricalSale).where(HistoricalSale.sku == sku).order_by(HistoricalSale.date.asc())
     if store_id:
         stmt = stmt.where(HistoricalSale.store_id == store_id)
+    stmt = apply_filter(stmt, HistoricalSale.source_run_id, resolved)
     rows = list(db.scalars(stmt.limit(limit)))
     return {
         "sku": sku,
@@ -880,8 +915,18 @@ def sku_history(
 
 
 @router.get("/costs")
-def list_costs(db: Session = Depends(get_db)):
-    rows = list(db.scalars(select(ProductCost).order_by(ProductCost.sku)))
+def list_costs(
+    db: Session = Depends(get_db),
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. Default all.",
+    ),
+):
+    resolved = current_scope(scope)
+    stmt = apply_filter(
+        select(ProductCost).order_by(ProductCost.sku), ProductCost.source_run_id, resolved
+    )
+    rows = list(db.scalars(stmt))
     return {
         "costs": [
             {"sku": r.sku, "cost": r.cost, "effective_from": r.effective_from}
@@ -891,9 +936,31 @@ def list_costs(db: Session = Depends(get_db)):
 
 
 @router.get("/signals")
-def list_signals(db: Session = Depends(get_db)):
-    rows = list(db.scalars(select(ExternalSignal).order_by(ExternalSignal.effective_from.desc())))
+def list_signals(
+    db: Session = Depends(get_db),
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user signals + legacy), 'demo' (seeded only), 'all'. Default all.",
+    ),
+):
+    resolved = current_scope(scope)
+    stmt = apply_filter(
+        select(ExternalSignal).order_by(ExternalSignal.effective_from.desc()),
+        ExternalSignal.source_run_id,
+        resolved,
+    )
+    rows = list(db.scalars(stmt))
     now = datetime.now(timezone.utc)
+
+    def _aware(dt: datetime | None) -> datetime | None:
+        # SQLite drops tzinfo on read even for DateTime(timezone=True) columns,
+        # so a stored value comes back naive. Treat naive as UTC before
+        # comparing against the tz-aware `now` — otherwise the comparison
+        # raises "can't compare offset-naive and offset-aware datetimes".
+        if dt is not None and dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
     return {
         "signals": [
             {
@@ -905,7 +972,7 @@ def list_signals(db: Session = Depends(get_db)):
                 "effective_until": s.effective_until,
                 "category_pattern": s.category_pattern,
                 "sku_pattern": s.sku_pattern,
-                "is_active": s.effective_from <= now <= s.effective_until,
+                "is_active": _aware(s.effective_from) <= now <= _aware(s.effective_until),
             }
             for s in rows
         ],

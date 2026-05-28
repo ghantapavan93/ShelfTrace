@@ -154,7 +154,10 @@ export default function ProductGraphPage() {
     let alive = true;
     setDetailLoading(true);
     api
-      .graphEntity(selectedEntityId)
+      // Scope the detail's linked SKUs + competitor observations to match
+      // the (already-scoped) entity list, so a Live-mode card never shows
+      // demo-seeded observations on a shared entity.
+      .graphEntity(selectedEntityId, isLiveWorkMode ? "live" : undefined)
       .then((d) => {
         if (alive) setDetail(d);
       })
@@ -167,7 +170,7 @@ export default function ProductGraphPage() {
     return () => {
       alive = false;
     };
-  }, [selectedEntityId, reloadKey, toast]);
+  }, [selectedEntityId, reloadKey, toast, isLiveWorkMode]);
 
   const handleSeed = useCallback(async () => {
     setBusy("seed");

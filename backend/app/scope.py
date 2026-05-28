@@ -101,6 +101,27 @@ def build_demo_id(key: str) -> str:
     return f"demo:{key.strip().lower().replace(' ', '-')}"
 
 
+def is_demo(source_run_id: Optional[str]) -> bool:
+    """True if this source_run_id belongs to the demo side of the boundary.
+
+    Demo = starts with 'demo:'. Everything else (user:*, NULL legacy) is the
+    user/live side. This is the single predicate the pricing engine uses to
+    decide whether a signal may influence a recommendation.
+    """
+    return bool(source_run_id) and source_run_id.startswith("demo:")
+
+
+def same_scope_side(a: Optional[str], b: Optional[str]) -> bool:
+    """True if two source_run_ids sit on the same side of the Live/Demo line.
+
+    Used by the pricing engine: a demo signal may only multiply demo recs,
+    a user/legacy signal may only multiply user/legacy recs. Without this,
+    the global signal table would let a seeded demo demand-boost inflate a
+    real user's recommendation economics.
+    """
+    return is_demo(a) == is_demo(b)
+
+
 def apply_filter(query: Select, source_col: ColumnElement, scope: Scope) -> Select:
     """Compose a `WHERE source_run_id LIKE 'demo:%' / 'user:%' / 1=1` clause.
 

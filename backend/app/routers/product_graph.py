@@ -121,7 +121,16 @@ def list_entities(
 
 
 @router.get("/entities/{entity_id}")
-def get_entity(entity_id: str, db: Session = Depends(get_db)) -> dict:
+def get_entity(
+    entity_id: str,
+    scope: Optional[str] = Query(
+        None,
+        description="Data scope for the entity's linked SKUs + competitor observations: "
+        "'live', 'demo', 'all'. The entity itself is fetched by id (escape hatch); only "
+        "its child rows are filtered, so a Live-mode card doesn't show demo observations.",
+    ),
+    db: Session = Depends(get_db),
+) -> dict:
     """Get a single entity and all linked SKUs + competitor products.
 
     Each competitor observation is enriched with the per-signal match
@@ -130,19 +139,27 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)) -> dict:
     match — so the UI can show "why did we trust this match?" without
     a second roundtrip.
     """
+    resolved_scope = current_scope(scope)
     entity = db.scalar(select(ProductEntity).where(ProductEntity.id == entity_id))
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
 
-    # Get linked SKUs
-    sku_links = db.scalars(select(SKUProductLink).where(SKUProductLink.entity_id == entity_id)).all()
-
-    # Get competitor price observations
-    price_obs = list(
-        db.scalars(
-            select(CompetitorPriceObservation).where(CompetitorPriceObservation.entity_id == entity_id)
-        )
+    # Get linked SKUs — scoped so a shared entity's demo links don't show
+    # in a Live-mode detail card (and vice versa).
+    sku_link_stmt = apply_filter(
+        select(SKUProductLink).where(SKUProductLink.entity_id == entity_id),
+        SKUProductLink.source_run_id,
+        resolved_scope,
     )
+    sku_links = db.scalars(sku_link_stmt).all()
+
+    # Get competitor price observations — same scope contract.
+    obs_stmt = apply_filter(
+        select(CompetitorPriceObservation).where(CompetitorPriceObservation.entity_id == entity_id),
+        CompetitorPriceObservation.source_run_id,
+        resolved_scope,
+    )
+    price_obs = list(db.scalars(obs_stmt))
 
     # Bulk-fetch competitor products + their entity-match scores so we can
     # explain each edge. One query per join, not one per observation.
@@ -284,7 +301,16 @@ def _unit_size_in_title(unit_size: str, title: str) -> bool:
 
 
 @router.get("/entities/{entity_id}/substitutes")
-def get_substitutes(entity_id: str, db: Session = Depends(get_db)) -> dict:
+def get_substitutes(
+    entity_id: str,
+    scope: Optional[str] = Query(
+        None,
+        description="Data scope: 'live', 'demo', 'all'. Keeps the candidate set on the same "
+        "side of the Live/Demo boundary so a live entity doesn't surface demo products as "
+        "substitutes.",
+    ),
+    db: Session = Depends(get_db),
+) -> dict:
     """Find products that compete with or complement this entity.
 
     Calls the cannibalization heuristic: products in the same (or adjacent)
@@ -299,11 +325,13 @@ def get_substitutes(entity_id: str, db: Session = Depends(get_db)) -> dict:
     """
     from app.pricing.cannibalization import find_substitute_products
 
+    resolved_scope = current_scope(scope)
+
     entity = db.scalar(select(ProductEntity).where(ProductEntity.id == entity_id))
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
 
-    subs = find_substitute_products(db, entity_id, same_category_only=False)
+    subs = find_substitute_products(db, entity_id, same_category_only=False, scope=resolved_scope)
 
     # Pre-fetch category names so the UI can render "Dairy & Eggs" not "cat_42"
     cat_ids = {s.category_id for s in subs if s.category_id} | (
@@ -726,17 +754,28 @@ def seed_demo_graph(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/sku/{sku}/competitor-prices")
-def get_competitor_prices_for_sku(sku: str, db: Session = Depends(get_db)) -> dict:
+def get_competitor_prices_for_sku(
+    sku: str,
+    scope: Optional[str] = Query(
+        None,
+        description="Data scope: 'live', 'demo', 'all'. Keeps a demo competitor observation "
+        "from surfacing as the reference price for a Live-mode SKU.",
+    ),
+    db: Session = Depends(get_db),
+) -> dict:
     """Get recent competitor prices for an internal SKU (via entity linkage).
 
     Returns the latest observation per source. Used by the Scenarios builder
     to show competitor reference prices alongside each action.
     """
+    resolved_scope = current_scope(scope)
     entity = product_graph.get_entity_for_sku(db, sku)
     if not entity:
         return {"sku": sku, "entity_id": None, "observations": []}
 
-    observations = product_graph.get_competitor_prices_for_entity(db, entity.id)
+    observations = product_graph.get_competitor_prices_for_entity(
+        db, entity.id, scope=resolved_scope
+    )
 
     # Get source name for each observation via competitor_product lookup
     cp_ids = [o.competitor_product_id for o in observations]
