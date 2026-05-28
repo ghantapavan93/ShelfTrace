@@ -338,7 +338,9 @@ export default function PricingPage() {
           </h2>
           {recs.data && visibleRecommendations.length > 0 && (
             <a
-              href={`${api.base}/api/v1/pricing/recommendations/export.csv`}
+              href={`${api.base}/api/v1/pricing/recommendations/export.csv${
+                isLiveWorkMode ? "?scope=live" : ""
+              }`}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-white/10"

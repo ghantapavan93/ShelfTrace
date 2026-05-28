@@ -17,6 +17,7 @@ from app.models import (
     ProductEntity,
     SKUProductLink,
 )
+from app.scope import Scope, apply_filter
 
 
 def find_or_create_category(db: Session, category_name: str, parent_id: Optional[str] = None) -> ProductCategory:
@@ -121,12 +122,23 @@ def get_entity_for_sku(db: Session, sku: str, zone_id: Optional[str] = None) -> 
     return db.scalar(select(ProductEntity).where(ProductEntity.id == link.entity_id))
 
 
-def get_competitor_prices_for_entity(db: Session, entity_id: str, zone_id: Optional[str] = None) -> list[CompetitorPriceObservation]:
+def get_competitor_prices_for_entity(
+    db: Session,
+    entity_id: str,
+    zone_id: Optional[str] = None,
+    scope: Scope = Scope.ALL,
+) -> list[CompetitorPriceObservation]:
     """Get all recent competitor price observations for a canonical entity.
-    Useful for 'what are competitors charging for this product?'"""
+    Useful for 'what are competitors charging for this product?'
+
+    `scope` honors the Live/Demo data boundary: when scope=LIVE the result
+    excludes demo-seeded observations (and vice versa). Defaults to ALL so
+    existing callers that don't care about scope are unaffected.
+    """
     stmt = select(CompetitorPriceObservation).where(CompetitorPriceObservation.entity_id == entity_id)
     if zone_id:
         stmt = stmt.where(or_(CompetitorPriceObservation.zone_id == zone_id, CompetitorPriceObservation.zone_id == None))
+    stmt = apply_filter(stmt, CompetitorPriceObservation.source_run_id, scope)
 
     return db.scalars(stmt).all()
 

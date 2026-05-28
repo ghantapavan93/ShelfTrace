@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models import PriceAction, PriceBatch, RunMode
 from app.routers.common import get_batch_or_404
 from app.schemas import OperationsOverview
-from app.scope import apply_filter, current_scope
+from app.scope import Scope, apply_filter, current_scope
 from app.services import queries
 
 router = APIRouter(prefix="/api/v1", tags=["operations"])
@@ -92,11 +92,22 @@ def operations(
         stmt = apply_filter(stmt, PriceBatch.source_run_id, resolved)
         batch = db.scalar(stmt)
         if batch is None:
-            # No batch in the requested scope. Fall back to the unfiltered
-            # latest so /operations still has SOMETHING to render — the
-            # Live-mode clean-slate banner on the frontend handles this
-            # case explicitly by detecting the seeded external_id.
-            batch = get_batch_or_404(db, None)
+            # No batch in the requested scope. The fallback depends on the
+            # scope contract:
+            #   • Scope.ALL  → reviewer asked for "anything"; fall back to the
+            #     unfiltered latest so the page still renders something.
+            #   • Scope.LIVE / Scope.DEMO → caller asked for a SPECIFIC half of
+            #     the boundary. Returning the OTHER half would be a silent
+            #     contract violation (Live mode rendering the seeded Memorial
+            #     Day batch). Raise 404 — the frontend's clean-slate banner
+            #     renders the friendly empty state for a 404 here.
+            if resolved == Scope.ALL:
+                batch = get_batch_or_404(db, None)
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No batch found in scope '{resolved.value}'",
+                )
     return queries.operations_overview(db, batch)
 
 

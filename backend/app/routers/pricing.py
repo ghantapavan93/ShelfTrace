@@ -116,12 +116,20 @@ def list_recommendations(
 def export_recommendations_csv(
     db: Session = Depends(get_db),
     only_changes: bool = True,
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. Default all. "
+        "Mirrors GET /recommendations so the CSV download honors the same Live/Demo boundary — "
+        "a Live-mode export must not leak seeded demo recommendations into the downloaded file.",
+    ),
 ):
+    resolved = current_scope(scope)
     stmt = select(PricingRecommendation).where(
         PricingRecommendation.superseded_by.is_(None),
     ).order_by(desc(PricingRecommendation.created_at))
     if only_changes:
         stmt = stmt.where(PricingRecommendation.recommended_price != PricingRecommendation.current_price)
+    stmt = apply_filter(stmt, PricingRecommendation.source_run_id, resolved)
 
     def _stream():
         buf = io.StringIO()
@@ -502,16 +510,24 @@ def margin_targets(
     if not latest:
         return _empty_margin_payload()
 
-    # Cost catalog
-    costs = {c.sku: c.cost for c in db.scalars(select(ProductCost))}
+    # Cost catalog — scope-filtered. A demo ProductCost row must not set the
+    # cost basis for a Live-mode SKU that happens to share its key, or the
+    # margin math silently uses the wrong cost. Same source_run_id contract
+    # as the actions above.
+    cost_stmt = apply_filter(select(ProductCost), ProductCost.source_run_id, resolved)
+    costs = {c.sku: c.cost for c in db.scalars(cost_stmt)}
 
     # Revenue weights from history (last 30 obs per sku·store gives a fair
     # contemporary signal without going stale). Fallback to price-based
-    # weighting when no history exists.
+    # weighting when no history exists. Scope-filtered for the same reason
+    # as costs — demo sales volume must not weight a Live-mode rollup.
     revenue_weight: dict[tuple[str, str], float] = {}
-    history_rows = list(
-        db.scalars(select(HistoricalSale).order_by(HistoricalSale.date.desc()))
+    hist_stmt = apply_filter(
+        select(HistoricalSale).order_by(HistoricalSale.date.desc()),
+        HistoricalSale.source_run_id,
+        resolved,
     )
+    history_rows = list(db.scalars(hist_stmt))
     by_key: dict[tuple[str, str], list[HistoricalSale]] = {}
     for h in history_rows:
         by_key.setdefault((h.sku, h.store_id), []).append(h)
@@ -734,14 +750,16 @@ def kvi_watchlist(
             },
         }
 
-    # Latest non-superseded rec per (sku, store)
-    rec_rows = list(
-        db.scalars(
-            select(PricingRecommendation)
-            .where(PricingRecommendation.superseded_by.is_(None))
-            .order_by(desc(PricingRecommendation.created_at))
-        )
+    # Latest non-superseded rec per (sku, store) — scope-filtered so a demo
+    # recommendation can't attach itself to a Live-mode KVI row (or vice
+    # versa) when the two share a (sku, store) key.
+    rec_stmt = (
+        select(PricingRecommendation)
+        .where(PricingRecommendation.superseded_by.is_(None))
+        .order_by(desc(PricingRecommendation.created_at))
     )
+    rec_stmt = apply_filter(rec_stmt, PricingRecommendation.source_run_id, resolved)
+    rec_rows = list(db.scalars(rec_stmt))
     rec_by_key: dict[tuple[str, str], PricingRecommendation] = {}
     for r in rec_rows:
         key = (r.sku, r.store_id)
@@ -754,7 +772,9 @@ def kvi_watchlist(
         competitor_price: float | None = None
         competitor_source: str | None = None
         if entity:
-            observations = product_graph.get_competitor_prices_for_entity(db, entity.id)
+            observations = product_graph.get_competitor_prices_for_entity(
+                db, entity.id, scope=resolved
+            )
             if observations:
                 latest_obs = max(observations, key=lambda o: o.observed_at)
                 competitor_price = latest_obs.price

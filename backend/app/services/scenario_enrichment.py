@@ -94,6 +94,7 @@ def auto_enrich_for_actions(
     actions: list[dict],
     store_ids: list[str],
     zone_id: Optional[str] = None,
+    source_run_id: Optional[str] = None,
 ) -> dict:
     """Enrich a scenario's SKUs across graph + pricing in one transaction.
 
@@ -101,12 +102,24 @@ def auto_enrich_for_actions(
         actions: list of {"sku", "product_name", "approved_price"} dicts
         store_ids: stores the scenario targets (used for synthetic POS)
         zone_id: optional zone for SKU-graph linkage
+        source_run_id: Live/Demo data-scope tag stamped on EVERY row this
+            creates (entity, link, competitor observation, cost, sales). When
+            omitted, falls back to a user-scope sentinel so the rows are never
+            NULL — a NULL row reads as user:legacy under Scope.LIVE but is
+            hidden by Scope.DEMO, which would split a single scenario's data
+            across the boundary. Callers that know the scenario's scope
+            (execute_live) should always pass it.
 
     Returns:
         A summary dict the API can echo back to the UI.
     """
     if not actions:
         return _empty_summary()
+
+    # Never leave enrichment rows unscoped — pick a user-scope sentinel when
+    # the caller didn't specify (e.g. pre-execution hint prefetch from the
+    # scenario builder, where no batch/config scope exists yet).
+    effective_source_run_id = source_run_id or "user:auto-enrich"
 
     now = utcnow()
     bootstrapped_entities = 0
@@ -139,11 +152,17 @@ def auto_enrich_for_actions(
                 attributes={"bootstrapped_from_scenario": True},
                 is_manual=False,
             )
-            product_graph.link_sku_to_entity(db, sku, entity.id, zone_id=zone_id)
+            entity.source_run_id = effective_source_run_id
+            link = product_graph.link_sku_to_entity(db, sku, entity.id, zone_id=zone_id)
+            link.source_run_id = effective_source_run_id
             entity_id = entity.id
             bootstrapped_entities += 1
 
             # ── 2. Synthetic competitor observations ───────────────────
+            # CompetitorProduct / CompetitorProductEntity have no
+            # source_run_id column (they're source-keyed catalog rows, not
+            # scenario-scoped); the OBSERVATION is the scenario-scoped fact,
+            # so that's where the scope tag lives.
             for source_id, delta_pct in COMPETITOR_OFFSETS:
                 price = round(approved_price * (1 + delta_pct / 100), 2)
                 cp_id = f"cp_{uuid.uuid4().hex[:12]}"
@@ -161,6 +180,9 @@ def auto_enrich_for_actions(
                         raw_attributes={"bootstrapped": True},
                     ),
                 )
+                # Postgres enforces immediate FK constraints — flush the
+                # CompetitorProduct INSERT before its FK referrers below.
+                db.flush()
                 db.add(
                     CompetitorProductEntity(
                         id=f"cpe_{uuid.uuid4().hex[:12]}",
@@ -180,6 +202,7 @@ def auto_enrich_for_actions(
                         store_id=None,
                         observed_at=now,
                         delta_pct=delta_pct,
+                        source_run_id=effective_source_run_id,
                     ),
                 )
                 competitor_observations_created += 1
@@ -192,6 +215,7 @@ def auto_enrich_for_actions(
                     id=f"cost_{uuid.uuid4().hex[:12]}",
                     sku=sku,
                     cost=round(approved_price * DEFAULT_COST_RATIO, 2),
+                    source_run_id=effective_source_run_id,
                 ),
             )
             costs_seeded += 1
@@ -238,6 +262,7 @@ def auto_enrich_for_actions(
                             price=round(effective_price, 2),
                             units_sold=q,
                             on_promotion=is_promo,
+                            source_run_id=effective_source_run_id,
                         ),
                     )
                     sales_seeded += 1

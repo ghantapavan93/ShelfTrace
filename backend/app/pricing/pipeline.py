@@ -359,8 +359,14 @@ def run_pricing_engine(db: Session) -> dict:
     # inherits the same scope as its parent PriceAction's batch. Without
     # this, engine output lands with NULL source_run_id and Live mode
     # would surface demo recommendations as if they were user-uploaded.
+    #
+    # Select only (id, source_run_id) rather than whole PriceBatch ORM
+    # objects — the engine runs over the entire catalog, and materializing
+    # every batch row (with its JSON columns) just to read two scalars
+    # scales memory with total batch count, not with relevant data.
     batch_source_map: dict[str, str | None] = {
-        b.id: b.source_run_id for b in db.scalars(select(PriceBatch))
+        row.id: row.source_run_id
+        for row in db.execute(select(PriceBatch.id, PriceBatch.source_run_id))
     }
 
     cost_map: dict[str, float] = {

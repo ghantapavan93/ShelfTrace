@@ -149,7 +149,16 @@ function OperationsContent() {
   const externalId = searchParams?.get("external_id") || undefined;
   const fromScenario = searchParams?.get("from") === "scenario";
   const { mode, isHydrated } = useWorkMode();
-  const { data, error, reload } = useLive(() => api.operations(externalId), [externalId]);
+  // In Live work mode (once hydrated) forward scope=live so the backend
+  // applies the source_run_id filter and returns 404 — not the seeded demo
+  // batch — when no live batch exists. The escape-hatch external_id path
+  // bypasses scope on the backend, so this only matters for the implicit
+  // default lookup.
+  const workScope = isHydrated && mode === "live" ? "live" : undefined;
+  const { data, error, reload } = useLive(
+    () => api.operations(externalId, workScope),
+    [externalId, workScope],
+  );
   const [resetting, setResetting] = useState(false);
   const [coldStartHint, setColdStartHint] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);

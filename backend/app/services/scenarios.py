@@ -41,12 +41,36 @@ MEMORIAL_DAY_NAME = "Memorial Day Dallas Zone 2"
 _DEFAULT_COST_RATIO = 0.60
 
 
-def _ensure_cost_for_action(db: Session, sku: str, approved_price: float) -> None:
+def source_run_id_for_config(config: TestRunConfig) -> str:
+    """The data-scope tag every row derived from this config should carry.
+
+    Single source of truth shared by execute_live (batch + enrichment) and
+    create_config (inline cost seeding) so a scenario's batch, costs, graph,
+    and recommendations all land under the SAME source_run_id and the
+    Live/Demo filter treats them as one coherent unit.
+
+      • seeded showcase    → demo:memorial-day
+      • CSV-uploaded       → user:<import hash[:16]>
+      • manual/form-built  → user:scenario-<id[:16]>
+    """
+    if config.is_seeded:
+        return "demo:memorial-day"
+    if config.import_source_hash:
+        return f"user:{config.import_source_hash[:16]}"
+    return f"user:scenario-{config.id[:16]}"
+
+
+def _ensure_cost_for_action(
+    db: Session, sku: str, approved_price: float, source_run_id: str | None = None
+) -> None:
     """Idempotently seed ProductCost for `sku` from approved_price.
 
     No-op if a cost row already exists or the input price is non-positive.
     Called from every scenario-creation path so a CSV upload populates the
-    cost catalog inline.
+    cost catalog inline. `source_run_id` stamps the row with the scenario's
+    data scope so the margin-target rollup filters it consistently with the
+    rest of the scenario's data (a NULL cost is treated as user:legacy by
+    Scope.LIVE but hidden by Scope.DEMO — incoherent for a demo scenario).
     """
     if not sku or approved_price <= 0:
         return
@@ -59,6 +83,7 @@ def _ensure_cost_for_action(db: Session, sku: str, approved_price: float) -> Non
             sku=sku,
             cost=round(approved_price * _DEFAULT_COST_RATIO, 2),
             effective_from=datetime.now(timezone.utc),
+            source_run_id=source_run_id,
         )
     )
 
@@ -168,17 +193,11 @@ def execute_live(db: Session, config: TestRunConfig) -> PriceBatch:
     wipe_batch(db, external_id)
     payload = build_payload(config, "live_rollout", external_id, f"idem-{external_id}")
     result = ingest_batch(db, payload)
-    # Stamp source_run_id on the resulting batch so the Live/Demo filter
-    # can distinguish it. The Memorial Day seed scenario inherits the
-    # demo:memorial-day scope; everything else gets a user:<hash> id
-    # derived from the upload provenance, or user:scenario-<id> when no
-    # CSV provenance is present (manual form-based scenarios).
-    if config.is_seeded:
-        result.batch.source_run_id = "demo:memorial-day"
-    elif config.import_source_hash:
-        result.batch.source_run_id = f"user:{config.import_source_hash[:16]}"
-    else:
-        result.batch.source_run_id = f"user:scenario-{config.id[:16]}"
+    # Stamp source_run_id on the resulting batch so the Live/Demo filter can
+    # distinguish it. Uses the shared helper so the batch, its costs, its
+    # graph rows, and its recommendations all carry the SAME scope tag.
+    scope_id = source_run_id_for_config(config)
+    result.batch.source_run_id = scope_id
     db.commit()
     orchestrator.drain(db)
 
@@ -202,6 +221,9 @@ def execute_live(db: Session, config: TestRunConfig) -> PriceBatch:
             ],
             config.store_ids,
             zone_id=config.zone_name,
+            # Same scope tag as the batch so the enrichment rows (graph,
+            # costs, history, competitor obs) filter identically in Live/Demo.
+            source_run_id=scope_id,
         )
 
     db.refresh(result.batch)
@@ -266,6 +288,9 @@ def create_config(db: Session, payload: ScenarioIn, actor: str | None = None) ->
     )
     db.add(cfg)
     db.flush()
+    # cfg.id is now settled, so the scope tag for this config's derived rows
+    # (costs here, batch + enrichment at execute time) is computable.
+    scope_id = source_run_id_for_config(cfg)
     for a in payload.actions:
         db.add(TestRunAction(
             id=new_id("tra"), test_run_config_id=cfg.id, product_name=a.product_name, sku=a.sku,
@@ -274,7 +299,7 @@ def create_config(db: Session, payload: ScenarioIn, actor: str | None = None) ->
         ))
         # Auto-seed cost catalog so margin-target dashboards work for
         # CSV-uploaded SKUs without a manual ProductCost step.
-        _ensure_cost_for_action(db, a.sku, a.approved_price)
+        _ensure_cost_for_action(db, a.sku, a.approved_price, source_run_id=scope_id)
     for b in payload.behaviors:
         db.add(ConnectorBehaviorProfile(
             id=new_id("beh"), test_run_config_id=cfg.id, store_id=b.store_id, sku=b.sku,

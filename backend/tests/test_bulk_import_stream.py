@@ -83,6 +83,34 @@ def test_stream_preview_oversized_payload_emits_error_event():
     assert any("exceeds" in e[1]["message"].lower() for e in error_events)
 
 
+def test_stream_preview_row_cap_error_precedes_rows():
+    """Regression: the MAX_ROWS cap warning must be emitted BEFORE the row
+    events, not buffered until after the last row.
+
+    A payload over the row cap but under the byte cap exercises the in-loop
+    cap path (distinct from the early-return byte-cap path). The warning is
+    known the moment the iterator starts, so a progressive UI must see it up
+    front — otherwise the user watches 5,000 clean rows scroll past before
+    learning the file was truncated.
+    """
+    # ~6000 short rows: over MAX_ROWS (5000), well under MAX_BYTES (1 MiB).
+    content = "sku,product_name,prior_price,approved_price\n" + ("X,Y,1,1\n" * 6000)
+    events = list(bulk_import.stream_preview("csv", content))
+    kinds = [e[0] for e in events]
+
+    cap_idx = next(
+        i for i, e in enumerate(events)
+        if e[0] == "error" and "cap" in e[1]["message"].lower()
+    )
+    first_row_idx = kinds.index("row")
+    # The cap warning lands before the first row event (and after 'meta').
+    assert cap_idx < first_row_idx
+    assert kinds[0] == "meta"
+    assert kinds[-1] == "done"
+    # And the payload was actually truncated to the cap.
+    assert events[-1][1]["total"] == 5000
+
+
 def test_stream_preview_duplicate_skus_marked_invalid_inline():
     """Second occurrence of a SKU is flagged invalid WITHIN its row event —
     not in a separate after-the-fact pass. This matters for streaming UX:

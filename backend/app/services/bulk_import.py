@@ -199,25 +199,48 @@ def stream_preview(format_: ImportFormat, content: str) -> Iterator[StreamEvent]
         return ("row", asdict(row))
 
     payload_errors_buffer: list[str] = []
+    emitted_errors = 0
+
+    def _drain_errors() -> Iterator[StreamEvent]:
+        """Emit payload-level errors appended since the last drain.
+
+        Payload errors (oversize cap, malformed JSON shape) are appended to
+        the buffer by the row iterators — typically up-front, before the
+        first row is yielded. Draining BEFORE each row event keeps the SSE
+        stream faithful to its documented order (errors surface as soon as
+        they're known, interleaved with rows) instead of dumping them all
+        after the last row, where a progressive UI would only learn of a
+        truncation warning once the whole payload had scrolled past.
+        """
+        nonlocal emitted_errors
+        while emitted_errors < len(payload_errors_buffer):
+            msg = payload_errors_buffer[emitted_errors]
+            emitted_errors += 1
+            yield ("error", {"message": msg})
+
     try:
         if format_ == "json":
             for row in _iter_json_rows(content, payload_errors_buffer):
+                yield from _drain_errors()
                 yield _emit_row(row)
         elif format_ == "tsv":
             for row, blank_inc in _iter_delimited_rows(content, "\t", payload_errors_buffer):
+                yield from _drain_errors()
                 blank_skipped += blank_inc
                 if row is not None:
                     yield _emit_row(row)
         else:
             for row, blank_inc in _iter_delimited_rows(content, ",", payload_errors_buffer):
+                yield from _drain_errors()
                 blank_skipped += blank_inc
                 if row is not None:
                     yield _emit_row(row)
     except Exception as exc:  # pragma: no cover — defensive
         yield ("error", {"message": f"Unexpected parse failure: {exc}"})
 
-    for msg in payload_errors_buffer:
-        yield ("error", {"message": msg})
+    # Flush any errors appended during/after the final row (cap hit on the
+    # last batch, or errors from an iterator that yielded no rows at all).
+    yield from _drain_errors()
 
     yield ("done", {
         "total": total,

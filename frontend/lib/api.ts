@@ -98,8 +98,17 @@ async function del(path: string): Promise<void> {
 
 export const api = {
   base: BASE,
-  operations: (externalId?: string) =>
-    get<OperationsOverview>(`/api/v1/operations${externalId ? `?external_id=${externalId}` : ""}`),
+  operations: (externalId?: string, scope?: "live" | "demo" | "all") => {
+    // external_id is the escape hatch and bypasses the scope filter, so we
+    // only forward scope on the implicit-default path. In Live work mode the
+    // backend returns 404 when no live batch exists → clean-slate banner.
+    const qs = externalId
+      ? `?external_id=${externalId}`
+      : scope
+        ? `?scope=${scope}`
+        : "";
+    return get<OperationsOverview>(`/api/v1/operations${qs}`);
+  },
   batches: (scope?: "live" | "demo" | "all") =>
     get<BatchSummary[]>(`/api/v1/batches${scope ? `?scope=${scope}` : ""}`),
   batch: (externalId: string) => get<BatchDetail>(`/api/v1/batches/${externalId}`),

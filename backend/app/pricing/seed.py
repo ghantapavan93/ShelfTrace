@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import HistoricalSale, ProductCost
+from app.scope import DEMO_MEMORIAL_DAY
 
 # SKU profiles for the demo Memorial Day batch
 PROFILES: list[dict] = [
@@ -116,16 +117,23 @@ def seed_history(db: Session) -> int:
                         price=round(effective_price, 2),
                         units_sold=q,
                         on_promotion=is_promo,
+                        # This is Memorial Day demo seed data — tag it so the
+                        # Live/Demo boundary keeps it out of Live mode. Without
+                        # this the migration backfill would map NULL → user:legacy
+                        # and the engine would fit elasticity on demo history in
+                        # a Live-mode rollup.
+                        source_run_id=DEMO_MEMORIAL_DAY,
                     ),
                 )
                 inserted += 1
 
-        # Cost catalog
+        # Cost catalog — same demo scope tag as the history above.
         db.add(
             ProductCost(
                 id=f"cost_{uuid.uuid4().hex[:12]}",
                 sku=profile["sku"],
                 cost=profile["cost"],
+                source_run_id=DEMO_MEMORIAL_DAY,
             ),
         )
     db.commit()

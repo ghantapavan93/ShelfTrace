@@ -64,23 +64,34 @@ def list_entities(
     total = db.scalar(count_stmt) or 0
     rows = db.scalars(stmt.offset(skip).limit(limit)).all()
 
-    # Pre-fetch link counts for each entity in one query
+    # Pre-fetch link counts for each entity in one query. These counts are
+    # rendered next to each entity, so they must obey the SAME scope as the
+    # entity list itself — otherwise a Live-mode entity would advertise a
+    # linked_sku_count / observation_count that includes demo-scoped rows.
     entity_ids = [e.id for e in rows]
     sku_counts: dict[str, int] = {}
     obs_counts: dict[str, int] = {}
     if entity_ids:
-        sku_rows = db.execute(
+        sku_count_stmt = (
             select(SKUProductLink.entity_id, func.count(SKUProductLink.id))
             .where(SKUProductLink.entity_id.in_(entity_ids))
             .group_by(SKUProductLink.entity_id)
-        ).all()
+        )
+        sku_count_stmt = apply_filter(
+            sku_count_stmt, SKUProductLink.source_run_id, resolved_scope
+        )
+        sku_rows = db.execute(sku_count_stmt).all()
         sku_counts = {row[0]: row[1] for row in sku_rows}
 
-        obs_rows = db.execute(
+        obs_count_stmt = (
             select(CompetitorPriceObservation.entity_id, func.count(CompetitorPriceObservation.id))
             .where(CompetitorPriceObservation.entity_id.in_(entity_ids))
             .group_by(CompetitorPriceObservation.entity_id)
-        ).all()
+        )
+        obs_count_stmt = apply_filter(
+            obs_count_stmt, CompetitorPriceObservation.source_run_id, resolved_scope
+        )
+        obs_rows = db.execute(obs_count_stmt).all()
         obs_counts = {row[0]: row[1] for row in obs_rows}
 
     return {
@@ -441,8 +452,16 @@ def bootstrap_from_scenario(body: dict, db: Session = Depends(get_db)) -> dict:
     zone_id = body.get("zone_id") or None
     # Source-run id for the rows we're about to create. NULL would be
     # treated as user:legacy by Scope.LIVE — fine for backward compat,
-    # but explicit is better.
-    source_run_id = body.get("source_run_id") or "user:bootstrap-anonymous"
+    # but explicit is better. Use an `is None`/blank check rather than a
+    # bare `or` so a caller that deliberately sends "" or whitespace gets
+    # the sentinel (not a confusing empty-string scope tag), while a real
+    # value like "user:abc123" is preserved verbatim.
+    raw_srid = body.get("source_run_id")
+    source_run_id = (
+        raw_srid.strip()
+        if isinstance(raw_srid, str) and raw_srid.strip()
+        else "user:bootstrap-anonymous"
+    )
     if not isinstance(actions, list) or not actions:
         raise HTTPException(status_code=422, detail="actions list is required")
 

@@ -186,6 +186,11 @@ def auto_enrich_scenario(
     actions = body.get("actions") or []
     store_ids = body.get("store_ids") or []
     zone_id = body.get("zone_id") or None
+    # Optional explicit scope. Use `is not None` (not `or`) so an explicit
+    # empty string isn't silently swapped for the service default.
+    source_run_id = body.get("source_run_id")
+    if source_run_id is not None and not str(source_run_id).strip():
+        source_run_id = None
 
     if not isinstance(actions, list) or not actions:
         raise HTTPException(status_code=422, detail="actions list is required")
@@ -195,6 +200,7 @@ def auto_enrich_scenario(
         actions=actions,
         store_ids=store_ids if isinstance(store_ids, list) else [],
         zone_id=zone_id,
+        source_run_id=source_run_id,
     )
     return result
 
@@ -220,7 +226,10 @@ def load_realistic_scale(
 
 
 @router.post("/import/preview/stream")
-def import_preview_stream(payload: BulkImportRequest):
+def import_preview_stream(
+    payload: BulkImportRequest,
+    identity: Identity = Depends(require_operator),
+):
     """Stream per-row validation results as Server-Sent Events.
 
     Identical contract to /import/preview except the delivery shape is
@@ -273,7 +282,10 @@ def import_preview_stream(payload: BulkImportRequest):
 
 
 @router.post("/import/preview", response_model=BulkImportPreviewResponse)
-def import_preview(payload: BulkImportRequest):
+def import_preview(
+    payload: BulkImportRequest,
+    identity: Identity = Depends(require_operator),
+):
     """Server-side parse + validate of a CSV/TSV/JSON product payload.
 
     Stateless — no DB write. Frontend calls this when the user clicks

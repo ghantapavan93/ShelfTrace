@@ -24,11 +24,14 @@ Callers should NEVER hand-parse source_run_id strings. Use the helpers.
 from __future__ import annotations
 
 import hashlib
+import logging
 from enum import Enum
 from typing import Optional
 
 from sqlalchemy import or_
 from sqlalchemy.sql import ColumnElement, Select
+
+logger = logging.getLogger("shelftrace.scope")
 
 
 class Scope(str, Enum):
@@ -53,7 +56,17 @@ class Scope(str, Enum):
         v = value.strip().lower()
         if v in (cls.DEMO.value, cls.LIVE.value, cls.ALL.value):
             return cls(v)
-        # Unknown scope strings → safe default
+        # Unknown scope string — most likely a frontend typo or a
+        # mis-encoded query param. Falling back to ALL silently would let
+        # demo data bleed into a view the caller meant to scope, with no
+        # signal that anything went wrong. We still default to ALL (the
+        # least surprising behavior for a malformed read), but log it so the
+        # mistake is visible in the server logs instead of invisible.
+        logger.warning(
+            "Unknown scope value %r — falling back to Scope.ALL. "
+            "Expected one of: all, demo, live.",
+            value,
+        )
         return cls.ALL
 
 
