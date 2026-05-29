@@ -12,6 +12,8 @@ import {
   Lightbulb,
   ShieldCheck,
   CheckCircle2,
+  FileCheck2,
+  ArrowRight,
 } from "lucide-react";
 import clsx from "clsx";
 import { api, DEMO_BATCH } from "@/lib/api";
@@ -152,6 +154,26 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
       {/* Execution Measurement Eligibility — derived read-only state.
           Distinct from the rollout-expansion decision shown elsewhere. */}
       <EligibilityPanel eligibility={i.measurement_eligibility} />
+
+      {/* Decision Receipt — the full causal chain for this action. */}
+      <Link
+        href={`/operations/receipts/${i.action_id}`}
+        className="group flex items-center justify-between gap-3 rounded-2xl border border-orange-400/25 bg-orange-500/[.05] px-5 py-4 transition hover:border-orange-400/45 hover:bg-orange-500/[.08]"
+      >
+        <span className="flex items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-orange-400/30 bg-orange-500/10 text-orange-300">
+            <FileCheck2 className="h-4 w-4" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-white">View Decision Receipt</span>
+            <span className="block text-xs text-slate-400">
+              Trace the full chain — Signal → Match → Approved → Certified → Published → Verified →
+              Measured → Learned.
+            </span>
+          </span>
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-orange-300 transition group-hover:translate-x-0.5" />
+      </Link>
 
       {/* Explanation */}
       {exp.data && (

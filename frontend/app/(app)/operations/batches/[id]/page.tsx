@@ -10,6 +10,7 @@ import {
   Search,
   Store,
   ShieldCheck,
+  FileCheck2,
 } from "lucide-react";
 import { api, DEMO_BATCH } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
@@ -543,7 +544,17 @@ function MatrixRows({
               <Cell c={ch(a, "esl")} onClick={onCellClick ? () => onCellClick(a.id, "esl") : undefined} />
               <Cell c={ch(a, "ecommerce")} onClick={onCellClick ? () => onCellClick(a.id, "ecommerce") : undefined} />
               <td className="px-4 py-3">
-                <StatusPill value={a.decision} />
+                <div className="flex items-center gap-2">
+                  <StatusPill value={a.decision} />
+                  <Link
+                    href={`/operations/receipts/${a.id}`}
+                    title="View Decision Receipt"
+                    aria-label={`Decision Receipt for ${a.product_name}`}
+                    className="text-slate-500 transition hover:text-orange-300"
+                  >
+                    <FileCheck2 className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
               </td>
             </tr>
           ))}
