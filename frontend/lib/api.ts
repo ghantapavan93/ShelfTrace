@@ -186,6 +186,17 @@ export const api = {
         : "";
     return get<EngineeringTrace>(`/api/v1/engineering${q}`);
   },
+  // Decision Receipt — the derived evidence chain for a single action. Two
+  // entry points: by action id (batch matrix) and by incident id (incident
+  // detail resolves to its action).
+  receipt: (actionId: string) =>
+    get<import("./types").DecisionReceiptView>(
+      `/api/v1/actions/${encodeURIComponent(actionId)}/receipt`,
+    ),
+  incidentReceipt: (incidentId: string) =>
+    get<import("./types").DecisionReceiptView>(
+      `/api/v1/incidents/${encodeURIComponent(incidentId)}/receipt`,
+    ),
   retry: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/retry`),
   rollback: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/rollback`),
   resolve: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/resolve`),

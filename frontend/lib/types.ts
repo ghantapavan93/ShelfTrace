@@ -140,6 +140,89 @@ export interface AuditEventView {
   created_at: string;
 }
 
+// ── Decision Receipt — the connective evidence chain for one price action.
+// Threads upstream signal → product match → batch approval → connector
+// certification → channel dispatch → reconciliation → measurement eligibility
+// → recovery into ONE causal record. Derived server-side, read-only.
+export type ReceiptStageState =
+  | "verified"
+  | "active"
+  | "pending"
+  | "failed"
+  | "excluded"
+  | "not_applicable";
+
+export type ReceiptStageKey =
+  | "signal"
+  | "match"
+  | "approved"
+  | "certified"
+  | "published"
+  | "verified"
+  | "measured"
+  | "learned";
+
+export type EvidenceTone = "verified" | "danger" | "warn" | "violet" | "muted" | null;
+
+export interface ReceiptEvidenceItem {
+  label: string;
+  value: string;
+  tone?: EvidenceTone;
+}
+
+export interface ReceiptStageView {
+  key: ReceiptStageKey;
+  label: string;
+  state: ReceiptStageState;
+  headline: string;
+  detail: string;
+  evidence: ReceiptEvidenceItem[];
+  at: string | null;
+}
+
+export interface IncidentRefView {
+  id: string;
+  type: "price_mismatch" | "channel_timeout" | "deadline_risk";
+  severity: "critical" | "urgent" | "warning";
+  status: "open" | "retrying" | "resolved" | "rolled_back";
+  summary: string;
+  offending_channel: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export type ReceiptOutcome =
+  | "VERIFIED_ELIGIBLE"
+  | "AWAITING_ACKNOWLEDGEMENT"
+  | "EXECUTION_BLOCKED"
+  | "EXCLUDED_RECOVERY"
+  | "PENDING";
+
+export interface DecisionReceiptView {
+  action_id: string;
+  sku: string;
+  product_name: string;
+  store_id: string;
+  zone: string;
+  batch_id: string;
+  batch_external_id: string;
+  approved_price: number;
+  prior_price: number;
+  reason: string;
+  is_kvi: boolean;
+  is_perishable: boolean;
+  decision: Decision;
+  outcome: ReceiptOutcome;
+  headline: string;
+  stopped_at_stage: ReceiptStageKey | null;
+  channels: ChannelView[];
+  measurement_eligibility: MeasurementEligibilityView;
+  stages: ReceiptStageView[];
+  incidents: IncidentRefView[];
+  audit: AuditEventView[];
+  generated_at: string;
+}
+
 export interface OperationsOverview {
   batch: BatchSummary;
   critical_incident: IncidentView | null;
