@@ -54,6 +54,7 @@ import {
   Zap,
 } from "lucide-react";
 import { BackgroundOrbits, Pill } from "./Shell";
+import { EASE } from "@/lib/motion";
 
 /* ────────────────────────────────────────────────────────────────────────────
    ShelfTrace — Mission Control
@@ -325,6 +326,189 @@ function IsoCore({
   );
 }
 
+/* ─────────────────────────── Command Grid Boot (signature) ────────────────────
+   The hero's control board powers on: a matrix of cells lights up in a staggered
+   diagonal wave (opacity/scale), iris-threaded, with a few cells holding as "live
+   channels." A single scan sweep crosses on entry. Reduced-motion → fully lit,
+   static, no wave / no scan. transform + opacity + boxShadow only.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const GRID_COLS = 13;
+const GRID_ROWS = 7;
+const GRID_TOTAL = GRID_COLS * GRID_ROWS;
+
+// deterministic per-cell character so SSR and client agree (no Math.random)
+function cellSeed(i: number): number {
+  // cheap hash → 0..1
+  const v = Math.sin(i * 12.9898 + 4.137) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+// iris-thread the boot colors so it reads as the same family as iris-text
+const GRID_TONES = [
+  "rgba(34,211,238,", // cyan
+  "rgba(129,140,248,", // indigo
+  "rgba(192,132,252,", // violet
+  "rgba(251,146,60,", // orange
+] as const;
+
+type GridCell = {
+  i: number;
+  col: number;
+  row: number;
+  diag: number; // 0..1 normalized diagonal position → wave order
+  tone: string;
+  live: boolean; // keeps pulsing after boot as a "channel"
+  hot: boolean; // brighter seed cell
+};
+
+const GRID_CELLS: GridCell[] = Array.from({ length: GRID_TOTAL }).map((_, i) => {
+  const col = i % GRID_COLS;
+  const row = Math.floor(i / GRID_COLS);
+  const s = cellSeed(i);
+  return {
+    i,
+    col,
+    row,
+    diag: (col + row) / (GRID_COLS + GRID_ROWS - 2),
+    tone: GRID_TONES[i % GRID_TONES.length],
+    // ~1 in 7 cells stays alive as a live channel; a few are extra-hot
+    live: s > 0.84,
+    hot: s > 0.93,
+  };
+});
+
+/** A single live cell — own component so the pulse hook isn't called in a loop. */
+function LiveCell({
+  delay,
+  tone,
+}: {
+  delay: number;
+  tone: string;
+}) {
+  return (
+    <motion.span
+      aria-hidden
+      className="absolute inset-[1px] rounded-[3px]"
+      style={{ background: `${tone}0.9)` }}
+      initial={{ opacity: 0.18 }}
+      animate={{ opacity: [0.18, 0.7, 0.18] }}
+      transition={{
+        duration: 2.6,
+        repeat: Infinity,
+        ease: "easeInOut",
+        delay,
+      }}
+    />
+  );
+}
+
+function CommandGridBoot() {
+  const reduced = useReducedMotion();
+  // total wave time so the scan sweep + cells share one boot window
+  const BOOT = 1.15;
+
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden"
+    >
+      {/* the board: a single transform/opacity element, masked to fade at edges */}
+      <motion.div
+        className="relative grid h-[118%] w-[118%] gap-[6px] px-6"
+        style={{
+          gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+          gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`,
+          maskImage:
+            "radial-gradient(120% 90% at 50% 38%, black 38%, transparent 82%)",
+          WebkitMaskImage:
+            "radial-gradient(120% 90% at 50% 38%, black 38%, transparent 82%)",
+          opacity: 0.5,
+        }}
+        initial={reduced ? false : { opacity: 0 }}
+        animate={reduced ? undefined : { opacity: 0.5 }}
+        transition={reduced ? undefined : { duration: 0.5, ease: EASE.outQuart }}
+      >
+        {GRID_CELLS.map((c) => {
+          // diagonal wave: cells further along the diagonal light later
+          const cellDelay = c.diag * BOOT;
+          const restOpacity = c.hot ? 0.5 : c.live ? 0.4 : 0.22;
+          const border = c.hot
+            ? `${c.tone}0.55)`
+            : c.live
+              ? `${c.tone}0.4)`
+              : "rgba(255,255,255,0.07)";
+          const shadow = c.hot
+            ? `0 0 14px ${c.tone}0.45)`
+            : c.live
+              ? `0 0 9px ${c.tone}0.3)`
+              : "none";
+
+          return (
+            <motion.div
+              key={c.i}
+              className="relative rounded-[4px] border"
+              style={{
+                borderColor: border,
+                boxShadow: shadow,
+                background:
+                  c.hot || c.live
+                    ? `${c.tone}0.06)`
+                    : "rgba(255,255,255,0.012)",
+              }}
+              initial={reduced ? false : { opacity: 0, scale: 0.6 }}
+              animate={
+                reduced
+                  ? undefined
+                  : {
+                      opacity: [0, c.hot ? 0.95 : 0.85, restOpacity],
+                      scale: [0.6, 1.06, 1],
+                    }
+              }
+              transition={
+                reduced
+                  ? undefined
+                  : {
+                      duration: 0.7,
+                      ease: EASE.outQuart,
+                      delay: cellDelay,
+                      times: [0, 0.55, 1],
+                    }
+              }
+            >
+              {/* live channels keep breathing after the wave settles */}
+              {!reduced && c.live && (
+                <LiveCell tone={c.tone} delay={BOOT + cellDelay * 0.4} />
+              )}
+            </motion.div>
+          );
+        })}
+
+        {/* one-shot scan sweep across the board on entry */}
+        {!reduced && (
+          <motion.div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(129,140,248,0.16) 40%, rgba(34,211,238,0.22) 50%, rgba(251,146,60,0.16) 60%, transparent)",
+              filter: "blur(2px)",
+            }}
+            initial={{ x: "0%", opacity: 0 }}
+            animate={{ x: ["0%", "60%", "380%", "440%"], opacity: [0, 1, 1, 0] }}
+            transition={{
+              duration: BOOT + 0.5,
+              ease: EASE.outQuart,
+              times: [0, 0.12, 0.88, 1],
+              delay: 0.15,
+            }}
+          />
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
 /** Hero with parallax, timer, telemetry strips, isometric core, decision stream. */
 function HeroLaunchConsole({
   paused,
@@ -377,9 +561,11 @@ function HeroLaunchConsole({
           transformOrigin: "bottom",
         }}
       />
+      {/* signature: control board powers on behind the console */}
+      <CommandGridBoot />
       <motion.div
         style={{ rotateY: heroTilt, rotateX: heroTilt2, transformStyle: "preserve-3d" }}
-        className="relative mx-auto max-w-[1400px] px-4 pb-12 pt-12 sm:px-6"
+        className="relative z-10 mx-auto max-w-[1400px] px-4 pb-12 pt-12 sm:px-6"
       >
         {/* top eyebrow */}
         <div className="flex flex-wrap items-center gap-2">

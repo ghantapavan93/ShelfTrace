@@ -62,6 +62,379 @@ import {
    either illustrated SVG or qualitative explanation — no fake metrics.
    ──────────────────────────────────────────────────────────────────────────── */
 
+/* ───────────────── SIGNATURE MOMENT — "The Living Integration Spine" ──────────
+   An approved grocery price, emitted from the upstream pricing engine, travels
+   along an iridescent spine into the ShelfTrace core, then FORKS into three
+   packets that race out to POS, SHELF and ECOMMERCE — each channel flashing
+   verified-emerald on arrival. One ~3.6s loop = one reliable price reaching
+   every surface. transform + opacity only; reduced-motion gets a calm static
+   frame (all channels lit, one packet caught mid-flight).
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Geometry in a fixed 1000×440 viewBox so the path math is deterministic and
+   only `transform` ever animates. Nodes are absolutely positioned in % over it. */
+const SPINE = {
+  source: { x: 150, y: 220 },
+  core: { x: 500, y: 220 },
+  channels: [
+    { y: 96, label: "POS", icon: Terminal, hint: "checkout register" },
+    { y: 220, label: "SHELF", icon: Tag, hint: "electronic label" },
+    { y: 344, label: "ECOMMERCE", icon: Cloud, hint: "storefront PDP" },
+  ],
+  channelX: 850,
+};
+
+const CYCLE = 3.6; // seconds per full emit→fork→verify loop
+
+/* Master timeline (fractions of CYCLE):
+   .00–.30 packet source→core · .30–.36 core absorb pulse ·
+   .40–.74 three forks core→channel · .70–.86 channel verify flash · .86–1 settle */
+
+function LivingSpine() {
+  const reduced = useReducedMotion();
+
+  // Quadratic control points give each fork a gentle bow toward its channel.
+  const forks = SPINE.channels.map((c) => ({
+    ...c,
+    cx: (SPINE.core.x + SPINE.channelX) / 2,
+    cy: (SPINE.core.y + c.y) / 2 + (c.y - SPINE.core.y) * 0.12,
+  }));
+
+  const loop = (extra: object = {}) =>
+    reduced
+      ? undefined
+      : { duration: CYCLE, repeat: Infinity, ease: EASE.linear, ...extra };
+
+  return (
+    <div
+      className="relative w-full"
+      role="img"
+      aria-label="An approved price flows from the upstream pricing engine into the ShelfTrace core, then forks out to POS, shelf-label and ecommerce — each verified."
+    >
+      <svg
+        viewBox="0 0 1000 440"
+        className="h-auto w-full overflow-visible"
+        fill="none"
+        aria-hidden="true"
+      >
+        <defs>
+          {/* Iridescent thread gradient — the canonical cyan→indigo→purple→orange. */}
+          <linearGradient id="spine-iris" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#22d3ee" />
+            <stop offset="34%" stopColor="#818cf8" />
+            <stop offset="64%" stopColor="#a855f7" />
+            <stop offset="100%" stopColor="#fb923c" />
+          </linearGradient>
+          <radialGradient id="spine-packet" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="40%" stopColor="#c4b5fd" />
+            <stop offset="100%" stopColor="rgba(168,85,247,0)" />
+          </radialGradient>
+          <radialGradient id="spine-verified" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#d1fae5" />
+            <stop offset="45%" stopColor="#34d399" />
+            <stop offset="100%" stopColor="rgba(16,185,129,0)" />
+          </radialGradient>
+          <filter id="spine-glow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="4" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* ── Static spine bed: trunk + three forks, faint always-on ── */}
+        <line
+          x1={SPINE.source.x}
+          y1={SPINE.source.y}
+          x2={SPINE.core.x}
+          y2={SPINE.core.y}
+          stroke="url(#spine-iris)"
+          strokeWidth="1.5"
+          strokeOpacity="0.28"
+        />
+        {forks.map((f) => (
+          <path
+            key={`bed-${f.label}`}
+            d={`M ${SPINE.core.x} ${SPINE.core.y} Q ${f.cx} ${f.cy} ${SPINE.channelX} ${f.y}`}
+            stroke="url(#spine-iris)"
+            strokeWidth="1.5"
+            strokeOpacity="0.22"
+          />
+        ))}
+
+        {/* ── Trunk energize: a bright dash sweeps source→core each cycle ── */}
+        <motion.line
+          x1={SPINE.source.x}
+          y1={SPINE.source.y}
+          x2={SPINE.core.x}
+          y2={SPINE.core.y}
+          stroke="url(#spine-iris)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray="46 304"
+          filter="url(#spine-glow)"
+          initial={reduced ? { strokeDashoffset: 175, opacity: 0.9 } : false}
+          animate={
+            reduced
+              ? undefined
+              : { strokeDashoffset: [350, 0], opacity: [0, 1, 1, 0.15, 0.15] }
+          }
+          transition={loop({ times: [0, 0.06, 0.3, 0.34, 1], ease: EASE.outCubic })}
+        />
+
+        {/* ── Fork energize: bright dash races core→channel, staggered ── */}
+        {forks.map((f, i) => (
+          <motion.path
+            key={`live-${f.label}`}
+            d={`M ${SPINE.core.x} ${SPINE.core.y} Q ${f.cx} ${f.cy} ${SPINE.channelX} ${f.y}`}
+            stroke="url(#spine-iris)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray="40 360"
+            filter="url(#spine-glow)"
+            initial={reduced ? { strokeDashoffset: 200, opacity: 0.9 } : false}
+            animate={
+              reduced
+                ? undefined
+                : { strokeDashoffset: [400, 0], opacity: [0, 0, 1, 1, 0.12, 0.12] }
+            }
+            transition={loop({
+              times: [0, 0.4, 0.46, 0.74, 0.8, 1],
+              ease: EASE.outCubic,
+            })}
+          />
+        ))}
+
+        {/* ── The price packet: source → core (single orb on the horizontal trunk) ── */}
+        <motion.g
+          filter="url(#spine-glow)"
+          initial={
+            reduced
+              ? { opacity: 1, x: (SPINE.source.x + SPINE.core.x) / 2, y: SPINE.source.y }
+              : false
+          }
+          animate={
+            reduced
+              ? undefined
+              : {
+                  opacity: [0, 1, 1, 0, 0],
+                  x: [SPINE.source.x, SPINE.source.x, SPINE.core.x, SPINE.core.x, SPINE.core.x],
+                  y: SPINE.source.y,
+                }
+          }
+          transition={loop({ times: [0, 0.04, 0.3, 0.34, 1], ease: EASE.outCubic })}
+        >
+          <circle r="9" fill="url(#spine-packet)" />
+          <circle r="3.2" fill="#ffffff" />
+        </motion.g>
+
+        {/* ── Three forked packets: core → each channel ── */}
+        {forks.map((f, i) => {
+          // Sample the quadratic Bézier at t for the reduced-motion still frame.
+          const at = (t: number, p0: number, p1: number, p2: number) =>
+            (1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * p1 + t * t * p2;
+          return (
+            <motion.g
+              key={`pkt-${f.label}`}
+              filter="url(#spine-glow)"
+              initial={reduced ? { opacity: 1 } : false}
+              animate={reduced ? undefined : { opacity: [0, 0, 1, 1, 0, 0] }}
+              transition={loop({ times: [0, 0.4, 0.44, 0.72, 0.78, 1] })}
+            >
+              {!reduced ? (
+                <motion.g
+                  animate={{
+                    x: [SPINE.core.x, f.cx, SPINE.channelX],
+                    y: [SPINE.core.y, f.cy, f.y],
+                  }}
+                  transition={loop({ times: [0.4, 0.57, 0.74], ease: EASE.outCubic })}
+                >
+                  <circle r="6.5" fill="url(#spine-packet)" />
+                  <circle r="2.4" fill="#ffffff" />
+                </motion.g>
+              ) : (
+                // Static frame: first fork shown mid-flight, others arrived.
+                <g
+                  transform={`translate(${
+                    i === 0 ? at(0.5, SPINE.core.x, f.cx, SPINE.channelX) : SPINE.channelX
+                  }, ${i === 0 ? at(0.5, SPINE.core.y, f.cy, f.y) : f.y})`}
+                >
+                  <circle r="6.5" fill={i === 0 ? "url(#spine-packet)" : "url(#spine-verified)"} />
+                  <circle r="2.4" fill="#ffffff" />
+                </g>
+              )}
+            </motion.g>
+          );
+        })}
+
+        {/* ── Verified bloom at each channel on packet arrival ── */}
+        {forks.map((f, i) => (
+          <motion.circle
+            key={`bloom-${f.label}`}
+            cx={SPINE.channelX}
+            cy={f.y}
+            r="22"
+            fill="url(#spine-verified)"
+            initial={reduced ? { opacity: 0.55, scale: 1 } : false}
+            animate={
+              reduced ? undefined : { opacity: [0, 0, 0.85, 0], scale: [0.4, 0.4, 1.25, 1.7] }
+            }
+            transition={loop({ times: [0, 0.72, 0.8, 0.92] })}
+            style={{ transformOrigin: `${SPINE.channelX}px ${f.y}px` }}
+          />
+        ))}
+      </svg>
+
+      {/* ── Overlaid nodes (holo-cards) positioned over the SVG geometry ── */}
+      {/* Source — Approved Price */}
+      <SpineNode xPct={SPINE.source.x / 10} yPct={SPINE.source.y / 4.4}>
+        <SourceNode />
+      </SpineNode>
+
+      {/* Core — ShelfTrace seal */}
+      <SpineNode xPct={SPINE.core.x / 10} yPct={SPINE.core.y / 4.4}>
+        <CoreNode reduced={!!reduced} />
+      </SpineNode>
+
+      {/* Channels */}
+      {forks.map((f, i) => (
+        <SpineNode key={`node-${f.label}`} xPct={SPINE.channelX / 10} yPct={f.y / 4.4}>
+          <ChannelNode
+            icon={f.icon}
+            label={f.label}
+            hint={f.hint}
+            reduced={!!reduced}
+            index={i}
+          />
+        </SpineNode>
+      ))}
+    </div>
+  );
+}
+
+/* Absolute wrapper that centers a node on a (%, %) point of the diagram. */
+function SpineNode({
+  xPct,
+  yPct,
+  children,
+}: {
+  xPct: number;
+  yPct: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="absolute -translate-x-1/2 -translate-y-1/2"
+      style={{ left: `${xPct}%`, top: `${yPct}%` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SourceNode() {
+  return (
+    <div className="holo-card group flex w-[136px] flex-col gap-1 rounded-2xl px-3.5 py-3 sm:w-[160px]">
+      <span className="flex items-center gap-1.5 text-[8.5px] uppercase tracking-[.2em] text-cyan-300/90">
+        <TrendingUp className="h-3 w-3" /> upstream
+      </span>
+      <p className="text-[13px] font-semibold leading-tight text-white sm:text-sm">
+        Approved price
+      </p>
+      <p className="font-mono text-[10px] tabular-nums text-white/45">
+        egg-12 → <span className="text-emerald-200">$4.19</span>
+      </p>
+    </div>
+  );
+}
+
+function CoreNode({ reduced }: { reduced: boolean }) {
+  return (
+    <div className="relative flex flex-col items-center">
+      {/* steady iris glow ring */}
+      <div className="iris-ring glow-iris relative flex h-[88px] w-[88px] items-center justify-center rounded-[26px] sm:h-[104px] sm:w-[104px]">
+        {/* breathing pulse — pure scale/opacity, gated */}
+        <motion.span
+          aria-hidden
+          className="absolute inset-0 rounded-[26px] bg-[radial-gradient(circle,rgba(168,85,247,.35),transparent_70%)]"
+          initial={reduced ? { opacity: 0.4, scale: 1 } : false}
+          animate={reduced ? undefined : { opacity: [0.25, 0.6, 0.25], scale: [0.92, 1.06, 0.92] }}
+          transition={reduced ? undefined : { duration: CYCLE / 2, repeat: Infinity, ease: EASE.outCubic }}
+          style={{ transformOrigin: "center" }}
+        />
+        <div className="relative flex flex-col items-center">
+          <ShieldCheck className="h-6 w-6 text-white sm:h-7 sm:w-7" />
+          <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-[.18em] text-white/85">
+            ShelfTrace
+          </span>
+        </div>
+      </div>
+      <span className="mt-2 text-[8.5px] uppercase tracking-[.2em] text-white/40">core engine</span>
+    </div>
+  );
+}
+
+function ChannelNode({
+  icon: Icon,
+  label,
+  hint,
+  reduced,
+  index,
+}: {
+  icon: any;
+  label: string;
+  hint: string;
+  reduced: boolean;
+  index: number;
+}) {
+  // Each channel border/text flashes emerald on packet arrival, then settles.
+  const flash = reduced
+    ? undefined
+    : {
+        boxShadow: [
+          "0 0 0 0 rgba(52,211,153,0)",
+          "0 0 0 0 rgba(52,211,153,0)",
+          "0 0 26px -4px rgba(52,211,153,.8)",
+          "0 0 0 0 rgba(52,211,153,0)",
+        ],
+      };
+  return (
+    <motion.div
+      className="holo-card group flex w-[132px] items-center gap-2.5 rounded-2xl px-3 py-2.5 sm:w-[152px]"
+      initial={reduced ? { boxShadow: "0 0 22px -6px rgba(52,211,153,.7)" } : false}
+      animate={flash}
+      transition={reduced ? undefined : { duration: CYCLE, repeat: Infinity, times: [0, 0.74, 0.82, 0.96] }}
+    >
+      <motion.span
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border bg-white/[.04]"
+        initial={reduced ? { color: "#6ee7b7", borderColor: "rgba(52,211,153,.5)" } : false}
+        animate={
+          reduced
+            ? undefined
+            : {
+                color: ["#c4b5fd", "#c4b5fd", "#6ee7b7", "#a5b4fc"],
+                borderColor: [
+                  "rgba(255,255,255,.12)",
+                  "rgba(255,255,255,.12)",
+                  "rgba(52,211,153,.55)",
+                  "rgba(255,255,255,.14)",
+                ],
+              }
+        }
+        transition={reduced ? undefined : { duration: CYCLE, repeat: Infinity, times: [0, 0.74, 0.82, 0.98] }}
+      >
+        <Icon className="h-4 w-4" />
+      </motion.span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold leading-tight text-white sm:text-xs">{label}</p>
+        <p className="truncate text-[8.5px] text-white/40">{hint}</p>
+      </div>
+    </motion.div>
+  );
+}
+
 /* ─────────────────────────────── 1. HERO ─────────────────────────────────── */
 
 function Hero({ onLive }: { onLive: () => void }) {

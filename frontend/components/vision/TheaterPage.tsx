@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { ElementType } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { EASE } from "@/lib/motion";
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,6 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { BackgroundOrbits, Pill } from "./Shell";
+import type { Tone } from "./Shell";
 import { BlurRevealHeading } from "@/components/narrative/BlurRevealHeading";
 
 type TheaterMode = "certification" | "rollout" | "trace";
@@ -241,6 +243,252 @@ function ArchitectureRail({ vertical = false }: { vertical?: boolean }) {
   );
 }
 
+/* ───────────────────────────── The Vital Sign ───────────────────────────── */
+/* Signature moment: an iridescent EKG that reads the price-execution channel as
+ * a living heartbeat. It beats steady emerald (every channel VERIFIED), then
+ * once per cycle a single beat deflects rose (a POS price MISMATCH) before
+ * ShelfTrace catches and resolves it back to steady emerald (RECOVERED →
+ * VERIFIED). The line itself is one healthy SVG trace; the mismatch is a second
+ * path that fades in only during the rose phase; a gradient "scan" sweep runs
+ * the length of the trace via translateX. Transform + opacity only.
+ *
+ * Reduced-motion: a static healthy emerald trace + "VERIFIED" label, no spike,
+ * no sweep — the calm final-state frame. */
+
+type VitalPhase = "verified" | "mismatch" | "recovered";
+
+const VITAL_PHASE: Record<
+  VitalPhase,
+  { label: string; tone: Tone; dot: string; text: string; line: string }
+> = {
+  verified: {
+    label: "VERIFIED",
+    tone: "green",
+    dot: "bg-emerald-400",
+    text: "text-emerald-300",
+    line: "Shelf · POS · Ecommerce in agreement",
+  },
+  mismatch: {
+    label: "MISMATCH",
+    tone: "red",
+    dot: "bg-rose-400",
+    text: "text-rose-300",
+    line: "Checkout POS read $6.49 — expected $5.99",
+  },
+  recovered: {
+    label: "RECOVERED",
+    tone: "purple",
+    dot: "bg-violet-300",
+    text: "text-violet-200",
+    line: "Retry acknowledged — channel reconciled",
+  },
+};
+
+/* Healthy baseline trace: long flat runs broken by gentle QRS blips. Drawn in a
+ * 0..1000 x 0..120 viewBox so the SVG scales fluidly with the card. */
+const HEALTHY_PATH =
+  "M0 60 H120 l14 -7 14 7 H300 l14 -7 14 7 H500 l14 -7 14 7 H700 l14 -7 14 7 H880 l14 -7 14 7 H1000";
+
+/* The mismatch beat: a tall rose deflection centred on the trace — the moment a
+ * channel disagrees. Same start/end height as the baseline so it overlays cleanly. */
+const MISMATCH_PATH =
+  "M440 60 H478 l10 -42 12 78 14 -64 10 28 H1000";
+
+function VitalSign({ mode }: { mode: TheaterMode }) {
+  const reduced = useReducedMotion();
+  const [phase, setPhase] = useState<VitalPhase>("verified");
+  const meta = VITAL_PHASE[phase];
+
+  // One self-resetting cadence drives the label, the dot and the rose beat in
+  // lock-step. Mostly-steady emerald, with a brief mismatch → recovered pulse.
+  useEffect(() => {
+    if (reduced) {
+      setPhase("verified");
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout>;
+    const next = (p: VitalPhase) => {
+      setPhase(p);
+      const hold = p === "verified" ? 4200 : p === "mismatch" ? 900 : 1400;
+      const after: VitalPhase =
+        p === "verified" ? "mismatch" : p === "mismatch" ? "recovered" : "verified";
+      timer = setTimeout(() => next(after), hold);
+    };
+    next("verified");
+    return () => clearTimeout(timer);
+  }, [reduced]);
+
+  const spiking = phase === "mismatch";
+
+  return (
+    <div className="iris-border relative overflow-hidden rounded-[22px] bg-[#0a0e18]/80 p-5 sm:p-6">
+      {/* faint grid so it reads as a monitor, not a chart */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[.35]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px)",
+          backgroundSize: "34px 34px",
+          maskImage: "radial-gradient(120% 90% at 50% 50%,#000 55%,transparent 100%)",
+          WebkitMaskImage: "radial-gradient(120% 90% at 50% 50%,#000 55%,transparent 100%)",
+        }}
+      />
+
+      <div className="relative flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold tracking-[.23em] text-orange-300">
+            CHANNEL VITAL SIGN
+          </span>
+          <span className="hidden text-[10px] text-white/30 sm:inline">
+            · one approved price, three surfaces
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={meta.line}
+              initial={reduced ? false : { opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduced ? undefined : { opacity: 0, y: -4 }}
+              transition={{ duration: 0.28, ease: EASE.outQuart }}
+              className="hidden text-[11px] text-white/45 md:inline"
+            >
+              {meta.line}
+            </motion.span>
+          </AnimatePresence>
+          <Pill tone={meta.tone}>
+            <motion.span
+              className={`h-1.5 w-1.5 rounded-full ${meta.dot}`}
+              animate={reduced ? undefined : { opacity: spiking ? [1, 0.35, 1] : [0.55, 1, 0.55] }}
+              transition={
+                reduced
+                  ? undefined
+                  : { duration: spiking ? 0.5 : 1.6, repeat: Infinity, ease: "easeInOut" }
+              }
+            />
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={meta.label}
+                initial={reduced ? false : { opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduced ? undefined : { opacity: 0, y: -5 }}
+                transition={{ duration: 0.22, ease: EASE.outQuart }}
+              >
+                {meta.label}
+              </motion.span>
+            </AnimatePresence>
+          </Pill>
+        </div>
+      </div>
+
+      {/* The trace */}
+      <div className="relative mt-4 h-24 sm:h-28">
+        <svg
+          viewBox="0 0 1000 120"
+          preserveAspectRatio="none"
+          className="h-full w-full"
+          aria-hidden
+        >
+          <defs>
+            <linearGradient id="vital-sweep" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#34d399" stopOpacity="0" />
+              <stop offset="48%" stopColor="#a78bfa" stopOpacity="0.9" />
+              <stop offset="52%" stopColor="#22d3ee" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
+            </linearGradient>
+            <filter id="vital-glow" x="-5%" y="-40%" width="110%" height="180%">
+              <feGaussianBlur stdDeviation="2.4" result="b" />
+              <feMerge>
+                <feMergeNode in="b" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* steady healthy baseline — always present, colour eases by phase */}
+          <motion.path
+            d={HEALTHY_PATH}
+            fill="none"
+            strokeWidth={2.4}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            filter="url(#vital-glow)"
+            initial={false}
+            animate={{
+              stroke: spiking ? "#f43f5e" : phase === "recovered" ? "#a78bfa" : "#34d399",
+              opacity: spiking ? 0.28 : 1,
+            }}
+            transition={{ duration: 0.45, ease: EASE.outQuart }}
+          />
+
+          {/* the mismatch beat — only the deflecting segment, faded in on rose phase */}
+          <motion.path
+            d={MISMATCH_PATH}
+            fill="none"
+            stroke="#fb7185"
+            strokeWidth={2.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            filter="url(#vital-glow)"
+            initial={false}
+            animate={
+              reduced
+                ? { opacity: 0 }
+                : {
+                    opacity: spiking ? 1 : 0,
+                    scaleY: spiking ? 1 : 0.4,
+                  }
+            }
+            style={{ originX: 0.47, originY: 0.5 }}
+            transition={{ duration: 0.34, ease: EASE.outQuart }}
+          />
+
+          {/* gradient scan running the length of the trace (translateX only) */}
+          {!reduced && (
+            <motion.rect
+              x={-360}
+              y={0}
+              width={360}
+              height={120}
+              fill="url(#vital-sweep)"
+              opacity={0.85}
+              initial={{ x: -360 }}
+              animate={{ x: 1000 }}
+              transition={{ duration: 2.6, ease: EASE.linear, repeat: Infinity }}
+              style={{ mixBlendMode: "screen" }}
+            />
+          )}
+        </svg>
+
+        {/* the live read-head: a soft pulse that flashes rose on the mismatch beat */}
+        {!reduced && (
+          <motion.div
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 h-10 w-10 -translate-y-1/2 rounded-full"
+            style={{ left: "46%" }}
+            animate={{
+              opacity: spiking ? [0, 0.9, 0] : 0,
+              scale: spiking ? [0.6, 1.5, 0.6] : 0.6,
+              backgroundColor: "rgba(244,63,94,.28)",
+            }}
+            transition={{ duration: 0.7, ease: EASE.outQuart }}
+          />
+        )}
+      </div>
+
+      {/* caption ties the vital sign to the mode the operator is looking at */}
+      <p className="relative mt-3 text-[11px] leading-5 text-white/40">
+        {mode === "trace"
+          ? "Every beat is replayable evidence — the mismatch and its recovery are written to the audit trail."
+          : mode === "rollout"
+            ? "A single mismatched beat holds expansion until the channel reads clean again."
+            : "ShelfTrace watches the heartbeat of price agreement — and catches the beat that drifts."}
+      </p>
+    </div>
+  );
+}
+
 export default function TheaterPage() {
   const [mode, setMode] = useState<TheaterMode>("certification");
   const isTrace = mode === "trace";
@@ -308,7 +556,10 @@ export default function TheaterPage() {
           ))}
         </div>
       </div>
-      <div className="relative mt-7 grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+      <div className="relative mt-7">
+        <VitalSign mode={mode} />
+      </div>
+      <div className="relative mt-4 grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
         <div className="grid content-start gap-4">
           <div className="holo-card rounded-[28px] p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">

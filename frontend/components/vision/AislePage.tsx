@@ -36,6 +36,7 @@ import {
   Zap,
 } from "lucide-react";
 import { BackgroundOrbits, Pill } from "./Shell";
+import { EASE, SPRING } from "@/lib/motion";
 
 /* ──────────────────────────────────────────────────────────────────────────────
    Cinematic Aisle — six chapters, scrubbable, with decision-stream narration.
@@ -1055,6 +1056,319 @@ function ArchitectureDepth() {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────────
+   SIGNATURE MOMENT — "Shelf-light Ignition"
+   A row of shelf-edge price labels wakes left-to-right like store lights turning
+   on. One label boots to a stale rose price, holds, then a ShelfTrace reconcile
+   pulse sweeps across it and it snaps to the verified emerald canonical price —
+   the shelf telling the truth. Transform + opacity + boxShadow only.
+   Reduced-motion: all labels lit, the drift label already verified, static.
+   ────────────────────────────────────────────────────────────────────────────── */
+
+type ShelfLabel = {
+  sku: string;
+  name: string;
+  /** verified canonical price shown once lit / reconciled */
+  price: string;
+  /** the one label that boots stale before ShelfTrace corrects it */
+  drift?: { stale: string; gap: string };
+};
+
+const IGNITION_LABELS: ShelfLabel[] = [
+  { sku: "mk-dl-02-7731", name: "Cold Brew 48oz", price: "$6.99" },
+  { sku: "mk-dl-02-7736", name: "Sourdough Loaf", price: "$4.29" },
+  { sku: "mk-dl-02-7741", name: "Greek Yogurt 32oz", price: "$5.49", drift: { stale: "$5.99", gap: "+$0.50" } },
+  { sku: "mk-dl-02-7748", name: "Cold Press OJ", price: "$3.79" },
+  { sku: "mk-dl-02-7754", name: "Trail Mix 16oz", price: "$7.49" },
+];
+
+/** Phases of the one drift label's lifecycle. */
+type DriftPhase = "dark" | "stale" | "sweep" | "verified";
+
+function ShelfLightIgnition() {
+  const reduced = useReducedMotion();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [lit, setLit] = useState<boolean[]>(() => IGNITION_LABELS.map(() => false));
+  const [phase, setPhase] = useState<DriftPhase>("dark");
+  const driftIdx = IGNITION_LABELS.findIndex((l) => l.drift);
+
+  // run the choreography once when the rail scrolls into view
+  const started = useRef(false);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+
+    if (reduced) {
+      // calm static final-state frame: everything lit, drift already verified
+      setLit(IGNITION_LABELS.map(() => true));
+      setPhase("verified");
+      return;
+    }
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const ignite = () => {
+      if (started.current) return;
+      started.current = true;
+
+      // 1 — lights wake left-to-right
+      IGNITION_LABELS.forEach((label, i) => {
+        timers.push(
+          setTimeout(() => {
+            setLit((prev) => {
+              const next = [...prev];
+              next[i] = true;
+              return next;
+            });
+            // the drift label boots to its stale price the instant it lights
+            if (i === driftIdx) setPhase("stale");
+          }, 240 + i * 170),
+        );
+      });
+
+      const allLitAt = 240 + (IGNITION_LABELS.length - 1) * 170;
+      // 2 — hold the stale beat, then fire the reconcile sweep
+      timers.push(setTimeout(() => setPhase("sweep"), allLitAt + 620));
+      // 3 — snap to verified once the sweep has crossed the label
+      timers.push(setTimeout(() => setPhase("verified"), allLitAt + 620 + 520));
+    };
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            ignite();
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { threshold: 0.4 },
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      timers.forEach(clearTimeout);
+    };
+  }, [reduced, driftIdx]);
+
+  return (
+    <div
+      ref={wrapRef}
+      className="relative mt-10 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#0b1019]/90 to-[#06090f]/95 p-5 sm:p-6"
+    >
+      {/* faint ceiling light bar above the shelf — drifts on once anything is lit */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-6 top-0 h-px origin-center"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, rgba(251,191,36,.55), rgba(251,191,36,.18), rgba(251,191,36,.55), transparent)",
+        }}
+        initial={reduced ? false : { opacity: 0, scaleX: 0.6 }}
+        animate={{ opacity: phase === "dark" ? 0 : 1, scaleX: phase === "dark" ? 0.6 : 1 }}
+        transition={{ duration: 0.9, ease: EASE.outQuart }}
+      />
+
+      <div className="relative flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Pill tone="orange">Shelf-edge labels · Aisle 4</Pill>
+          <span className="hidden text-[11px] uppercase tracking-[.22em] text-white/30 sm:inline">
+            store lights waking
+          </span>
+        </div>
+        <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[.2em] text-white/35">
+          <CircleDot
+            className={`h-2.5 w-2.5 ${
+              phase === "stale"
+                ? "text-rose-400"
+                : phase === "verified"
+                  ? "text-emerald-400"
+                  : "text-amber-400"
+            } ${reduced ? "" : "animate-pulse"}`}
+          />
+          {phase === "stale" ? "drift detected" : phase === "verified" ? "shelf verified" : "esl sync"}
+        </span>
+      </div>
+
+      <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {IGNITION_LABELS.map((label, i) => (
+          <IgnitionTile
+            key={label.sku}
+            label={label}
+            lit={lit[i]}
+            isDrift={i === driftIdx}
+            phase={phase}
+            reduced={!!reduced}
+          />
+        ))}
+      </div>
+
+      <p className="relative mt-4 max-w-xl text-xs leading-relaxed text-white/40">
+        One canonical price per SKU. When a label boots stale, a ShelfTrace
+        reconcile sweep corrects it in place — the shelf is made to tell the truth
+        before a shopper ever reads it.
+      </p>
+    </div>
+  );
+}
+
+function IgnitionTile({
+  label,
+  lit,
+  isDrift,
+  phase,
+  reduced,
+}: {
+  label: ShelfLabel;
+  lit: boolean;
+  isDrift: boolean;
+  phase: DriftPhase;
+  reduced: boolean;
+}) {
+  // A normal tile is amber-verified once lit. The drift tile passes through
+  // rose (stale) → sweep → emerald (verified). Resolve current visual state:
+  const state: "dark" | "amber" | "rose" | "emerald" = !lit
+    ? "dark"
+    : isDrift
+      ? phase === "stale"
+        ? "rose"
+        : phase === "verified"
+          ? "emerald"
+          : "rose" // hold rose through the sweep, snap after
+      : "amber";
+
+  const shown =
+    isDrift && state === "rose" ? label.drift?.stale ?? label.price : label.price;
+
+  const glow =
+    state === "rose"
+      ? "0 0 0 1px rgba(244,63,94,.45), 0 14px 40px -18px rgba(244,63,94,.65), 0 0 26px -10px rgba(244,63,94,.55)"
+      : state === "emerald"
+        ? "0 0 0 1px rgba(52,211,153,.45), 0 14px 40px -18px rgba(16,185,129,.6), 0 0 30px -10px rgba(52,211,153,.6)"
+        : state === "amber"
+          ? "0 0 0 1px rgba(251,146,60,.40), 0 14px 40px -18px rgba(249,115,22,.55), 0 0 26px -10px rgba(251,191,36,.55)"
+          : "0 0 0 1px rgba(255,255,255,.05), 0 10px 30px -22px rgba(0,0,0,.6)";
+
+  const priceColor =
+    state === "rose"
+      ? "text-rose-200"
+      : state === "emerald"
+        ? "text-emerald-200"
+        : state === "amber"
+          ? "text-amber-100"
+          : "text-white/25";
+
+  const dotColor =
+    state === "rose"
+      ? "bg-rose-400"
+      : state === "emerald"
+        ? "bg-emerald-400"
+        : state === "amber"
+          ? "bg-amber-300"
+          : "bg-white/15";
+
+  return (
+    <motion.div
+      className="relative overflow-hidden rounded-2xl border border-white/[.06] bg-[#0a0e16]/90 p-3.5"
+      initial={reduced ? false : { opacity: 0.18, scale: 0.965, y: 6 }}
+      animate={{
+        opacity: lit ? 1 : 0.2,
+        scale: lit ? 1 : 0.965,
+        y: lit ? 0 : 6,
+        boxShadow: glow,
+      }}
+      transition={
+        reduced
+          ? { duration: 0 }
+          : { ...SPRING.gentle, boxShadow: { duration: 0.5, ease: EASE.outQuart } }
+      }
+    >
+      {/* booting scanlines — only visible while still dark */}
+      {!reduced && (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 1px, transparent 1px 3px)",
+          }}
+          animate={{ opacity: lit ? 0 : 0.5 }}
+          transition={{ duration: 0.4 }}
+        />
+      )}
+
+      <div className="relative flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-[8.5px] font-mono uppercase tracking-[.16em] text-white/35">
+          <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+          {label.sku}
+        </span>
+        {isDrift && state === "rose" && (
+          <motion.span
+            initial={reduced ? false : { opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2, ease: EASE.outQuart }}
+            className="rounded-full border border-rose-400/40 bg-rose-500/10 px-1.5 py-0.5 text-[8px] font-mono tracking-[.1em] text-rose-200"
+          >
+            POS {label.drift?.gap}
+          </motion.span>
+        )}
+        {isDrift && state === "emerald" && (
+          <motion.span
+            initial={reduced ? false : { opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.25, ease: EASE.outQuart }}
+            className="flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-1.5 py-0.5 text-[8px] font-mono tracking-[.1em] text-emerald-200"
+          >
+            <BadgeCheck className="h-2.5 w-2.5" /> verified
+          </motion.span>
+        )}
+      </div>
+
+      <p className="relative mt-2 truncate text-[11px] font-medium text-white/65">
+        {label.name}
+      </p>
+
+      {/* price — cross-fades between stale and canonical on the snap */}
+      <div className="relative mt-1 h-7 overflow-hidden">
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={shown + state}
+            initial={reduced ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? undefined : { opacity: 0, y: -10 }}
+            transition={{ duration: 0.28, ease: EASE.outQuart }}
+            className={`absolute inset-x-0 top-0 font-mono text-xl font-semibold tabular-nums ${priceColor}`}
+          >
+            {shown}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+
+      {/* ShelfTrace reconcile pulse — a vertical bar that sweeps the drift tile
+          left→right (transform only) the instant before the price snaps green. */}
+      {isDrift && !reduced && (
+        <AnimatePresence>
+          {phase === "sweep" && (
+            <motion.div
+              key="sweep"
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 left-0 w-1/3"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(52,211,153,.0) 10%, rgba(52,211,153,.55) 50%, rgba(167,243,208,.85) 60%, transparent)",
+              }}
+              initial={{ x: "-120%", opacity: 0 }}
+              animate={{ x: "320%", opacity: [0, 1, 1, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.52, ease: EASE.outQuart }}
+            />
+          )}
+        </AnimatePresence>
+      )}
+    </motion.div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────────
    Hero + CTA
    ────────────────────────────────────────────────────────────────────────────── */
 
@@ -1099,6 +1413,9 @@ function Hero() {
             See Horizon Studio <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         </div>
+
+        {/* Signature moment — shelf-edge labels ignite, drift self-corrects */}
+        <ShelfLightIgnition />
       </div>
     </section>
   );

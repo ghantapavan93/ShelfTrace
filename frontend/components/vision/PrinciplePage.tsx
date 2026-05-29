@@ -597,6 +597,195 @@ function SeatbeltMoment() {
   );
 }
 
+/* ──────────────────── 3.5 THE THREE SEALS (signature moment) ─────────────
+   Three reliability commitments as tall holo-cards. As each scrolls into
+   view, an emerald VERIFIED seal stamps on: a ring overshoots from 1.6→1.0
+   with a glow burst (boxShadow), a checkmark pops, and the commitment text
+   reveals opacity+y. Each seal is a repo-true property, not a claim.
+   Reduced-motion: every seal pre-stamped to its final state, no animation. */
+
+type Seal = {
+  index: string;
+  tag: string;
+  title: string;
+  body: string;
+  proof: string;
+};
+
+const SEALS: Seal[] = [
+  {
+    index: "I",
+    tag: "Causal order",
+    title: "Acknowledgement precedes resolution.",
+    body: "No incident can close before it was acknowledged. The audit trail preserves the causal ordering — ack always lands before resolve, microsecond-stamped.",
+    proof: "ack < resolve · enforced",
+  },
+  {
+    index: "II",
+    tag: "Containment",
+    title: "Canary verifies before expansion.",
+    body: "An approved price reaches the canary corridor first. The gate holds the rest of the zone until those stores reconcile clean across POS, shelf-label and ecommerce.",
+    proof: "gate held until verified",
+  },
+  {
+    index: "III",
+    tag: "Recovery",
+    title: "Recovery is audit-verified.",
+    body: "A drift is only sealed once the channel agrees again and the operator's hand is on record. The seal is the legal proof that the price truly reached every surface.",
+    proof: "sealed · verified-only",
+  },
+];
+
+/* The emerald stamp: ring overshoots in, glow bursts, checkmark pops. */
+function VerifiedSeal({ active }: { active: boolean }) {
+  const reduced = useReducedMotion();
+  // Reduced-motion (or pre-active) renders the final stamped state directly.
+  const stamped = reduced || active;
+
+  return (
+    <div className="relative h-16 w-16">
+      {/* outer glow burst — boxShadow only, transform-safe */}
+      <motion.div
+        aria-hidden
+        className="absolute inset-0 rounded-full"
+        initial={false}
+        animate={
+          reduced
+            ? { boxShadow: "0 0 28px 2px rgba(16,185,129,.28)" }
+            : active
+              ? {
+                  boxShadow: [
+                    "0 0 0px 0px rgba(16,185,129,0)",
+                    "0 0 46px 10px rgba(16,185,129,.55)",
+                    "0 0 28px 2px rgba(16,185,129,.28)",
+                  ],
+                }
+              : { boxShadow: "0 0 0px 0px rgba(16,185,129,0)" }
+        }
+        transition={reduced ? { duration: 0 } : { duration: 0.9, ease: EASE.outQuart, delay: 0.08 }}
+      />
+      {/* the stamping ring — overshoots from 1.6 → 1.0 */}
+      <motion.div
+        aria-hidden
+        className="absolute inset-0 rounded-full border-2 border-emerald-400/80 bg-emerald-500/[.08] backdrop-blur"
+        initial={reduced ? false : { scale: 1.6, opacity: 0 }}
+        animate={stamped ? { scale: 1, opacity: 1 } : { scale: 1.6, opacity: 0 }}
+        transition={reduced ? { duration: 0 } : { ...SPRING.bouncy, delay: 0.05 }}
+      />
+      {/* a second faint ring that expands and fades — the "stamp ripple" */}
+      {!reduced && (
+        <motion.div
+          aria-hidden
+          className="absolute inset-0 rounded-full border border-emerald-300/60"
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={active ? { scale: [0.9, 1.5], opacity: [0.7, 0] } : { scale: 0.9, opacity: 0 }}
+          transition={{ duration: 0.8, ease: EASE.outQuart, delay: 0.12 }}
+        />
+      )}
+      {/* checkmark — pops in with weight after the ring lands */}
+      <motion.svg
+        viewBox="0 0 24 24"
+        fill="none"
+        className="absolute inset-0 m-auto h-7 w-7 text-emerald-300"
+        initial={reduced ? false : { scale: 0, opacity: 0 }}
+        animate={stamped ? { scale: 1, opacity: 1 } : { scale: 0, opacity: 0 }}
+        transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 16, delay: 0.24 }}
+      >
+        <path
+          d="M5 12.5l4.2 4.2L19 7"
+          stroke="currentColor"
+          strokeWidth={2.6}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </motion.svg>
+    </div>
+  );
+}
+
+function SealCard({ seal, index }: { seal: Seal; index: number }) {
+  const reduced = useReducedMotion();
+  const [stamped, setStamped] = useState(reduced === true);
+
+  return (
+    <motion.div
+      initial={reduced ? false : { opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-120px" }}
+      transition={{ duration: 0.7, ease: EASE.outQuart, delay: index * 0.12 }}
+      onViewportEnter={() => setStamped(true)}
+      className="holo-card iris-border group relative flex min-h-[420px] flex-col rounded-3xl p-7 sm:p-8"
+    >
+      {/* roman-numeral index + commitment tag */}
+      <div className="relative z-[2] flex items-center justify-between">
+        <span className="font-mono text-[11px] tracking-[.32em] text-emerald-300/70">
+          {seal.index}
+        </span>
+        <span className="rounded-full border border-emerald-400/25 bg-emerald-500/[.06] px-3 py-1 text-[9px] uppercase tracking-[.22em] text-emerald-200/90">
+          {seal.tag}
+        </span>
+      </div>
+
+      {/* the seal stamps onto the card */}
+      <div className="relative z-[2] mt-9 flex justify-center">
+        <VerifiedSeal active={stamped} />
+      </div>
+      <motion.p
+        initial={reduced ? false : { opacity: 0, y: 8 }}
+        animate={stamped ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+        transition={reduced ? { duration: 0 } : { duration: 0.5, ease: EASE.outQuart, delay: 0.42 }}
+        className="relative z-[2] mt-4 text-center font-mono text-[10px] uppercase tracking-[.28em] text-emerald-300/90"
+      >
+        verified
+      </motion.p>
+
+      {/* commitment copy reveals after the stamp lands (opacity + y) */}
+      <motion.div
+        initial={reduced ? false : { opacity: 0, y: 12 }}
+        animate={stamped ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
+        transition={reduced ? { duration: 0 } : { duration: 0.6, ease: EASE.outQuart, delay: 0.5 }}
+        className="relative z-[2] mt-auto pt-8"
+      >
+        <h3 className="text-[clamp(20px,2vw,26px)] font-semibold leading-[1.12] tracking-[-0.015em] text-white">
+          {seal.title}
+        </h3>
+        <p className="mt-3 text-sm leading-relaxed text-white/60">{seal.body}</p>
+        <div className="mt-5 flex items-center gap-2 border-t border-emerald-400/15 pt-4 font-mono text-[10px] tracking-[.16em] text-emerald-300/70">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,.7)]" />
+          {seal.proof}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function ThreeSeals() {
+  return (
+    <section className="relative">
+      <ChapterMarker n="02" label="Three commitments, sealed" />
+      <div className="relative mx-auto max-w-[1400px] px-5 pt-6 sm:px-8">
+        <div className="max-w-3xl">
+          <Pill tone="green">What the engine guarantees</Pill>
+          <h2 className="mt-5 text-[clamp(30px,4.5vw,60px)] font-semibold leading-[1.04] tracking-[-0.02em] text-white">
+            Three reliability commitments —
+            <br />
+            <span className="iris-text">each one provable, not promised.</span>
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/55">
+            These are the properties the schema and the test suite hold true on every approved price
+            action. Scroll each into view to see it stamped.
+          </p>
+        </div>
+      </div>
+      <div className="mx-auto mt-12 grid max-w-[1400px] gap-6 px-5 sm:px-8 lg:grid-cols-3">
+        {SEALS.map((s, i) => (
+          <SealCard key={s.index} seal={s} index={i} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /* ─────────────────────────────── 4. RISKS LIST ─────────────────────────── */
 
 const RISKS = [
@@ -784,6 +973,7 @@ export default function PrinciplePage() {
       <Hero onScroll={() => sixRef.current?.scrollIntoView({ behavior: "smooth" })} />
       <SixThingsStory anchorRef={sixRef} />
       <SeatbeltMoment />
+      <ThreeSeals />
       <RisksItPrevents />
       <FastLaneSlowLane />
       <HumanControl />

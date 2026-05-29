@@ -6,16 +6,20 @@ import type { ElementType } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
+  ArrowUpRight,
   BadgeCheck,
   CheckCircle2,
   ChevronRight,
   CircleAlert,
+  Compass,
   FlaskConical,
   Pause,
   Play,
+  Presentation,
   ScanBarcode,
 } from "lucide-react";
 import { BackgroundOrbits, Pill } from "./Shell";
+import { EASE } from "@/lib/motion";
 
 type SignalChapter = "aisle" | "approved" | "checkout" | "recover";
 
@@ -254,6 +258,158 @@ function GroceryWorld({ chapter }: { chapter: SignalChapter }) {
   );
 }
 
+/* ───────────────────────────── The Gateway ──────────────────────────────── */
+/* Signature moment: the three reviewer entries (Keynote, Showcase, Concepts)
+ * rendered as glowing portals. Each is a holo-card framed by an iris-ring
+ * halo; on hover a light beam draws upward into the card (scaleY + opacity)
+ * and the portal deepens its glow (glow-iris). Choosing one feels like
+ * stepping through a door into the product. Transform/opacity only; the whole
+ * thing collapses to calm static portals under prefers-reduced-motion. */
+
+type Portal = {
+  href: string;
+  eyebrow: string;
+  title: string;
+  copy: string;
+  icon: ElementType;
+  number: string;
+};
+
+const GATEWAY_PORTALS: Portal[] = [
+  {
+    href: "/vision/keynote",
+    eyebrow: "The narrative",
+    title: "Keynote",
+    copy: "Watch one approved grocery price reach POS, shelf label and ecommerce — in sync.",
+    icon: Presentation,
+    number: "00",
+  },
+  {
+    href: "/vision/showcase",
+    eyebrow: "The proof",
+    title: "Showcase",
+    copy: "The reliability control plane, working: reconciliation, containment, recovery.",
+    icon: ScanBarcode,
+    number: "01",
+  },
+  {
+    href: "/vision/horizon",
+    eyebrow: "The frontier",
+    title: "Concepts",
+    copy: "Where execution reliability is heading — exploratory horizon studies.",
+    icon: Compass,
+    number: "03",
+  },
+];
+
+function GatewayCard({ portal, index }: { portal: Portal; index: number }) {
+  const reduced = useReducedMotion();
+  const Icon = portal.icon;
+
+  return (
+    <motion.div
+      initial={reduced ? false : { opacity: 0, y: 22 }}
+      whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-12%" }}
+      transition={{ duration: 0.7, ease: EASE.outQuart, delay: index * 0.09 }}
+      whileHover={reduced ? undefined : { y: -4 }}
+      className="group relative"
+    >
+      <Link
+        href={portal.href}
+        className="iris-ring relative block rounded-[26px] p-px"
+        aria-label={`Enter ${portal.title}`}
+      >
+        {/* Portal deepens its glow on hover — reuse glow-iris, fade via opacity only. */}
+        <span
+          aria-hidden="true"
+          className="glow-iris pointer-events-none absolute inset-0 rounded-[26px] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+        />
+        <div className="holo-card relative flex min-h-[252px] flex-col justify-between overflow-hidden rounded-[25px] p-7">
+          {/* Light beam drawing up into the portal on hover (transform/opacity). */}
+          {!reduced && (
+            <motion.div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-44 origin-bottom bg-[linear-gradient(to_top,rgba(168,139,250,.34),rgba(34,211,238,.16)_45%,transparent)] opacity-0 blur-[2px] transition-[opacity,transform] duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-y-100 group-hover:opacity-100"
+              style={{ transform: "scaleY(0.18)" }}
+            />
+          )}
+          {/* Static reduced-motion highlight: a calm fixed beam. */}
+          {reduced && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-28 bg-[linear-gradient(to_top,rgba(168,139,250,.16),transparent)] opacity-0 group-hover:opacity-100"
+            />
+          )}
+
+          <div className="relative z-[2] flex items-start justify-between">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[.04] backdrop-blur transition-colors duration-500 group-hover:border-violet-300/40">
+              <Icon className="h-5 w-5 text-orange-300 transition-transform duration-500 group-hover:-translate-y-0.5 group-hover:text-violet-200" />
+            </span>
+            <span className="font-mono text-[10px] tabular-nums tracking-[.3em] text-white/25">
+              {portal.number}
+            </span>
+          </div>
+
+          <div className="relative z-[2] mt-6">
+            <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-orange-300/80">
+              {portal.eyebrow}
+            </p>
+            <h3 className="mt-2 text-2xl font-semibold tracking-[-.02em] text-white">
+              {portal.title}
+            </h3>
+            <p className="mt-2 max-w-[28ch] text-sm leading-6 text-white/52">{portal.copy}</p>
+          </div>
+
+          <div className="relative z-[2] mt-6 flex items-center gap-1.5 text-xs font-medium text-white/45 transition-colors duration-300 group-hover:text-white">
+            Step through
+            <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
+function GatewayPortals() {
+  const reduced = useReducedMotion();
+  return (
+    <div className="relative mt-5 overflow-hidden rounded-[34px] border border-white/[.07] bg-[#070a12]/70 p-6 sm:p-9">
+      {/* Aurora gateway behind the portals. */}
+      <div className="pointer-events-none absolute inset-0 opacity-90">
+        <div className="aurora-futurist !absolute" />
+      </div>
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-0 z-0 h-px w-[62%] -translate-x-1/2 bg-[linear-gradient(90deg,transparent,rgba(168,139,250,.5),rgba(34,211,238,.4),transparent)]"
+        animate={reduced ? undefined : { opacity: [0.45, 0.85, 0.45], scaleX: [0.94, 1, 0.94] }}
+        transition={reduced ? undefined : { duration: 6.5, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      <div className="relative z-[1] flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[.26em] text-orange-300">
+            The Gateway
+          </p>
+          <h2 className="mt-3 max-w-md text-[26px] font-semibold leading-[1.08] tracking-[-.03em] text-white sm:text-[32px]">
+            Choose a door into the{" "}
+            <span className="iris-text">control plane.</span>
+          </h2>
+        </div>
+        <p className="max-w-xs text-sm leading-6 text-white/45">
+          Three ways in — the story, the working proof, and where it&apos;s headed.
+        </p>
+      </div>
+
+      <div className="relative z-[1] mt-8 grid gap-5 md:grid-cols-3">
+        {GATEWAY_PORTALS.map((portal, index) => (
+          <GatewayCard key={portal.href} portal={portal} index={index} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function StoryStrip({
   icon: Icon,
   title,
@@ -398,6 +554,7 @@ export default function SignalPage() {
           status="Full test suite"
         />
       </div>
+      <GatewayPortals />
     </motion.section>
   );
 }

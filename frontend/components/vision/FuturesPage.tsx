@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef } from "react";
 import type { ElementType } from "react";
+import type { MotionValue } from "framer-motion";
 import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import {
   ArrowRight,
@@ -65,12 +66,132 @@ import { BlurRevealHeading } from "@/components/narrative/BlurRevealHeading";
 
 /* ─────────────────────────────── 1. HERO ─────────────────────────────────── */
 
+/* Signature moment — "Dawn Over the Horizon".
+   A single iridescent horizon line sits low in the hero. A perspective grid-floor
+   recedes to a vanishing point on that line (static, for depth). An aurora swells
+   upward like sunrise as the section enters view, and a small cascade of concept
+   tokens — the on-thesis ShelfTrace chain (approved price → POS · shelf-label ·
+   ecommerce) — rises up out of the horizon in a staggered lift. The aurora + line
+   drift gently with scrollYProgress for parallax.
+   Reduced-motion: tokens land in their final row, the horizon is a static glow,
+   no parallax, no swell. transform + opacity only. */
+function DawnHorizon({ parallaxY }: { parallaxY: MotionValue<number> }) {
+  const reduced = useReducedMotion();
+
+  // The ShelfTrace promise, read left-to-right as it rises from the horizon.
+  const tokens: { label: string; icon: ElementType; tone: string }[] = [
+    { label: "approved price", icon: BadgeCheck, tone: "from-orange-300/90 to-amber-200/70 text-orange-100 border-orange-300/40" },
+    { label: "POS", icon: ScanLine, tone: "from-cyan-300/80 to-sky-200/60 text-cyan-50 border-cyan-300/40" },
+    { label: "shelf-label", icon: Package, tone: "from-violet-300/85 to-fuchsia-200/60 text-violet-50 border-violet-300/40" },
+    { label: "ecommerce", icon: Wifi, tone: "from-emerald-300/85 to-teal-200/60 text-emerald-50 border-emerald-300/40" },
+  ];
+
+  return (
+    <motion.div
+      aria-hidden
+      style={reduced ? undefined : { y: parallaxY }}
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-[72%] overflow-hidden"
+    >
+      {/* Perspective grid-floor receding to a vanishing point on the horizon.
+          Static — depth, not motion. transform: perspective + rotateX only. */}
+      <div
+        className="absolute inset-x-[-40%] bottom-0 h-[58%] origin-bottom opacity-[.55]"
+        style={{
+          transform: "perspective(620px) rotateX(74deg)",
+          backgroundImage:
+            "linear-gradient(rgba(129,140,248,.22) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,.16) 1px, transparent 1px)",
+          backgroundSize: "46px 46px",
+          maskImage: "radial-gradient(ellipse 60% 86% at 50% 100%, #000 8%, transparent 72%)",
+          WebkitMaskImage: "radial-gradient(ellipse 60% 86% at 50% 100%, #000 8%, transparent 72%)",
+        }}
+      />
+
+      {/* Aurora that swells upward like sunrise as the hero enters view. */}
+      <motion.div
+        initial={reduced ? false : { opacity: 0, scaleY: 0.35, scaleX: 0.85 }}
+        whileInView={{ opacity: reduced ? 0.7 : 0.95, scaleY: 1, scaleX: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 1.4, ease: EASE.outQuart, delay: 0.2 }}
+        className="absolute inset-x-0 bottom-[26%] h-[60%] origin-bottom"
+        style={{
+          background:
+            "radial-gradient(ellipse 52% 100% at 50% 100%, rgba(251,146,60,.34), rgba(168,85,247,.20) 38%, rgba(34,211,238,.12) 60%, transparent 78%)",
+        }}
+      />
+
+      {/* The iridescent horizon line, low in the frame. */}
+      <div className="absolute inset-x-0 bottom-[26%]">
+        <motion.div
+          initial={reduced ? false : { opacity: 0, scaleX: 0.4 }}
+          whileInView={{ opacity: 1, scaleX: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1.2, ease: EASE.outQuart, delay: 0.15 }}
+          className="mx-auto h-px w-[min(1100px,86%)] origin-center"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, rgba(34,211,238,.65) 18%, rgba(129,140,248,.9) 50%, rgba(251,146,60,.7) 82%, transparent)",
+            boxShadow: "0 0 24px rgba(129,140,248,.55), 0 0 64px rgba(34,211,238,.35)",
+          }}
+        />
+        {/* a soft sun-bloom sitting on the line at the vanishing point */}
+        <motion.div
+          initial={reduced ? false : { opacity: 0, scale: 0.6 }}
+          whileInView={{ opacity: reduced ? 0.8 : 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1.5, ease: EASE.outQuart, delay: 0.3 }}
+          className="absolute left-1/2 top-1/2 h-24 w-64 -translate-x-1/2 -translate-y-1/2 rounded-[100%]"
+          style={{
+            background: "radial-gradient(ellipse at center, rgba(254,215,170,.5), rgba(251,146,60,.16) 45%, transparent 72%)",
+          }}
+        />
+      </div>
+
+      {/* Concept tokens rising up OUT of the horizon line, staggered. */}
+      <div className="absolute inset-x-0 bottom-[27%] flex justify-center">
+        <div className="flex flex-wrap items-center justify-center gap-2.5 px-6 sm:gap-3.5">
+          {tokens.map((t, i) => {
+            const TokenIcon = t.icon;
+            const isLast = i === tokens.length - 1;
+            return (
+              <div key={t.label} className="flex items-center gap-2.5 sm:gap-3.5">
+                <motion.span
+                  initial={reduced ? false : { opacity: 0, y: 34, scale: 0.92 }}
+                  whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, ease: EASE.outQuart, delay: reduced ? 0 : 0.55 + i * 0.16 }}
+                  className={`inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-b ${t.tone} px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[.16em] backdrop-blur-md`}
+                  style={{ boxShadow: "0 10px 30px -14px rgba(129,140,248,.6)" }}
+                >
+                  <TokenIcon className="h-3 w-3" />
+                  {t.label}
+                </motion.span>
+                {!isLast && (
+                  <motion.span
+                    initial={reduced ? false : { opacity: 0, scale: 0.4 }}
+                    whileInView={{ opacity: 0.7, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, ease: EASE.outQuart, delay: reduced ? 0 : 0.63 + i * 0.16 }}
+                  >
+                    <ArrowRight className="h-3.5 w-3.5 text-white/40" />
+                  </motion.span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function Hero({ onScroll }: { onScroll: () => void }) {
   const reduced = useReducedMotion();
   const heroRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const scale = useTransform(scrollYProgress, [0, 1], [reduced ? 1 : 1.06, reduced ? 1 : 1.22]);
   const overlay = useTransform(scrollYProgress, [0, 1], [0.6, 0.92]);
+  // Parallax for the dawn layer — drifts up gently as you scroll past the hero.
+  const dawnY = useTransform(scrollYProgress, [0, 1], [0, -90]);
 
   return (
     <section ref={heroRef} className="relative isolate h-[100vh] min-h-[720px] w-full overflow-hidden">
@@ -84,6 +205,9 @@ function Hero({ onScroll }: { onScroll: () => void }) {
       />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_120%,rgba(251,146,60,.16),transparent_55%),radial-gradient(ellipse_at_20%_-10%,rgba(167,139,250,.10),transparent_55%)]" />
       <Particles count={24} color="rgba(254,215,170,.45)" />
+
+      {/* Signature moment — Dawn Over the Horizon (behind the headline). */}
+      <DawnHorizon parallaxY={dawnY} />
 
       <div className="relative z-10 mx-auto flex h-full max-w-[1400px] flex-col justify-end px-5 pb-24 sm:px-8 sm:pb-32">
         <motion.div

@@ -38,6 +38,7 @@ import {
   Zap,
 } from "lucide-react";
 import { BackgroundOrbits, Pill } from "./Shell";
+import { EASE } from "@/lib/motion";
 
 /* ─────────────────────────────────────────────────────────────────────────────
    /vision/orbit — Command Sphere
@@ -1166,6 +1167,262 @@ function CtaRail() {
   );
 }
 
+/* ─────────────────────────── SIGNATURE · ORBITING CHANNELS ─────────────────
+   Hero showpiece. A ShelfTrace core (the approved price) sits center; three
+   channel nodes — POS, ESL, Ecommerce — orbit on iridescent rings. The orbit
+   container rotates; each node's label counter-rotates so text stays upright
+   (transform only). Periodically the core emits a price pulse — a ring scaling
+   outward + fading — and as the wave reaches each node it flashes
+   verified-emerald, the on-thesis moment: one approved price landing on every
+   channel. Reduced-motion: nodes parked static, one static pulse ring, no spin.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const ORBIT_CHANNELS = [
+  { id: "pos", label: "POS", sub: "register", icon: ScanLine, angle: -90, ring: 0 },
+  { id: "esl", label: "ESL", sub: "shelf label", icon: Tag, angle: 30, ring: 1 },
+  { id: "web", label: "Ecommerce", sub: "web · app", icon: Globe2, angle: 150, ring: 2 },
+] as const;
+
+// Three concentric orbit radii (px, at the stage's base scale).
+const ORBIT_RADII = [104, 150, 196] as const;
+// Seconds for one full revolution of the orbit container.
+const ORBIT_PERIOD = 26;
+
+function OrbitingChannels() {
+  const reduced = useReducedMotion();
+
+  // Master orbit angle (degrees). One continuous rotation; nodes counter-rotate.
+  const [spin, setSpin] = useState(0);
+  // Pulse cadence: each tick emits a new ring + arms the verified flash wave.
+  const [pulseKey, setPulseKey] = useState(0);
+
+  useEffect(() => {
+    if (reduced) return;
+    let raf = 0;
+    let last = performance.now();
+    const loop = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      setSpin((s) => (s + (dt * 360) / ORBIT_PERIOD) % 360);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [reduced]);
+
+  useEffect(() => {
+    if (reduced) return;
+    const id = setInterval(() => setPulseKey((k) => k + 1), 3600);
+    return () => clearInterval(id);
+  }, [reduced]);
+
+  return (
+    <div className="relative mx-auto aspect-square w-full max-w-[440px]">
+      {/* soft field glow behind the system */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-full opacity-70"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 50%, rgba(168,139,250,.16), rgba(34,211,238,.08) 42%, transparent 68%)",
+        }}
+      />
+
+      {/* the perspective stage */}
+      <div className="absolute inset-0" style={{ perspective: 1100 }}>
+        {/* tilted plane: rings + nodes share one transform context */}
+        <div
+          className="absolute inset-0"
+          style={{ transformStyle: "preserve-3d", transform: "rotateX(58deg)" }}
+        >
+          {/* three iridescent orbit rings (the outermost gets the hero conic ring) */}
+          {ORBIT_RADII.map((r, i) => (
+            <div
+              key={r}
+              className={`absolute left-1/2 top-1/2 rounded-full ${
+                i === ORBIT_RADII.length - 1 ? "iris-ring" : "iris-border"
+              }`}
+              style={{
+                width: r * 2,
+                height: r * 2,
+                transform: "translate(-50%, -50%)",
+                opacity: 0.45 + i * 0.12,
+              }}
+            />
+          ))}
+
+          {/* static pulse ring for reduced-motion — one calm verified halo */}
+          {reduced && (
+            <div
+              className="absolute left-1/2 top-1/2 rounded-full border border-emerald-400/45"
+              style={{
+                width: ORBIT_RADII[2] * 2 + 28,
+                height: ORBIT_RADII[2] * 2 + 28,
+                transform: "translate(-50%, -50%)",
+                boxShadow: "0 0 40px rgba(34,197,94,.18)",
+              }}
+            />
+          )}
+
+          {/* animated price pulses — a ring scales outward from the core + fades */}
+          {!reduced && (
+            <AnimatePresence>
+              {[pulseKey, pulseKey - 1].map((k) => (
+                <motion.span
+                  key={k}
+                  className="absolute left-1/2 top-1/2 rounded-full border border-orange-300/70"
+                  style={{
+                    width: 96,
+                    height: 96,
+                    marginLeft: -48,
+                    marginTop: -48,
+                    boxShadow: "0 0 24px rgba(251,146,60,.35)",
+                  }}
+                  initial={{ scale: 0.34, opacity: 0 }}
+                  animate={{ scale: 4.6, opacity: [0, 0.7, 0] }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 3.4, ease: EASE.outQuart }}
+                />
+              ))}
+            </AnimatePresence>
+          )}
+
+          {/* rotating orbit container — rotate ONLY; nodes counter-rotate */}
+          <motion.div
+            className="absolute inset-0"
+            style={{ rotate: reduced ? 0 : spin, transformStyle: "preserve-3d" }}
+          >
+            {ORBIT_CHANNELS.map((ch, idx) => {
+              const radius = ORBIT_RADII[ch.ring];
+              const p = polar(ch.angle, radius);
+              const Icon = ch.icon;
+              return (
+                <div
+                  key={ch.id}
+                  className="absolute left-1/2 top-1/2"
+                  style={{ transform: `translate(${p.x}px, ${p.y}px)` }}
+                >
+                  {/* counter-rotate the plane tilt + the spin so the chip faces the viewer upright */}
+                  <div
+                    style={{
+                      transform: reduced
+                        ? "translate(-50%, -50%)"
+                        : `translate(-50%, -50%) rotate(${-spin}deg) rotateX(-58deg)`,
+                      transformStyle: "preserve-3d",
+                    }}
+                  >
+                    <OrbitNode
+                      label={ch.label}
+                      sub={ch.sub}
+                      Icon={Icon}
+                      pulseKey={pulseKey}
+                      delay={0.45 + ch.ring * 0.34}
+                      reduced={!!reduced}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </motion.div>
+        </div>
+      </div>
+
+      {/* the core — approved price, dead center, above the tilted plane */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        {!reduced && (
+          <motion.span
+            key={`core-${pulseKey}`}
+            aria-hidden
+            className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ background: "radial-gradient(circle, rgba(251,146,60,.55), transparent 70%)" }}
+            initial={{ scale: 0.8, opacity: 0.9 }}
+            animate={{ scale: 1.5, opacity: 0 }}
+            transition={{ duration: 1.1, ease: EASE.outQuart }}
+          />
+        )}
+        <div className="glow-iris relative flex h-[108px] w-[108px] flex-col items-center justify-center rounded-full border border-orange-400/40 bg-[#0a0f1a]/85 backdrop-blur-md">
+          <span className="text-[8px] uppercase tracking-[.24em] text-orange-300">approved</span>
+          <span className="mt-0.5 font-mono text-xl tabular-nums text-white">$5.49</span>
+          <span className="mt-0.5 flex items-center gap-1 text-[8px] uppercase tracking-[.18em] text-emerald-300">
+            <ShieldCheck className="h-2.5 w-2.5" /> canonical
+          </span>
+        </div>
+      </div>
+
+      {/* caption */}
+      <p className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] uppercase tracking-[.22em] text-white/40">
+        one price · every channel
+      </p>
+    </div>
+  );
+}
+
+function OrbitNode({
+  label,
+  sub,
+  Icon,
+  pulseKey,
+  delay,
+  reduced,
+}: {
+  label: string;
+  sub: string;
+  Icon: ElementType;
+  pulseKey: number;
+  delay: number;
+  reduced: boolean;
+}) {
+  // Each pulse arms a brief verified-emerald flash as the wave reaches this ring.
+  const verified = {
+    boxShadow: [
+      "0 8px 30px rgba(0,0,0,.35)",
+      "0 0 22px rgba(34,197,94,.55)",
+      "0 8px 30px rgba(0,0,0,.35)",
+    ],
+    borderColor: [
+      "rgba(255,255,255,.12)",
+      "rgba(52,211,153,.7)",
+      "rgba(255,255,255,.12)",
+    ],
+    scale: [1, 1.06, 1],
+  };
+
+  return (
+    <motion.div
+      className="flex w-[112px] flex-col items-center gap-1 rounded-2xl border border-white/12 bg-[#0a0e18]/90 px-3 py-2.5 text-center backdrop-blur-sm"
+      style={{ boxShadow: "0 8px 30px rgba(0,0,0,.35)" }}
+      animate={reduced ? undefined : verified}
+      transition={
+        reduced
+          ? undefined
+          : { duration: 1.05, ease: EASE.outQuart, delay, repeat: 0 }
+      }
+      // re-keying on pulseKey restarts the flash each cadence
+      key={`${label}-${pulseKey}`}
+    >
+      <motion.span
+        className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[.04]"
+        animate={
+          reduced
+            ? undefined
+            : { color: ["#a78bfa", "#34d399", "#a78bfa"] }
+        }
+        transition={reduced ? undefined : { duration: 1.05, ease: EASE.outQuart, delay }}
+        style={{ color: reduced ? "#34d399" : "#a78bfa" }}
+      >
+        <Icon className="h-3.5 w-3.5" />
+      </motion.span>
+      <span className="text-[11px] font-semibold leading-none text-white">{label}</span>
+      <span className="text-[8px] uppercase tracking-[.16em] text-white/40">{sub}</span>
+      {reduced && (
+        <span className="flex items-center gap-0.5 text-[8px] uppercase tracking-[.14em] text-emerald-300">
+          <BadgeCheck className="h-2.5 w-2.5" /> verified
+        </span>
+      )}
+    </motion.div>
+  );
+}
+
 /* ─────────────────────────────────── PAGE ─────────────────────────────────── */
 
 export default function OrbitPage() {
@@ -1217,27 +1474,32 @@ export default function OrbitPage() {
       <section className="relative overflow-hidden pb-6 pt-10">
         <BackgroundOrbits variant="orange" />
         <div className="relative mx-auto max-w-[1500px] px-4 sm:px-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <Pill tone="orange">06 · Command Sphere</Pill>
-            <Pill tone="purple">Concept vision</Pill>
-            <Pill tone="neutral">Interactive simulator — your inputs change the state</Pill>
+          <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr]">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Pill tone="orange">06 · Command Sphere</Pill>
+                <Pill tone="purple">Concept vision</Pill>
+                <Pill tone="neutral">Interactive simulator — your inputs change the state</Pill>
+              </div>
+              <h1 className="mt-6 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl">
+                Fly the engine.
+                <span className="iris-text">
+                  {" "}Inject drift. Watch reliability respond.
+                </span>
+              </h1>
+              <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/55">
+                This is not a video. The orbital console below is a live state machine. Click any inject
+                button (or press <kbd className="rounded bg-white/[.06] px-1">D</kbd>{" "}
+                <kbd className="rounded bg-white/[.06] px-1">S</kbd>{" "}
+                <kbd className="rounded bg-white/[.06] px-1">T</kbd>{" "}
+                <kbd className="rounded bg-white/[.06] px-1">R</kbd>{" "}
+                <kbd className="rounded bg-white/[.06] px-1">X</kbd>) — the simulation reacts in real time:
+                log streams update, dollar counters move, twin spawns, audit seals. Drag the sphere to
+                rotate; click any node or store to inspect.
+              </p>
+            </div>
+            <OrbitingChannels />
           </div>
-          <h1 className="mt-6 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl">
-            Fly the engine.
-            <span className="iris-text">
-              {" "}Inject drift. Watch reliability respond.
-            </span>
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/55">
-            This is not a video. The orbital console below is a live state machine. Click any inject
-            button (or press <kbd className="rounded bg-white/[.06] px-1">D</kbd>{" "}
-            <kbd className="rounded bg-white/[.06] px-1">S</kbd>{" "}
-            <kbd className="rounded bg-white/[.06] px-1">T</kbd>{" "}
-            <kbd className="rounded bg-white/[.06] px-1">R</kbd>{" "}
-            <kbd className="rounded bg-white/[.06] px-1">X</kbd>) — the simulation reacts in real time:
-            log streams update, dollar counters move, twin spawns, audit seals. Drag the sphere to
-            rotate; click any node or store to inspect.
-          </p>
         </div>
       </section>
 
