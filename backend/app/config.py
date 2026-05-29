@@ -32,6 +32,7 @@ Rate limiting:
 from __future__ import annotations
 
 import json
+import os
 from urllib.parse import urlparse
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -78,9 +79,24 @@ class Settings(BaseSettings):
     canary_store_count: int = 2
     esl_timeout_seconds: int = 30
 
+    # Scraping demo — the fresh_market_demo spider scrapes the storefront the
+    # API serves at /demo-storefront. Empty → resolve the app's own origin
+    # (localhost:$PORT), which is correct on localhost, Docker, and the
+    # deployed host. Set only if the storefront is hosted elsewhere.
+    scrape_storefront_base_url: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def self_base_url(self) -> str:
+        """Origin the app serves on — used by the demo storefront spider to
+        scrape ShelfTrace's own synthetic storefront over real HTTP."""
+        explicit = self.scrape_storefront_base_url.strip()
+        if explicit:
+            return explicit.rstrip("/")
+        return f"http://localhost:{os.environ.get('PORT', '8000')}"
 
     @property
     def normalized_app_env(self) -> str:

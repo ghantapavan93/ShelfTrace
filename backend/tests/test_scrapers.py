@@ -209,7 +209,10 @@ def test_list_sources_returns_serialisable_metadata():
     assert len(sources) >= 1
     first = sources[0]
     assert {"source_id", "name", "description", "start_url", "max_pages"} <= set(first.keys())
-    assert first["source_id"] == "books_demo"
+    # The grocery storefront leads the registry (most representative source for
+    # a grocery pricing control plane); the books reference source follows.
+    assert first["source_id"] == "fresh_market_demo"
+    assert "books_demo" in {s["source_id"] for s in sources}
 
 
 # ──────────────────────────────────────────────────────────────────────

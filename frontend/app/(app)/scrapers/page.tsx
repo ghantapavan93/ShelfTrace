@@ -63,7 +63,7 @@ type RunSummary = {
 };
 
 export default function ScrapersPage() {
-  const [selected, setSelected] = useState<string>("books_demo");
+  const [selected, setSelected] = useState<string>("fresh_market_demo");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [running, setRunning] = useState(false);
@@ -127,7 +127,7 @@ export default function ScrapersPage() {
       {isLiveWorkMode && (
         <SandboxStrip
           surfaceName="Scraper runs"
-          missingForLive="The reference source extracts from a policy-safe book catalog. Production would point at retailer-specific sources with credentials, rendering and grocery-specific normalization."
+          missingForLive="The wired sources are a synthetic grocery storefront ShelfTrace scrapes over real HTTP and a public scraper-practice site. Production would point at retailer-specific sources with credentials, rendering and grocery-specific normalization."
         />
       )}
 
@@ -137,10 +137,12 @@ export default function ScrapersPage() {
           <h1 className="text-2xl font-bold text-white">Competitor Scraping</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Production-shaped data extraction pipeline. Fetch → parse →
-            validate → normalize → deduplicate → preserve observations.
-            This policy-safe reference source demonstrates the extraction
-            architecture. A real grocery source would require retailer-specific
-            access, rendering, compliance review and grocery-specific normalization.
+            validate → normalize → deduplicate → preserve observations. The
+            grocery storefront below is a synthetic competitor aisle ShelfTrace
+            serves and scrapes over real HTTP — grocery-shaped data without
+            hitting a real retailer. A real grocer source swaps the spider&apos;s
+            selector pack and adds rendering + a scraping agreement; nothing else
+            in the pipeline changes.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -153,10 +155,23 @@ export default function ScrapersPage() {
         </div>
       </div>
 
-      {/* Scope note — honest framing about the demo target */}
+      {/* Scope note — honest framing about the demo sources */}
       <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[.04] px-4 py-3 text-sm text-amber-200">
-        <span className="font-semibold">Scope note:</span> the wired
-        spider targets{" "}
+        <span className="font-semibold">Scope note:</span> two reference
+        sources are wired.{" "}
+        <span className="font-medium text-amber-100">Fresh Market</span> is a
+        synthetic grocery aisle ShelfTrace serves at{" "}
+        <a
+          href={`${api.base}/demo-storefront/`}
+          target="_blank"
+          rel="noreferrer"
+          className="underline decoration-amber-400/60 underline-offset-2"
+        >
+          /demo-storefront
+        </a>{" "}
+        and scrapes over real HTTP — grocery-shaped competitor data whose prices
+        drift each minute, so re-runs surface genuine price-change deltas, with
+        no real-retailer ToS risk.{" "}
         <a
           href="https://books.toscrape.com/"
           target="_blank"
@@ -165,13 +180,10 @@ export default function ScrapersPage() {
         >
           books.toscrape.com
         </a>{" "}
-        — the standard scraper-practice site — because production grocer
-        sites have anti-bot defenses and ToS restrictions that require a
-        commercial scraping agreement. The DATA SHAPE is identical to a
-        competitor product listing (title, price, category, availability,
-        image), and the same pipeline consumes that shape regardless of source.
-        Retailer-specific adapters remain future integration work and are not
-        connected in this demo.
+        proves the same pipeline against an external scraper-practice site. A
+        real grocer would add Playwright + proxy rotation + a scraping
+        agreement — that swaps the spider&apos;s selector pack, nothing else in
+        the fetch → validate → dedupe → price-history pipeline.
       </div>
 
       {/* ── Source + Run panel ───────────────────────────────────────── */}

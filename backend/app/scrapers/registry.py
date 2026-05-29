@@ -7,9 +7,14 @@ from __future__ import annotations
 
 from app.scrapers.base import Spider
 from app.scrapers.spiders.books_demo import BooksDemoSpider
+from app.scrapers.spiders.fresh_market import FreshMarketDemoSpider
 
-# Mapping: source_id → spider class. Order is preserved for UI display.
+# Mapping: source_id → spider class. Order is preserved for UI display, so the
+# grocery storefront leads (it's the most representative source for a grocery
+# pricing control plane); the books site follows as proof of the live-network
+# path against an external site.
 SPIDERS: dict[str, type[Spider]] = {
+    FreshMarketDemoSpider.SOURCE_ID: FreshMarketDemoSpider,
     BooksDemoSpider.SOURCE_ID: BooksDemoSpider,
     # WholeFoodsStubSpider intentionally not wired — see its docstring.
 }
