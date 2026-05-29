@@ -85,6 +85,20 @@ class SourceDatasetType(str, enum.Enum):
     OPEN_PRICES = "open_prices"
 
 
+class RegressionCaseType(str, enum.Enum):
+    """How a saved failure should be re-exercised when replayed."""
+
+    CONNECTOR_CERTIFICATION = "connector_certification"  # POS/price mismatch
+    MATCH_RELATIONSHIP = "match_relationship"
+    MARKDOWN_FALLBACK = "markdown_fallback"  # deadline / ESL timeout
+
+
+class RegressionCaseStatus(str, enum.Enum):
+    ACTIVE = "active"  # captured, guards future batches, not yet replayed
+    REPLAYED = "replayed"  # re-exercised through the shared engine at least once
+    RETIRED = "retired"  # operator decided the failure mode no longer applies
+
+
 class ObservationType(str, enum.Enum):
     PRODUCT_IDENTITY = "product_identity"
     ADVERTISED_PRICE = "advertised_price"
@@ -486,6 +500,44 @@ class SourceObservation(Base):
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     dataset: Mapped[SourceDataset] = relationship(back_populates="observations")
+
+
+# ---------------------------------------------------------------------------
+# Override Memory / Regression Replay — a resolved failure or human correction
+# becomes a durable, replayable case so the next batch is protected against the
+# same failure mode. Net-new self-contained table; create_all provisions it
+# (no db_migrate column entry needed). Enums are native_enum=False -> VARCHAR.
+# ---------------------------------------------------------------------------
+class RegressionCase(Base):
+    __tablename__ = "regression_cases"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    case_type: Mapped[RegressionCaseType] = mapped_column(
+        Enum(RegressionCaseType, native_enum=False, length=32), index=True
+    )
+    title: Mapped[str] = mapped_column(String)
+    # The incident / action the case was learned from (nullable so a case can be
+    # authored without an originating incident if needed).
+    origin_incident_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    origin_action_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    sku: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    store_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    channel: Mapped[str | None] = mapped_column(String, nullable=True)  # pos | esl | ecommerce
+    # What must now be guaranteed, e.g. "POS must acknowledge approved price $5.99".
+    expected_behavior: Mapped[str] = mapped_column(Text)
+    # What went wrong, e.g. "POS returned $6.49 vs approved $5.99".
+    failure_signature: Mapped[str] = mapped_column(Text)
+    # Snapshot of the incident/receipt state at creation (JSON as Text — matches
+    # the SourceObservation *_json convention so a fresh create_all needs no
+    # JSONB target entry).
+    source_payload_json: Mapped[str] = mapped_column(Text)
+    status: Mapped[RegressionCaseStatus] = mapped_column(
+        Enum(RegressionCaseStatus, native_enum=False, length=32),
+        default=RegressionCaseStatus.ACTIVE,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_replayed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ConnectorBehaviorProfile(Base):

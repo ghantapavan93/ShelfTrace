@@ -442,3 +442,50 @@ class ExplainResponse(BaseModel):
     evidence_chips: list[str] = Field(default_factory=list, description="Labels of the evidence nodes backing the answer.")
     zone_status: dict[str, str] = Field(default_factory=dict, description="store_id → human-readable status label.")
     measurement_gate: str = Field(..., description="QUARANTINED | ELIGIBLE | PENDING")
+
+
+# ---------------------------------------------------------------------------
+# Override Memory / Regression Replay — a resolved failure becomes a durable,
+# replayable case that protects future batches against the same failure mode.
+# ---------------------------------------------------------------------------
+class RegressionCaseView(BaseModel):
+    id: str
+    case_type: str = Field(..., description="connector_certification | match_relationship | markdown_fallback")
+    title: str
+    origin_incident_id: str | None = None
+    origin_action_id: str | None = None
+    sku: str | None = None
+    store_id: str | None = None
+    channel: str | None = None
+    expected_behavior: str = Field(..., description="What must now be guaranteed for this SKU/store/channel.")
+    failure_signature: str = Field(..., description="What went wrong, captured from real row data.")
+    status: str = Field(..., description="active | replayed | retired")
+    created_at: datetime
+    last_replayed_at: datetime | None = None
+
+
+class RegressionCaseCreateIn(BaseModel):
+    """Optional overrides when capturing a regression case from an incident.
+    ``case_type`` is auto-derived from the incident when omitted."""
+
+    case_type: str | None = Field(
+        default=None,
+        description="Override the auto-derived case type "
+        "(connector_certification | match_relationship | markdown_fallback).",
+    )
+
+
+class RegressionReplayResult(BaseModel):
+    """Result of replaying a saved regression case through the shared engine."""
+
+    case_id: str
+    status: str = Field(..., description="The case status after replay (typically 'replayed').")
+    healed: bool = Field(..., description="True when the replay re-exercised the failure and it now passes.")
+    certification_run_id: str | None = Field(
+        default=None, description="The certification run that re-exercised this case, when one was used."
+    )
+    check_id: str | None = Field(
+        default=None, description="The certification check row recording this replay, when one was created."
+    )
+    redirect: str = Field(..., description="Suggested UI redirect target for the replay result.")
+    detail: str = Field(..., description="Plain-English summary of the replay outcome.")

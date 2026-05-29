@@ -139,6 +139,13 @@ def decision_receipt(db: Session, action: PriceAction) -> DecisionReceiptView:
 
     audit_rows = _action_audit(db, action.id, incident_ids)
 
+    # Override Memory: durable regression cases learned from this action. Lazy
+    # import keeps the receipt module's import graph flat (regression -> cert ->
+    # ... never imports receipt, but the lazy import is defensive).
+    from app.services import regression
+
+    regression_cases = regression.cases_for_action(db, action.id)
+
     stages = [
         _stage_signal(action, batch),
         _stage_match(action, sku_link, entity),
@@ -147,7 +154,7 @@ def decision_receipt(db: Session, action: PriceAction) -> DecisionReceiptView:
         _stage_published(action, channels),
         _stage_verified(channels),
         _stage_measured(eligibility),
-        _stage_learned(incidents, store_tasks, audit_rows),
+        _stage_learned(incidents, store_tasks, audit_rows, regression_cases),
     ]
 
     stopped = next((s.key for s in stages if s.state == "failed"), None)
@@ -485,6 +492,7 @@ def _stage_learned(
     incidents: list[Incident],
     store_tasks: list[StoreTask],
     audit_rows: list[AuditEventView],
+    regression_cases: list | None = None,
 ) -> ReceiptStageView:
     open_inc = [i for i in incidents if i.status in (IncidentStatus.OPEN, IncidentStatus.RETRYING)]
     rolled = [i for i in incidents if i.status == IncidentStatus.ROLLED_BACK]
@@ -495,6 +503,36 @@ def _stage_learned(
     open_tasks = [t for t in store_tasks if t.status == StoreTaskStatus.OPEN]
     if open_tasks:
         ev.append(ReceiptEvidenceItem(label="Open store task", value=f"{len(open_tasks)} awaiting associate", tone="warn"))
+
+    # Override Memory: when this action's failure mode was captured as a durable
+    # regression case, the Learned stage points at the real saved row instead of
+    # relying on the narrative "captured in the audit trail" hint. The override
+    # is provably remembered — it now guards future batches.
+    regression_cases = regression_cases or []
+    if regression_cases:
+        case_ev = list(ev)
+        for case in regression_cases[:3]:
+            replayed = getattr(case, "last_replayed_at", None) is not None
+            case_ev.append(
+                ReceiptEvidenceItem(
+                    label="Regression case" + (" · replayed" if replayed else ""),
+                    value=case.title,
+                    tone="verified",
+                )
+            )
+        return ReceiptStageView(
+            key="learned",
+            label="Learned",
+            state="verified",
+            headline=f"Saved as durable protection — {len(regression_cases)} regression case"
+            + ("s" if len(regression_cases) != 1 else ""),
+            detail=(
+                "This failure mode was captured as Override Memory: a durable regression case "
+                "that re-exercises the original failure signature through the shared certification "
+                "engine, so the next batch is protected rather than re-learning the same lesson."
+            ),
+            evidence=case_ev,
+        )
 
     if rolled:
         return ReceiptStageView(
