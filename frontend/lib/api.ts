@@ -202,7 +202,17 @@ export const api = {
   retry: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/retry`),
   rollback: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/rollback`),
   resolve: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/resolve`),
-  storeTask: (id: string) => post<unknown>(`/api/v1/incidents/${id}/store-task`),
+  // Create a human field-verification task for the offending store. An
+  // optional instruction overrides the backend's auto-generated default.
+  storeTask: (id: string, instruction?: string) =>
+    post<import("./types").StoreTaskView>(
+      `/api/v1/incidents/${id}/store-task`,
+      instruction ? { instruction } : undefined,
+    ),
+  // Mark the incident's open verification task DONE (the associate confirmed
+  // the shelf). Re-reconciles server-side; 409 when no open task exists.
+  completeStoreTask: (id: string) =>
+    post<import("./types").StoreTaskView>(`/api/v1/incidents/${id}/complete-store-task`),
   reset: () => post<BatchSummary>(`/api/v1/demo/reset`),
   systemStatus: () =>
     get<{ label: string; tone: "neutral" | "danger" | "warn" | "verified"; status: string | null }>(

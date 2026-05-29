@@ -148,3 +148,24 @@ def store_task(
         status=task.status.value,
         created_at=task.created_at,
     )
+
+
+@router.post("/incidents/{incident_id}/complete-store-task", response_model=StoreTaskView)
+def complete_store_task(
+    incident_id: str,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
+    """Mark the incident's open verification task DONE (the associate confirmed)."""
+    try:
+        task = recovery.complete_store_task(db, incident_id, actor=identity.actor)
+    except recovery.RecoveryError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    return StoreTaskView(
+        id=task.id,
+        incident_id=task.incident_id,
+        store_id=task.store_id,
+        instruction=task.instruction,
+        status=task.status.value,
+        created_at=task.created_at,
+    )

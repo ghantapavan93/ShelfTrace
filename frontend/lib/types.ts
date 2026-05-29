@@ -132,6 +132,17 @@ export interface IncidentExplanation {
   channels: ChannelView[];
 }
 
+// A human field-verification task dispatched to the offending store. Created
+// via POST /incidents/{id}/store-task and closed via .../complete-store-task.
+export interface StoreTaskView {
+  id: string;
+  incident_id: string;
+  store_id: string;
+  instruction: string;
+  status: "open" | "done";
+  created_at: string;
+}
+
 export interface AuditEventView {
   id: string;
   event: string;

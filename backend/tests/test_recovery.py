@@ -2,11 +2,14 @@ import pytest
 
 from app.models import (
     ActionDecision,
+    AuditEvent,
     BatchStatus,
     Incident,
     IncidentStatus,
     IncidentType,
     PriceAction,
+    StoreTask,
+    StoreTaskStatus,
 )
 from app.seed import demo_payload
 from app.services import orchestrator, recovery
@@ -81,3 +84,71 @@ def test_double_resolution_is_safe(db):
 
     db.refresh(incident)
     assert incident.status == IncidentStatus.RESOLVED
+
+
+def test_complete_store_task_marks_done_and_audits(db):
+    """Completing the open verification task flips it to DONE and writes audit."""
+    _seed(db)
+    incident = _egg_incident(db)
+    task = recovery.create_store_task(db, incident.id)
+    assert task.status == StoreTaskStatus.OPEN
+
+    completed = recovery.complete_store_task(db, incident.id)
+
+    assert completed.id == task.id
+    assert completed.status == StoreTaskStatus.DONE
+    # The completion is recorded for the audit trail.
+    events = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.incident_id == incident.id,
+            AuditEvent.event == "Store verification task completed",
+        )
+        .count()
+    )
+    assert events == 1
+
+
+def test_complete_store_task_without_open_task_raises(db):
+    """No open task -> RecoveryError (surfaced as 409), not a silent no-op."""
+    _seed(db)
+    incident = _egg_incident(db)
+    with pytest.raises(recovery.RecoveryError):
+        recovery.complete_store_task(db, incident.id)
+
+
+def test_complete_store_task_is_idempotent_guarded(db):
+    """A second completion finds no OPEN task and is rejected."""
+    _seed(db)
+    incident = _egg_incident(db)
+    recovery.create_store_task(db, incident.id)
+    recovery.complete_store_task(db, incident.id)
+
+    with pytest.raises(recovery.RecoveryError):
+        recovery.complete_store_task(db, incident.id)
+
+    # Exactly one task exists and it stayed DONE.
+    tasks = db.query(StoreTask).filter(StoreTask.incident_id == incident.id).all()
+    assert len(tasks) == 1
+    assert tasks[0].status == StoreTaskStatus.DONE
+
+
+def test_complete_store_task_resolves_when_channels_agree(db):
+    """If the underlying action already heals, completing the task closes the incident."""
+    _seed(db)
+    incident = _egg_incident(db)
+    # Heal the offending channel first so reconciliation will return ELIGIBLE,
+    # then create + complete the verification task.
+    recovery.retry_incident(db, incident.id)
+    db.refresh(incident)
+    # retry already resolved the egg; create a fresh incident scenario via the
+    # strawberry deadline-risk path instead to exercise the resolve-on-complete.
+    straw = _strawberry_incidents(db)[0]
+    recovery.retry_incident(db, straw.id)  # heals ESL timeout_then_success
+    recovery.create_store_task(db, straw.id)
+
+    completed = recovery.complete_store_task(db, straw.id)
+    db.refresh(straw)
+
+    assert completed.status == StoreTaskStatus.DONE
+    assert straw.status == IncidentStatus.RESOLVED

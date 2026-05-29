@@ -7,7 +7,7 @@ failures live in connector_behavior_profiles, not in code.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -93,8 +93,17 @@ def _ensure_cost_for_action(
 
 
 def _markdown_deadline() -> datetime:
-    now = datetime.now(timezone.utc)
-    return now.replace(hour=18, minute=0, second=0, microsecond=0)
+    """A live, always-future sell-through deadline for the perishable markdown.
+
+    Anchored to ``utcnow() + 2h`` rather than a fixed wall-clock time so the
+    markdown SLA always renders a "~2h remaining" deadline-risk relative to
+    *now* — never a stale "Nd late / OVERDUE" calendar date when the demo is
+    viewed hours or days after the first seed. The deadline is still computed
+    once and persisted (create_memorial_day only runs when get_memorial_day
+    returns None), so this is "near-future at seed time"; re-seeding after a
+    wipe produces a fresh +2h window.
+    """
+    return datetime.now(timezone.utc) + timedelta(hours=2)
 
 
 # ---------------------------------------------------------------------------

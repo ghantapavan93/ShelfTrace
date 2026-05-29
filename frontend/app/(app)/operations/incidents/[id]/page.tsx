@@ -18,6 +18,10 @@ import {
   CheckCircle,
   XCircle,
   BarChart2,
+  UserCheck,
+  StickyNote,
+  Send,
+  Wrench,
 } from "lucide-react";
 import clsx from "clsx";
 import { api, DEMO_BATCH } from "@/lib/api";
@@ -32,12 +36,35 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { useWorkMode } from "@/components/ModeProvider";
 import { FlaskConical } from "lucide-react";
-import type { AuditEventView, IncidentExplanation, IncidentView } from "@/lib/types";
+import type {
+  AuditEventView,
+  IncidentExplanation,
+  IncidentView,
+  StoreTaskView,
+} from "@/lib/types";
+
+// A note an operator jots while working an incident. Session-only — there is
+// no backend note endpoint, so these live in component state and are clearly
+// labelled "(session note)" in the UI. They are NOT persisted or audited.
+interface SessionNote {
+  id: string;
+  text: string;
+  at: string;
+}
 
 export default function IncidentPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmRollback, setConfirmRollback] = useState(false);
+  const [confirmRetry, setConfirmRetry] = useState(false);
+  const [confirmResolve, setConfirmResolve] = useState(false);
+  // The open field-verification task this operator created this session, if
+  // any. Lets us surface its instruction and gate "Mark Verification Complete"
+  // (the backend 409s when no open task exists). Cleared once completed.
+  const [storeTask, setStoreTask] = useState<StoreTaskView | null>(null);
+  // Session-only operator scratch notes (see SessionNote — not persisted).
+  const [notes, setNotes] = useState<SessionNote[]>([]);
+  const [noteDraft, setNoteDraft] = useState("");
   const { toast } = useToast();
   const { mode, isHydrated } = useWorkMode();
   const isLiveWorkMode = isHydrated && mode === "live";
@@ -46,13 +73,24 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
   const exp = useLive<IncidentExplanation>(() => api.explanation(id), [id]);
   const audit = useLive<AuditEventView[]>(() => api.incidentAudit(id), [id]);
 
-  async function act(kind: "retry" | "rollback" | "resolve" | "task") {
+  async function act(kind: "retry" | "rollback" | "resolve" | "task" | "complete") {
     setBusy(kind);
     try {
       if (kind === "retry") await api.retry(id);
       if (kind === "rollback") await api.rollback(id);
       if (kind === "resolve") await api.resolve(id);
-      if (kind === "task") await api.storeTask(id);
+      if (kind === "task") {
+        const task = await api.storeTask(id);
+        setStoreTask(task);
+      }
+      if (kind === "complete") {
+        await api.completeStoreTask(id);
+        // Task is closed server-side; drop the open-task affordance.
+        setStoreTask(null);
+      }
+      // Re-fetch the incident view, explanation, and audit timeline so the
+      // page visibly reflects the new state — POS receipt, RESOLVED status,
+      // and the measurement gate all re-render from fresh data.
       await Promise.all([inc.reload(), exp.reload(), audit.reload()]);
       toast.success(
         kind === "retry"
@@ -61,14 +99,28 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
             ? "Shelf label rolled back to match checkout."
             : kind === "resolve"
               ? "Incident resolved."
-              : "Store verification task created.",
+              : kind === "complete"
+                ? "Verification confirmed — shelf re-reconciled."
+                : "Store verification task created.",
       );
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
       setBusy(null);
       if (kind === "rollback") setConfirmRollback(false);
+      if (kind === "retry") setConfirmRetry(false);
+      if (kind === "resolve") setConfirmResolve(false);
     }
+  }
+
+  function addNote() {
+    const text = noteDraft.trim();
+    if (!text) return;
+    setNotes((prev) => [
+      { id: `note-${Date.now()}`, text, at: new Date().toISOString() },
+      ...prev,
+    ]);
+    setNoteDraft("");
   }
 
   if (inc.error) return <div className="glass rounded-2xl p-6 text-slate-300">Incident not found.</div>;
@@ -78,6 +130,16 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
   const offending = i.channels.find((c) => c.channel === i.offending_channel);
   const variance = offending?.observed_price != null ? offending.observed_price - i.approved_price : null;
   const resolved = i.status === "resolved" || i.status === "rolled_back";
+  // The "Retry" verb is channel-specific: an ESL deadline-risk re-pushes the
+  // shelf label, a POS mismatch re-pushes the register update. Keep the label
+  // honest instead of hardcoding "POS".
+  const offendingLabel =
+    i.offending_channel === "esl"
+      ? "Shelf Label (ESL)"
+      : i.offending_channel === "ecommerce"
+        ? "Ecommerce"
+        : "POS";
+  const retryLabel = `Retry ${offendingLabel} Update`;
   // Surface a small chip when a Live-mode user opens an incident from
   // a demo batch, the Realistic Scale catalog, or a certification
   // sandbox — explicit escape hatch.
@@ -280,7 +342,14 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
         </section>
       )}
 
-      {/* Actions — replaced by a verified confirmation once resolved */}
+      {/* ── Recovery workspace ──────────────────────────────────────────
+          The operator's command surface for this incident. When live, a
+          labelled action toolbar + the field-verification panel; once
+          resolved, a verified confirmation. The session-notes scratchpad
+          stays available either way (notes are a working aid, not a write
+          path). Every action re-fetches the incident view, so the Channel
+          Evidence table, POS receipt and measurement gate above re-render
+          to reflect the new state. */}
       {resolved ? (
         <section className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-5 py-4">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-verified" />
@@ -296,19 +365,131 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
           </div>
         </section>
       ) : (
-        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <ActionButton
-            primary
-            icon={RotateCcw}
-            label="Retry POS Update"
-            loading={busy === "retry"}
-            onClick={() => act("retry")}
-          />
-          <ActionButton icon={Undo2} label="Roll Back Shelf Label" loading={busy === "rollback"} onClick={() => setConfirmRollback(true)} />
-          <ActionButton icon={ClipboardList} label="Create Store Task" loading={busy === "task"} onClick={() => act("task")} />
-          <ActionButton icon={CheckCircle2} label="Resolve" loading={busy === "resolve"} onClick={() => act("resolve")} />
+        <section className="glass rounded-2xl p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <Wrench className="h-4 w-4 text-brand-400" />
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Recovery Actions</h3>
+            <span className="ml-auto text-[10px] uppercase tracking-[.18em] text-slate-500">
+              Operator-gated · audited
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <ActionButton
+              primary
+              icon={RotateCcw}
+              label={retryLabel}
+              loading={busy === "retry"}
+              disabled={busy !== null}
+              onClick={() => setConfirmRetry(true)}
+            />
+            <ActionButton
+              icon={Undo2}
+              label="Roll Back Action"
+              loading={busy === "rollback"}
+              disabled={busy !== null}
+              onClick={() => setConfirmRollback(true)}
+            />
+            <ActionButton
+              icon={ClipboardList}
+              label="Assign Human Verification"
+              loading={busy === "task"}
+              disabled={busy !== null || storeTask !== null}
+              onClick={() => act("task")}
+            />
+            <ActionButton
+              icon={UserCheck}
+              label="Mark Verification Complete"
+              loading={busy === "complete"}
+              disabled={busy !== null || storeTask === null}
+              onClick={() => act("complete")}
+            />
+            <ActionButton
+              icon={CheckCircle2}
+              label="Resolve"
+              loading={busy === "resolve"}
+              disabled={busy !== null}
+              onClick={() => setConfirmResolve(true)}
+            />
+          </div>
+
+          {/* Field-verification task — appears once dispatched this session.
+              The "Mark Verification Complete" button above closes it. */}
+          {storeTask && (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-violet-500/30 bg-violet-500/[.06] px-4 py-3">
+              <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-200">
+                <ClipboardList className="h-3.5 w-3.5" />
+              </span>
+              <div className="min-w-0 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-violet-100">Field verification dispatched</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[.18em] text-violet-200">
+                    Open · Store {storeTask.store_id}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-slate-300">{storeTask.instruction}</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Confirm once the associate verifies the shelf — that re-reconciles the action and
+                  closes the incident if every channel agrees.
+                </p>
+              </div>
+            </div>
+          )}
         </section>
       )}
+
+      {/* Operator notes — session-only scratchpad. Clearly labelled as
+          NOT persisted: there is no backend note endpoint, so these are a
+          working aid for the current session only. */}
+      <section className="glass rounded-2xl p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <StickyNote className="h-4 w-4 text-brand-400" />
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Operator Notes</h3>
+          <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[.18em] text-slate-400">
+            Session note · not persisted
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addNote();
+              }
+            }}
+            placeholder="Add a working note (visible this session only)…"
+            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 outline-none transition focus:border-brand-400/50 focus:bg-white/[.05]"
+          />
+          <button
+            type="button"
+            onClick={addNote}
+            disabled={!noteDraft.trim()}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10 active:scale-[0.98] disabled:opacity-40"
+          >
+            <Send className="h-3.5 w-3.5" /> Add
+          </button>
+        </div>
+        {notes.length > 0 && (
+          <ul className="mt-4 space-y-2">
+            {notes.map((n) => (
+              <li
+                key={n.id}
+                className="flex items-start gap-3 rounded-xl border border-white/[.06] bg-white/[.02] px-3.5 py-2.5"
+              >
+                <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-sm text-slate-200">{n.text}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {new Date(n.at).toLocaleTimeString()} · session note
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <ConfirmDialog
         open={confirmRollback}
@@ -326,6 +507,40 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
         busy={busy === "rollback"}
         onCancel={() => setConfirmRollback(false)}
         onConfirm={() => act("rollback")}
+      />
+
+      <ConfirmDialog
+        open={confirmRetry}
+        title={`Re-push the ${offendingLabel.toLowerCase()} update?`}
+        body={
+          <>
+            This re-dispatches the approved price ({money(i.approved_price)}) to{" "}
+            {offendingLabel} and re-reconciles all channels. If they now agree,
+            the incident clears and the measurement gate flips to eligible.
+          </>
+        }
+        confirmLabel="Re-push update"
+        variant="neutral"
+        busy={busy === "retry"}
+        onCancel={() => setConfirmRetry(false)}
+        onConfirm={() => act("retry")}
+      />
+
+      <ConfirmDialog
+        open={confirmResolve}
+        title="Resolve this incident?"
+        body={
+          <>
+            Resolving re-verifies every channel first. If they still disagree
+            the resolve is rejected — retry the failing channel or assign a
+            field verification before closing.
+          </>
+        }
+        confirmLabel="Resolve incident"
+        variant="neutral"
+        busy={busy === "resolve"}
+        onCancel={() => setConfirmResolve(false)}
+        onConfirm={() => act("resolve")}
       />
 
       {/* Audit timeline */}
@@ -372,13 +587,14 @@ function ActionButton({
       onClick={onClick}
       disabled={loading || disabled}
       className={clsx(
-        "flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition disabled:opacity-40",
+        "flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-medium transition active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100",
         primary
           ? "bg-gradient-to-r from-brand to-brand-600 text-white shadow-glow-brand hover:brightness-110"
           : "border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
       )}
     >
-      <Icon className={clsx("h-4 w-4", loading && "animate-spin")} /> {label}
+      <Icon className={clsx("h-4 w-4 shrink-0", loading && "animate-spin")} />
+      <span className="leading-tight">{label}</span>
     </button>
   );
 }

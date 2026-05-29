@@ -14,6 +14,7 @@ from app.models import (
     PriceAction,
     PriceBatch,
     StoreTask,
+    StoreTaskStatus,
     utcnow,
 )
 from app.services import reconciliation
@@ -139,6 +140,75 @@ def create_store_task(
         detail=text,
         actor=actor,
     )
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+def complete_store_task(db: Session, incident_id: str, actor: str = "operator") -> StoreTask:
+    """Mark the incident's open verification task DONE — the human-in-the-loop close.
+
+    Represents "the floor associate physically verified the shelf and confirmed."
+    Locks the incident first (same row lock as every other recovery action), finds
+    the single OPEN StoreTask, flips it to DONE, writes an audit event, and then
+    re-checks whether the incident can now resolve: if every channel agrees the
+    action heals and we close the incident in the same transaction (the causal
+    "associate verified -> reconciliation verified -> resolved" sequence).
+
+    A DONE task no longer counts against measurement eligibility or the receipt's
+    open-task list, so completing it is what lets a rolled-back / awaiting-verify
+    action re-enter downstream measurement.
+    """
+    incident = _lock_incident(db, incident_id)
+    task = db.scalar(
+        select(StoreTask)
+        .where(
+            StoreTask.incident_id == incident.id,
+            StoreTask.status == StoreTaskStatus.OPEN,
+        )
+        .order_by(StoreTask.created_at)
+        .with_for_update()
+    )
+    if task is None:
+        raise RecoveryError(
+            "No open store-verification task for this incident. "
+            "Create one before completing it."
+        )
+
+    action = db.get(PriceAction, incident.action_id)
+    task.status = StoreTaskStatus.DONE
+    record_audit(
+        db,
+        incident_id=incident.id,
+        action_id=action.id,
+        batch_id=action.batch_id,
+        event="Store verification task completed",
+        detail=f"{actor} confirmed the shelf price for {action.product_name} at "
+        f"Store {action.store_id} was physically verified. Manual recovery task closed.",
+        actor=actor,
+    )
+
+    # The human verification may have removed the last thing holding the incident
+    # open. Re-reconcile; if every channel now agrees, close it in the same
+    # transaction so the operator does not have to click Resolve separately.
+    decision = reconciliation.reconcile_action(db, action)
+    if incident.status not in TERMINAL and decision == ActionDecision.ELIGIBLE:
+        incident.status = IncidentStatus.RESOLVED
+        incident.resolved_at = utcnow()
+        batch = db.get(PriceBatch, action.batch_id)
+        if batch is not None:
+            reconciliation.refresh_batch(db, batch)
+        record_audit(
+            db,
+            incident_id=incident.id,
+            action_id=action.id,
+            batch_id=action.batch_id,
+            event="Incident resolved after verification",
+            detail=f"{action.product_name} at Store {action.store_id} verified across "
+            f"all channels following the completed store task.",
+            actor=actor,
+        )
+
     db.commit()
     db.refresh(task)
     return task
