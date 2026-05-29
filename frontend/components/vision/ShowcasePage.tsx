@@ -164,7 +164,7 @@ function HeroCinematic() {
         >
           <Link
             href="/vision/keynote"
-            className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#040608] transition hover:bg-orange-50"
+            className="group glow-iris inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#040608] transition hover:bg-orange-50"
           >
             See the story <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </Link>
@@ -256,7 +256,7 @@ function PriceVerificationProof() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-15%" }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="mt-14 overflow-hidden rounded-3xl border border-white/10 bg-[#0a0e18]/85 p-6 backdrop-blur sm:p-10"
+        className="iris-border glow-iris mt-14 overflow-hidden rounded-3xl bg-[#0a0e18]/85 p-6 backdrop-blur sm:p-10"
       >
         <PriceVerificationAnimation />
       </motion.div>
@@ -488,7 +488,7 @@ function FeatureGrid() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.65, delay: i * 0.06 }}
-              className="group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0e18] transition hover:-translate-y-0.5 hover:border-white/25"
+              className="holo-card group relative overflow-hidden rounded-3xl"
             >
               <div className="relative aspect-[16/10] overflow-hidden">
                 <motion.div className="absolute inset-0" whileHover={{ scale: 1.06 }} transition={{ duration: 0.8 }}>
@@ -631,7 +631,7 @@ function ReliabilityPrinciples() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.7, delay: i * 0.08 }}
-            className="relative rounded-3xl border border-white/10 bg-gradient-to-br from-white/[.04] to-transparent p-8"
+            className="holo-card relative overflow-hidden rounded-3xl p-8"
           >
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-300">
               <span className="font-mono text-sm">{String(i + 1).padStart(2, "0")}</span>
@@ -688,11 +688,11 @@ function HowItWorks() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.65, delay: i * 0.1 }}
-              className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a0e18] p-8"
+              className="holo-card relative overflow-hidden rounded-3xl p-8"
             >
               <div className="flex items-center justify-between">
                 <span className="text-[64px] font-semibold leading-none tracking-[-0.04em] text-orange-300/30">{s.n}</span>
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[.04] text-orange-300">
+                <span className="iris-ring flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[.04] text-orange-300">
                   <Icon className="h-5 w-5" />
                 </span>
               </div>
@@ -725,7 +725,7 @@ function ClosingCta() {
             <h2 className="mt-5 text-[clamp(36px,5vw,88px)] font-semibold leading-[1.02] tracking-[-0.02em] text-white">
               Independent reliability layer.
               <br />
-              <span className="bg-gradient-to-r from-orange-300 via-orange-400 to-rose-400 bg-clip-text text-transparent">
+              <span className="iris-text">
                 Audit-grade, end to end.
               </span>
             </h2>
@@ -753,12 +753,12 @@ function ClosingCta() {
             <p className="text-[10px] tracking-[.2em] text-orange-300 uppercase">Working surfaces</p>
             <ul className="mt-4 space-y-3">
               {[
-                ["/operations", "Live Operations"],
-                ["/scenarios", "Scenario Builder"],
-                ["/certification", "Certification Lab"],
-                ["/engineering", "Engineering Trace"],
-                ["/operations/incidents", "Incidents"],
-                ["/operations/markdowns", "Markdown SLAs"],
+                ["/operations", "Execution Assurance"],
+                ["/scenarios", "Action Simulator"],
+                ["/certification", "Connector Certification"],
+                ["/engineering", "Evidence & Replay"],
+                ["/operations/incidents", "Exception Command Center"],
+                ["/operations/markdowns", "Perishable Deadline Desk"],
               ].map(([href, label]) => (
                 <li key={href}>
                   <Link
@@ -783,6 +783,8 @@ function ClosingCta() {
 export default function ShowcasePage() {
   return (
     <div className="relative bg-[#040608]">
+      <div className="aurora-futurist" aria-hidden />
+      <div className="relative z-10">
       <FilmGrain />
       <HeroCinematic />
       <MarqueeStrip />
@@ -841,6 +843,7 @@ export default function ShowcasePage() {
       <ReliabilityPrinciples />
       <HowItWorks />
       <ClosingCta />
+      </div>
     </div>
   );
 }
