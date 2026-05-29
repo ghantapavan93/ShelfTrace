@@ -278,11 +278,23 @@ def engineering(
         ]
     incident_from_behavior = any(b["behavior"] in ("stale_price", "timeout", "timeout_then_success") for b in behaviors)
 
+    # Source lineage: if the scenario was created from a real public-data
+    # observation, surface its provenance alongside the technical trace.
+    from app.models import TestRunConfig
+    from app.services import data_replay
+
+    source_lineage = None
+    if batch.scenario_config_id:
+        cfg = db.get(TestRunConfig, batch.scenario_config_id)
+        if cfg is not None and cfg.source_observation_id:
+            source_lineage = data_replay.lineage_for_scenario(db, cfg.source_observation_id)
+
     return {
         "batch": queries.batch_summary(db, batch).model_dump(),
         "run_mode": batch.run_mode.value,
         "environment": batch.environment.value,
         "scenario_config_id": batch.scenario_config_id,
+        "source_lineage": source_lineage,
         "behavior_profiles": behaviors,
         "incident_from_configured_behavior": incident_from_behavior,
         "shared_engine_statement": shared_engine_statement,

@@ -37,6 +37,8 @@ _TEST_RUN_CONFIG_COLUMNS = [
     ("import_source_name", "VARCHAR(256)"),
     ("import_summary_json", "JSONB"),
     ("created_by", "VARCHAR(128)"),
+    # Real Data Replay: scenarios may link to a real public-data observation.
+    ("source_observation_id", "VARCHAR"),
 ]
 
 _SQLITE_TEST_RUN_CONFIG_COLUMNS = [
@@ -44,6 +46,7 @@ _SQLITE_TEST_RUN_CONFIG_COLUMNS = [
     ("import_source_name", "VARCHAR(256)"),
     ("import_summary_json", "JSON"),
     ("created_by", "VARCHAR(128)"),
+    ("source_observation_id", "VARCHAR"),
 ]
 
 # JSONB upgrade for payload columns. Idempotent: the USING clause is a no-op

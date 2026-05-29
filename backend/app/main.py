@@ -12,13 +12,14 @@ from app.database import Base, SessionLocal, engine
 from app.db_migrate import run_migrations
 from app.logging_config import configure_logging
 from app.middleware import RequestIDMiddleware
-from app.models import ConnectorProfile, PriceBatch, RunMode
+from app.models import ConnectorProfile, PriceBatch, RunMode, SourceDatasetType
 from app.observability import setup_tracing
 from app.rate_limit import get_limiter
-from app.routers import batches, certification, demo, engineering, incidents, operations, pricing, product_graph, receipts, scenarios, scraping, storefront
+from app.routers import batches, certification, data_replay, demo, engineering, incidents, operations, pricing, product_graph, receipts, scenarios, scraping, storefront
 from app.security import auth_enabled
 from app.seed import seed_live
 from app.services import certification as cert_service
+from app.services import data_replay as data_replay_service
 from app.services import scenarios as scenario_service
 
 configure_logging(settings.log_level, settings.log_format)
@@ -82,6 +83,12 @@ async def lifespan(app: FastAPI):
             if profile is None:
                 logger.info("Demo mode: seeding certification sandbox run")
                 cert_service.reset_demo(db)
+            # Real Data Replay: pre-import both bundled USDA fixtures (idempotent).
+            try:
+                data_replay_service.import_source(db, SourceDatasetType.USDA_FDC)
+                data_replay_service.import_source(db, SourceDatasetType.USDA_AMS)
+            except Exception:
+                logger.exception("Real Data Replay fixture import skipped")
     yield
     # No teardown work for now.
 
@@ -127,6 +134,7 @@ app.include_router(receipts.router)
 app.include_router(engineering.router)
 app.include_router(certification.router)
 app.include_router(scenarios.router)
+app.include_router(data_replay.router)
 app.include_router(scraping.router)
 app.include_router(pricing.router)
 app.include_router(product_graph.router)

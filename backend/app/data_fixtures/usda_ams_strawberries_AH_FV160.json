@@ -1,0 +1,36 @@
+{
+  "source_type": "usda_ams",
+  "source_name": "USDA AMS Specialty Crops Market News — Hart County Kentucky Produce Auction Summary",
+  "attribution_text": "U.S. Department of Agriculture, Agricultural Marketing Service, Specialty Crops Market News (Federal-State Market News Service). Released by University of Kentucky / Center for Crop Diversification. Compiled by Hart County Produce Auction, Munfordville, KY.",
+  "source_url": "https://mymarketnews.ams.usda.gov/filerepo/reports",
+  "license_or_usage_note": "U.S. Government public-domain publication. Auction prices to growers (wholesale) — not advertised retail prices.",
+  "external_record_id": "AH_FV160_2026-05-20_strawberries_3qt",
+  "observation_type": "advertised_price",
+  "normalized": {
+    "product_name": "Fresh Strawberries (3-quart pail)",
+    "sku_hint": "ams-ah-fv160-strawberries-3qt",
+    "commodity": "Strawberries",
+    "package": "3 quart pails",
+    "region": "Hart County, Kentucky",
+    "market": "Hart County Produce Auction, Munfordville, KY",
+    "observation_date": "2026-05-20",
+    "report_published_at": "2026-05-22T15:11:32-05:00",
+    "price_unit": "USD per 3-quart pail",
+    "price_low": 8.00,
+    "price_high": 10.50,
+    "price_average": 9.25,
+    "volume_units": 720,
+    "price_basis_note": "Auction prices paid to growers (wholesale); not a retail shelf price."
+  },
+  "raw_payload": {
+    "report_slug": "AH_FV160",
+    "report_title": "Hart County Kentucky Produce Auction Summary",
+    "auction_date": "Wednesday, May 20, 2026",
+    "compiled_by": "Hart County Produce Auction, 6880 Cub Run Hwy, Munfordville, Kentucky 42765",
+    "released_by": "University of Kentucky / Center for Crop Diversification",
+    "distributed_by": "USDA AMS Specialty Crops Market News (Federal-State Market News Service), Philadelphia office",
+    "phone": "(215) 551-6791",
+    "weather_note": "Mostly cloudy, low 66, high 76",
+    "commodity_line": "STRAWBERRIES: 3 quart pails, Volume 720, Low 8.00, High 10.50, Average 9.25"
+  }
+}

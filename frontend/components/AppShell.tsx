@@ -22,6 +22,7 @@ import {
   Brain,
   Menu,
   X,
+  Database,
 } from "lucide-react";
 import { Brand } from "./Brand";
 import { ModeBadge } from "./ModeBadge";
@@ -33,6 +34,7 @@ import { EASE } from "@/lib/motion";
 
 const NAV = [
   { href: "/vision", label: "Vision Studio", sub: "Concept showcase", icon: Sparkles, match: /^\/vision/ },
+  { href: "/data-replay", label: "Real Data Replay", sub: "Public-source records", icon: Database, match: /^\/data-replay/ },
   { href: "/scenarios", label: "Scenario Builder", sub: "Configure a test run", icon: SlidersHorizontal, match: /^\/scenarios/ },
   { href: "/scrapers", label: "Competitor Scraping", sub: "Data extraction pipeline", icon: Globe, match: /^\/scrapers/ },
   { href: "/product-graph", label: "Knowledge Graph", sub: "Cross-source unification", icon: Network, match: /^\/product-graph/ },

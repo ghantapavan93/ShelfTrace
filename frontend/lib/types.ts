@@ -353,11 +353,60 @@ export interface BulkImportPreviewResponse {
   schema_version: string;
 }
 
+export interface SourceDataset {
+  id: string;
+  source_type: "usda_fdc" | "usda_ams" | "open_prices";
+  source_name: string;
+  attribution_text: string;
+  source_url: string;
+  license_or_usage_note: string;
+  imported_at: string;
+}
+
+export interface SourceObservation {
+  id: string;
+  source_dataset_id: string;
+  source: SourceDataset;
+  external_record_id: string;
+  observation_type: "product_identity" | "advertised_price";
+  product_name: string;
+  category: string | null;
+  brand: string | null;
+  gtin_upc: string | null;
+  region: string | null;
+  observation_date: string | null;
+  observed_price: number | null;
+  normalized: Record<string, unknown>;
+  raw_payload: Record<string, unknown>;
+  imported_at: string;
+}
+
+export interface SourceLineage {
+  observation_id: string;
+  external_record_id: string;
+  product_name: string;
+  observation_type: string;
+  observed_price: number | null;
+  observation_date: string | null;
+  region: string | null;
+  brand: string | null;
+  gtin_upc: string | null;
+  source: {
+    id: string | null;
+    source_type: string | null;
+    source_name: string | null;
+    attribution_text: string | null;
+    source_url: string | null;
+    license_or_usage_note: string | null;
+  };
+}
+
 export interface EngineeringTrace {
   batch: BatchSummary;
   run_mode: string;
   environment: string;
   scenario_config_id: string | null;
+  source_lineage: SourceLineage | null;
   behavior_profiles: {
     store_id: string;
     sku: string;
