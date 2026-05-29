@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, AlertTriangle, Clock, ShieldCheck, Filter, ArrowLeft } from "lucide-react";
+import { ArrowRight, AlertTriangle, Clock, ShieldCheck, ArrowLeft, Activity, TimerReset } from "lucide-react";
 import clsx from "clsx";
 import { api, DEMO_BATCH } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
@@ -13,14 +13,6 @@ import { useWorkMode } from "@/components/ModeProvider";
 import type { IncidentView } from "@/lib/types";
 
 type Filter = "all" | "open" | "resolved" | "critical" | "warning";
-
-const FILTERS: Array<{ id: Filter; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "open", label: "Open" },
-  { id: "critical", label: "Critical" },
-  { id: "warning", label: "Warnings" },
-  { id: "resolved", label: "Resolved" },
-];
 
 export default function IncidentsPage() {
   const [filter, setFilter] = useState<Filter>("all");
@@ -92,31 +84,22 @@ export default function IncidentsPage() {
           <h1 className="mt-1 text-2xl font-bold text-white">Incidents</h1>
           <p className="text-sm text-slate-400">
             Execution failures detected during canary verification.
+            {data && modeScoped.length > 0 && (
+              <span className="ml-1 text-slate-500">
+                Tap a tile below to filter.
+              </span>
+            )}
           </p>
         </div>
-        {data && data.length > 0 && (
-          <div className="flex flex-wrap gap-2 text-xs">
-            <div className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5">
-              <Filter className="h-3 w-3 text-slate-500" />
-              <span className="text-slate-500">Filter</span>
-            </div>
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                className={clsx(
-                  "rounded-lg border px-2.5 py-1.5 transition",
-                  filter === f.id
-                    ? "border-brand/40 bg-brand/10 text-brand-400"
-                    : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10",
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
+
+      {data && modeScoped.length > 0 && (
+        <IncidentSummary
+          incidents={modeScoped}
+          filter={filter}
+          onFilter={setFilter}
+        />
+      )}
 
       {!data ? (
         <ListSkeleton rows={4} />
@@ -152,6 +135,147 @@ export default function IncidentsPage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function fmtDuration(ms: number): string {
+  const mins = Math.round(ms / 60000);
+  if (mins < 1) return "<1m";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem ? `${hrs}h ${rem}m` : `${hrs}h`;
+}
+
+// Aggregate health header for the incident list. Counts are derived from the
+// mode-scoped set (the same rows the list shows), so they always match what's
+// visible below. The first four tiles double as one-click filters; MTTR is an
+// informational readout computed from resolved incidents that carry timestamps.
+function IncidentSummary({
+  incidents,
+  filter,
+  onFilter,
+}: {
+  incidents: IncidentView[];
+  filter: Filter;
+  onFilter: (f: Filter) => void;
+}) {
+  const stats = useMemo(() => {
+    let open = 0,
+      critical = 0,
+      warning = 0,
+      resolved = 0,
+      mttrSum = 0,
+      mttrCount = 0;
+    for (const i of incidents) {
+      if (i.status === "open" || i.status === "retrying") open += 1;
+      if (i.severity === "critical") critical += 1;
+      if (i.severity === "warning" || i.severity === "urgent") warning += 1;
+      if (i.status === "resolved" || i.status === "rolled_back") {
+        resolved += 1;
+        if (i.resolved_at) {
+          const dt =
+            new Date(i.resolved_at).getTime() - new Date(i.created_at).getTime();
+          if (dt > 0) {
+            mttrSum += dt;
+            mttrCount += 1;
+          }
+        }
+      }
+    }
+    return {
+      total: incidents.length,
+      open,
+      critical,
+      warning,
+      resolved,
+      mttr: mttrCount ? mttrSum / mttrCount : null,
+    };
+  }, [incidents]);
+
+  const tiles: Array<{
+    id: Filter;
+    label: string;
+    value: number;
+    tone: "neutral" | "danger" | "warn" | "verified";
+    icon: typeof Activity;
+  }> = [
+    { id: "all", label: "Total", value: stats.total, tone: "neutral", icon: Activity },
+    { id: "open", label: "Open", value: stats.open, tone: "warn", icon: Clock },
+    { id: "critical", label: "Critical", value: stats.critical, tone: "danger", icon: AlertTriangle },
+    { id: "warning", label: "Warnings", value: stats.warning, tone: "warn", icon: AlertTriangle },
+    { id: "resolved", label: "Resolved", value: stats.resolved, tone: "verified", icon: ShieldCheck },
+  ];
+
+  const toneText: Record<string, string> = {
+    neutral: "text-white",
+    danger: "text-danger",
+    warn: "text-warn",
+    verified: "text-verified",
+  };
+  const toneActiveRing: Record<string, string> = {
+    neutral: "border-white/25 bg-white/[.06]",
+    danger: "border-rose-500/40 bg-rose-500/[.08]",
+    warn: "border-amber-500/40 bg-amber-500/[.08]",
+    verified: "border-emerald-500/40 bg-emerald-500/[.08]",
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+      {tiles.map((t) => {
+        const active = filter === t.id;
+        const Icon = t.icon;
+        return (
+          <button
+            key={t.id}
+            onClick={() => onFilter(t.id)}
+            className={clsx(
+              "group rounded-2xl border p-3.5 text-left transition active:scale-[0.98]",
+              active
+                ? toneActiveRing[t.tone]
+                : "border-white/10 bg-white/[.025] hover:bg-white/[.05]",
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-[.16em] text-slate-500">
+                {t.label}
+              </span>
+              <Icon
+                className={clsx(
+                  "h-3.5 w-3.5 transition",
+                  active ? toneText[t.tone] : "text-slate-600 group-hover:text-slate-400",
+                )}
+              />
+            </div>
+            <div
+              className={clsx(
+                "mono mt-1.5 text-2xl font-bold tabular-nums",
+                t.value === 0 ? "text-slate-600" : toneText[t.tone],
+              )}
+            >
+              {t.value}
+            </div>
+          </button>
+        );
+      })}
+      {/* MTTR — informational, not a filter */}
+      <div className="rounded-2xl border border-white/10 bg-white/[.025] p-3.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-[.16em] text-slate-500">
+            MTTR
+          </span>
+          <TimerReset className="h-3.5 w-3.5 text-slate-600" />
+        </div>
+        <div
+          className={clsx(
+            "mono mt-1.5 text-2xl font-bold tabular-nums",
+            stats.mttr == null ? "text-slate-600" : "text-white",
+          )}
+        >
+          {stats.mttr == null ? "—" : fmtDuration(stats.mttr)}
+        </div>
+      </div>
     </div>
   );
 }

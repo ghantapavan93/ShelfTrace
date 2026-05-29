@@ -112,18 +112,39 @@ def operations(
 
 
 @router.get("/markdowns")
-def markdowns(external_id: str | None = None, db: Session = Depends(get_db)):
-    batch = get_batch_or_404(db, external_id)
-    canary = set(next((g.store_ids for g in batch.rollout_groups if g.kind == "canary"), []))
-    rows = [
-        a for a in batch.actions if a.is_perishable and a.markdown_deadline and a.store_id in canary
-    ]
-    out = []
-    for a in sorted(rows, key=lambda x: x.store_id):
-        out.append(
-            {
-                "action": queries.action_view(a).model_dump(),
-                "markdown_deadline": a.markdown_deadline,
-            }
+def markdowns(
+    external_id: str | None = None,
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. "
+        "Applied only when external_id is omitted. With scope=live and no live batch, "
+        "an empty SLA payload is returned (not 404) so the UI shows a clean empty state.",
+    ),
+    db: Session = Depends(get_db),
+):
+    """Perishable-markdown reliability SLA for the batch in the requested scope.
+
+    SLA semantics: every perishable markdown's shelf label (ESL) must
+    acknowledge the approved markdown before its sell-through deadline. The
+    response carries per-item SLA status plus an aggregate compliance summary
+    (see ``queries.markdown_sla``).
+    """
+    if external_id:
+        # Explicit URL → escape hatch (a Live-mode user can still inspect the
+        # seeded demo batch's markdowns by id).
+        batch = get_batch_or_404(db, external_id)
+    else:
+        resolved = current_scope(scope)
+        stmt = (
+            select(PriceBatch)
+            .where(PriceBatch.run_mode == RunMode.LIVE_ROLLOUT)
+            .order_by(PriceBatch.created_at.desc())
         )
-    return {"zone": batch.zone, "markdowns": out}
+        stmt = apply_filter(stmt, PriceBatch.source_run_id, resolved)
+        batch = db.scalar(stmt)
+        if batch is None:
+            if resolved == Scope.ALL:
+                batch = get_batch_or_404(db, None)
+            else:
+                return queries.empty_markdown_sla()
+    return queries.markdown_sla(db, batch)

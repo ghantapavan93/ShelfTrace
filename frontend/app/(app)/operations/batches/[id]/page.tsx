@@ -71,6 +71,139 @@ function Cell({
 
 type GroupBy = "none" | "store";
 
+// ── Per-channel verification health ──────────────────────────────────────
+const CHANNEL_META: Record<string, { label: string; sub: string }> = {
+  pos: { label: "POS Checkout", sub: "Register price" },
+  esl: { label: "ESL Shelf", sub: "Shelf label ack" },
+  ecommerce: { label: "Ecommerce", sub: "Online listing" },
+};
+
+const STATUS_TONE: Record<
+  ChannelView["status"],
+  { bar: string; text: string; label: string }
+> = {
+  verified: { bar: "bg-emerald-400", text: "text-verified", label: "Verified" },
+  mismatch: { bar: "bg-rose-400", text: "text-danger", label: "Mismatch" },
+  timeout: { bar: "bg-amber-400", text: "text-warn", label: "No ack" },
+  pending: { bar: "bg-slate-500", text: "text-slate-400", label: "Pending" },
+};
+
+const STATUS_ORDER: ChannelView["status"][] = [
+  "verified",
+  "mismatch",
+  "timeout",
+  "pending",
+];
+
+function ChannelHealthStrip({ actions }: { actions: BatchDetail["actions"] }) {
+  const summary = useMemo(() => {
+    const channels: ChannelView["channel"][] = ["pos", "esl", "ecommerce"];
+    return channels
+      .map((name) => {
+        const cells = actions
+          .map((a) => a.channels.find((c) => c.channel === name))
+          .filter((c): c is ChannelView => !!c);
+        const counts: Record<ChannelView["status"], number> = {
+          verified: 0,
+          mismatch: 0,
+          timeout: 0,
+          pending: 0,
+        };
+        cells.forEach((c) => {
+          counts[c.status] += 1;
+        });
+        const total = cells.length;
+        const verifiedPct = total
+          ? Math.round((counts.verified / total) * 100)
+          : 0;
+        return { name, counts, total, verifiedPct };
+      })
+      .filter((s) => s.total > 0);
+  }, [actions]);
+
+  if (summary.length === 0) return null;
+
+  return (
+    <div>
+      <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[.2em] text-slate-500">
+        Channel health
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {summary.map((s) => {
+          const meta = CHANNEL_META[s.name];
+          const allClear = s.counts.verified === s.total;
+          const hasDanger = s.counts.mismatch > 0;
+          return (
+            <div
+              key={s.name}
+              className={clsx(
+                "rounded-2xl border bg-[#0a0e18]/60 p-4 transition",
+                hasDanger
+                  ? "border-rose-500/25"
+                  : allClear
+                    ? "border-emerald-500/20"
+                    : "border-white/10",
+              )}
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-white">
+                    {meta.label}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-[.16em] text-slate-500">
+                    {meta.sub}
+                  </div>
+                </div>
+                <div
+                  className={clsx(
+                    "mono text-lg font-bold tabular-nums",
+                    allClear ? "text-verified" : hasDanger ? "text-danger" : "text-white",
+                  )}
+                >
+                  {s.verifiedPct}%
+                </div>
+              </div>
+              {/* Stacked share of each reconciliation state */}
+              <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-white/5">
+                {STATUS_ORDER.map((st) =>
+                  s.counts[st] > 0 ? (
+                    <div
+                      key={st}
+                      className={STATUS_TONE[st].bar}
+                      style={{ width: `${(s.counts[st] / s.total) * 100}%` }}
+                    />
+                  ) : null,
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {STATUS_ORDER.map((st) =>
+                  s.counts[st] > 0 ? (
+                    <span
+                      key={st}
+                      className={clsx(
+                        "inline-flex items-center gap-1 rounded-md border border-white/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+                        STATUS_TONE[st].text,
+                      )}
+                    >
+                      <span
+                        className={clsx(
+                          "h-1.5 w-1.5 rounded-full",
+                          STATUS_TONE[st].bar,
+                        )}
+                      />
+                      {s.counts[st]} {STATUS_TONE[st].label}
+                    </span>
+                  ) : null,
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function BatchPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const { data: b, error, reload } = useLive<BatchDetail>(
@@ -211,6 +344,12 @@ export default function BatchPage({ params }: { params: { id: string } }) {
           tone={b.expansion_blocked ? "danger" : "verified"}
         />
       </div>
+
+      {/* Per-channel verification health — derived client-side from the
+          batch's actions. Shows, for each delivery channel, how many of its
+          cells landed in each reconciliation state. Makes the bottleneck
+          channel obvious at a glance before you scan the full matrix. */}
+      <ChannelHealthStrip actions={b.actions} />
 
       {b.block_reason && (
         <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 px-4 py-3 text-sm text-rose-200">

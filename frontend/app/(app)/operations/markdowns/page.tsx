@@ -4,13 +4,25 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { motion, useReducedMotion } from "framer-motion";
-import { Clock, Tag, ScanLine, Globe, CheckCircle2, AlertCircle, AlertTriangle, FlaskConical, ArrowRight } from "lucide-react";
+import {
+  Clock,
+  Tag,
+  ScanLine,
+  Globe,
+  CheckCircle2,
+  AlertCircle,
+  AlertTriangle,
+  FlaskConical,
+  ArrowRight,
+  ShieldCheck,
+  Gauge,
+} from "lucide-react";
 import { api, DEMO_BATCH } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { money, timeOf } from "@/lib/format";
 import { ListSkeleton } from "@/components/Skeleton";
 import { useWorkMode } from "@/components/ModeProvider";
-import type { ActionView, ChannelView } from "@/lib/types";
+import type { ChannelView, MarkdownItem, MarkdownsResponse, SlaStatus } from "@/lib/types";
 
 const CH = {
   pos: { Icon: ScanLine, name: "POS" },
@@ -35,7 +47,55 @@ function ChannelChip({ c }: { c: ChannelView }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Urgency classification — single source of truth for color + label
+// SLA status — the canonical compliance signal, computed server-side and
+// mirrored here for color/label. Distinct from the time-only countdown badge.
+// ────────────────────────────────────────────────────────────────────────
+const SLA_META: Record<
+  SlaStatus,
+  { label: string; chip: string; dot: string; Icon: typeof CheckCircle2 }
+> = {
+  met: {
+    label: "SLA met",
+    chip: "border-emerald-500/30 bg-emerald-500/[.07] text-emerald-200",
+    dot: "bg-emerald-400",
+    Icon: ShieldCheck,
+  },
+  pending: {
+    label: "Awaiting ack",
+    chip: "border-sky-500/30 bg-sky-500/[.07] text-sky-200",
+    dot: "bg-sky-400",
+    Icon: Clock,
+  },
+  at_risk: {
+    label: "At risk",
+    chip: "border-amber-500/35 bg-amber-500/[.08] text-amber-200",
+    dot: "bg-amber-400",
+    Icon: AlertCircle,
+  },
+  breached: {
+    label: "SLA breached",
+    chip: "border-rose-500/50 bg-rose-500/[.10] text-rose-100",
+    dot: "bg-rose-400",
+    Icon: AlertTriangle,
+  },
+};
+
+function SlaPill({ status }: { status: SlaStatus }) {
+  const m = SLA_META[status];
+  return (
+    <span
+      className={clsx(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium",
+        m.chip,
+      )}
+    >
+      <m.Icon className="h-3 w-3" /> {m.label}
+    </span>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Urgency classification — single source of truth for the countdown badge
 // ────────────────────────────────────────────────────────────────────────
 type Urgency = "calm" | "watch" | "act" | "overdue";
 
@@ -74,10 +134,6 @@ function formatDuration(ms: number): string {
 
 // ────────────────────────────────────────────────────────────────────────
 // CountdownBadge — re-ticks at a rate matched to urgency
-// > 6h:    every 60 s  (no need to flicker the seconds when it's overnight)
-// 2-6h:    every 30 s
-// < 2h:    every 1 s   (drama)
-// overdue: every 5 s
 // ────────────────────────────────────────────────────────────────────────
 function CountdownBadge({ deadlineIso }: { deadlineIso: string }) {
   const reduced = useReducedMotion();
@@ -157,73 +213,114 @@ function CountdownBadge({ deadlineIso }: { deadlineIso: string }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
+// SLA compliance header — the aggregate reliability read for the batch
+// ────────────────────────────────────────────────────────────────────────
+const SEGMENTS: Array<{ key: keyof SegCounts; tone: string; label: string }> = [
+  { key: "met", tone: "bg-emerald-400", label: "Met" },
+  { key: "at_risk", tone: "bg-amber-400", label: "At risk" },
+  { key: "breached", tone: "bg-rose-400", label: "Breached" },
+  { key: "pending", tone: "bg-sky-400", label: "Pending" },
+];
+
+interface SegCounts {
+  met: number;
+  at_risk: number;
+  breached: number;
+  pending: number;
+}
+
+function ComplianceHeader({ data }: { data: MarkdownsResponse }) {
+  const reduced = useReducedMotion();
+  const s = data.summary;
+  const pct = s.compliance_pct;
+  const tone =
+    pct >= 100 ? "text-verified"
+    : s.breached > 0 ? "text-danger"
+    : s.at_risk > 0 ? "text-warn"
+    : "text-sky-300";
+
+  return (
+    <section className="glass-strong rounded-3xl border border-white/10 p-6">
+      <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
+        {/* Compliance dial */}
+        <div className="flex items-center gap-4">
+          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[.03]">
+            <Gauge className={clsx("h-6 w-6", tone)} />
+          </div>
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[.22em] text-slate-500">
+              Shelf-label SLA compliance
+            </div>
+            <div className="mt-0.5 flex items-baseline gap-2">
+              <span className={clsx("text-4xl font-bold tabular-nums", tone)}>{pct}%</span>
+              <span className="text-sm text-slate-400">
+                {s.met} of {s.total} shelf{s.total === 1 ? "" : "ves"} updated
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Stacked bar + breakdown */}
+        <div className="min-w-0">
+          <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-white/[.06]">
+            {SEGMENTS.map(({ key, tone }) => {
+              const v = s[key];
+              if (!v) return null;
+              const w = (v / Math.max(1, s.total)) * 100;
+              return (
+                <motion.div
+                  key={key}
+                  className={tone}
+                  initial={reduced ? false : { width: 0 }}
+                  animate={{ width: `${w}%` }}
+                  transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                />
+              );
+            })}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+            {SEGMENTS.map(({ key, tone, label }) => (
+              <div key={key} className="flex items-center gap-1.5 text-xs text-slate-400">
+                <span className={clsx("h-2 w-2 rounded-full", tone)} />
+                {label}
+                <span className="tabular-nums font-medium text-slate-200">{s[key]}</span>
+              </div>
+            ))}
+          </div>
+          {s.soonest_unmet_deadline && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-slate-400">
+              <Clock className="h-3.5 w-3.5 text-slate-500" />
+              Most urgent unmet shelf label —
+              <CountdownBadge deadlineIso={s.soonest_unmet_deadline} />
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
 // Page
 // ────────────────────────────────────────────────────────────────────────
 export default function MarkdownsPage() {
   const { mode, isHydrated } = useWorkMode();
   const isLiveWorkMode = isHydrated && mode === "live";
-  // In Live mode the markdowns query is demo-bound and would either
-  // surface seeded strawberry data or 404; short-circuit before we even
-  // try the fetch so the page never flashes an error state.
-  const { data, error } = useLive(() => api.markdowns(DEMO_BATCH), [isLiveWorkMode]);
+  // Live mode resolves the most recent user-uploaded batch via scope=live
+  // (empty SLA payload when there's none); Demo mode opens the seeded batch
+  // by its explicit id (the documented escape hatch).
+  const { data, error } = useLive<MarkdownsResponse>(
+    () => (isLiveWorkMode ? api.markdowns(undefined, "live") : api.markdowns(DEMO_BATCH)),
+    [isLiveWorkMode],
+  );
 
-  // Sort by deadline ascending — most urgent floats to the top
-  const sortedMarkdowns = useMemo(() => {
-    if (!data) return [];
-    return [...data.markdowns].sort((a, b) => {
-      const da = new Date(a.markdown_deadline).getTime();
-      const db = new Date(b.markdown_deadline).getTime();
-      return da - db;
-    });
-  }, [data]);
-
-  // Live mode: show clean-slate notice BEFORE any loading/error states.
-  // The underlying batch query is hard-bound to the seeded demo, so even
-  // a successful fetch would leak demo SLA data into Live mode.
-  if (isLiveWorkMode) {
-    return (
-      <div className="space-y-5">
-        <div className="glass-strong rounded-3xl border border-violet-500/25 bg-gradient-to-br from-violet-500/[.04] via-ink-900 to-black p-7 sm:p-10">
-          <div className="flex items-start gap-4">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-violet-500/30 bg-violet-500/10 text-violet-200">
-              <FlaskConical className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[.22em] text-violet-300">
-                Live mode clean slate
-              </div>
-              <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
-                Perishable markdowns are demo-scoped today.
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm text-slate-400">
-                The markdown reliability SLA page is currently bound to the seeded
-                Memorial Day demo batch (strawberries). Once uploaded batches expose
-                their own perishable deadlines through the markdowns endpoint, this
-                surface will show your live batch instead. Switch to Demo mode to
-                inspect the strawberry SLA timeline, or open the live batch directly
-                from /operations.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Link
-                  href="/operations"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110"
-                >
-                  Back to live operations
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/scenarios"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
-                >
-                  Upload a perishable scenario
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+  const sorted = useMemo(() => {
+    if (!data) return [] as MarkdownItem[];
+    return [...data.markdowns].sort(
+      (a, b) =>
+        new Date(a.markdown_deadline).getTime() - new Date(b.markdown_deadline).getTime(),
     );
-  }
+  }, [data]);
 
   if (error)
     return (
@@ -240,33 +337,88 @@ export default function MarkdownsPage() {
       </div>
     );
 
+  // Empty SLA scope — no perishable markdowns in the active scope.
+  if (data.summary.total === 0) {
+    return (
+      <div className="space-y-5">
+        <Header zone={data.zone} />
+        {isLiveWorkMode ? (
+          <div className="glass-strong rounded-3xl border border-violet-500/25 bg-gradient-to-br from-violet-500/[.04] via-ink-900 to-black p-7 sm:p-10">
+            <div className="flex items-start gap-4">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-violet-500/30 bg-violet-500/10 text-violet-200">
+                <FlaskConical className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[.22em] text-violet-300">
+                  No perishable markdowns in Live mode
+                </div>
+                <h2 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
+                  Upload a batch with perishable deadlines to track its SLA here.
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm text-slate-400">
+                  This surface tracks every perishable markdown in your most recent live batch
+                  and reports whether each shelf label acknowledged the markdown before its
+                  sell-through deadline. Switch to Demo mode to watch the Memorial Day strawberry
+                  SLA, or run a scenario that includes a markdown deadline.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Link
+                    href="/scenarios"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110"
+                  >
+                    Build a perishable scenario
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/operations"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                  >
+                    Back to live operations
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="glass rounded-2xl border border-emerald-500/25 p-8">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-verified">
+                <ShieldCheck className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-base font-semibold text-white">No perishable markdowns</h3>
+                <p className="mt-1 text-sm text-slate-400">
+                  This batch has no items with a sell-through deadline to track.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Perishable Markdowns</h1>
-        <p className="text-sm text-slate-400">
-          Markdown reliability for {data.zone}. Shelf labels must reflect markdowns before the sell-through deadline.
-          Items are sorted with the most urgent on top.
-        </p>
-      </div>
+      <Header zone={data.zone} />
+      <ComplianceHeader data={data} />
 
       <div className="grid gap-4 md:grid-cols-2">
-        {sortedMarkdowns.map(({ action, markdown_deadline }: { action: ActionView; markdown_deadline: string }) => {
-          const eslOk = action.channels.find((c) => c.channel === "esl")?.status === "verified";
-          const urgency = classify(markdown_deadline, Date.now()).level;
+        {sorted.map((m) => {
+          const { action, markdown_deadline, sla_status } = m;
           const borderTone =
-            urgency === "overdue" || urgency === "act"
+            sla_status === "breached"
               ? "border-rose-500/40"
-              : urgency === "watch"
+              : sla_status === "at_risk"
                 ? "border-amber-500/35"
-                : eslOk
+                : sla_status === "met"
                   ? "border-emerald-500/25"
                   : "border-white/10";
 
           return (
             <div key={action.id} className={clsx("glass rounded-2xl p-5 border", borderTone)}>
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold text-white">{action.product_name}</h3>
                   <p className="text-xs text-slate-400">
                     Store {action.store_id} · markdown to {money(action.approved_price)} from{" "}
@@ -279,25 +431,47 @@ export default function MarkdownsPage() {
                 <CountdownBadge deadlineIso={markdown_deadline} />
               </div>
 
+              <div className="mt-3 flex items-center gap-2">
+                <SlaPill status={sla_status} />
+              </div>
+
               <div className="mt-4 flex flex-wrap gap-2">
                 {action.channels.map((c) => (
                   <ChannelChip key={c.channel} c={c} />
                 ))}
               </div>
 
-              {!eslOk && (
-                <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
-                  Shelf label has not acknowledged the markdown. It may not be visible to in-store shoppers before the
-                  deadline. Retry the ESL update or assign an associate.
+              {!m.esl_verified && (
+                <div
+                  className={clsx(
+                    "mt-4 rounded-xl border px-3 py-2 text-xs",
+                    sla_status === "breached"
+                      ? "border-rose-500/30 bg-rose-500/5 text-rose-200"
+                      : "border-amber-500/30 bg-amber-500/5 text-amber-200",
+                  )}
+                >
+                  {sla_status === "breached"
+                    ? "Deadline passed and the shelf label still has not acknowledged the markdown — in-store shoppers may not have seen the lower price in time. Retry the ESL update or assign an associate."
+                    : "Shelf label has not acknowledged the markdown yet. It may not be visible to in-store shoppers before the deadline. Retry the ESL update or assign an associate."}
                 </div>
               )}
             </div>
           );
         })}
-        {sortedMarkdowns.length === 0 && (
-          <div className="glass rounded-2xl p-6 text-slate-400">No perishable markdowns in this batch.</div>
-        )}
       </div>
+    </div>
+  );
+}
+
+function Header({ zone }: { zone: string | null }) {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-white">Perishable Markdown SLAs</h1>
+      <p className="text-sm text-slate-400">
+        {zone ? `Markdown reliability for ${zone}. ` : ""}
+        Each perishable markdown must reach its shelf label before the sell-through deadline.
+        Sorted with the most urgent on top.
+      </p>
     </div>
   );
 }

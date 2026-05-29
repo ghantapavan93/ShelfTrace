@@ -169,10 +169,15 @@ export const api = {
   explanation: (id: string) => get<IncidentExplanation>(`/api/v1/incidents/${id}/explanation`),
   incidentAudit: (id: string) =>
     get<import("./types").AuditEventView[]>(`/api/v1/incidents/${id}/audit`),
-  markdowns: (externalId?: string) =>
-    get<{ zone: string; markdowns: { action: import("./types").ActionView; markdown_deadline: string }[] }>(
-      `/api/v1/markdowns${externalId ? `?external_id=${externalId}` : ""}`,
-    ),
+  markdowns: (externalId?: string, scope?: "live" | "demo" | "all") => {
+    const params = new URLSearchParams();
+    if (externalId) params.set("external_id", externalId);
+    if (scope) params.set("scope", scope);
+    const qs = params.toString();
+    return get<import("./types").MarkdownsResponse>(
+      `/api/v1/markdowns${qs ? `?${qs}` : ""}`,
+    );
+  },
   engineering: (opts?: { externalId?: string; runMode?: string }) => {
     const q = opts?.externalId
       ? `?external_id=${opts.externalId}`

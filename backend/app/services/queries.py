@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,6 +30,21 @@ from app.schemas import (
 from app.services import measurement
 
 CHANNEL_ORDER = {"pos": 0, "esl": 1, "ecommerce": 2}
+
+# A perishable markdown enters the "at risk" band once it's inside this window
+# of its sell-through deadline and the shelf label still hasn't acknowledged.
+# Kept in sync with the frontend's "act" urgency threshold so the server-side
+# SLA status and the client-side countdown badge classify identically.
+SLA_AT_RISK_WINDOW_MINUTES = 120
+
+
+def _ensure_utc(dt: datetime) -> datetime:
+    """Normalise a possibly-naive DB datetime to UTC.
+
+    Postgres returns tz-aware datetimes; SQLite (local/tests) hands back naive
+    ones. Treat naive values as UTC so deadline math is consistent everywhere.
+    """
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
 
 def _channels_for(action: PriceAction) -> list[ChannelView]:
@@ -326,3 +343,101 @@ def operations_overview(db: Session, batch: PriceBatch) -> OperationsOverview:
         recent_activity=recent_audit(db, batch.id),
         rollout_progress=progress,
     )
+
+
+def empty_markdown_sla() -> dict:
+    """The zeroed SLA payload returned when no batch exists in the requested
+    scope. Lets the frontend render a clean "no markdowns" state instead of
+    treating an empty live scope as an error."""
+    return {
+        "zone": None,
+        "markdowns": [],
+        "summary": {
+            "total": 0,
+            "met": 0,
+            "at_risk": 0,
+            "breached": 0,
+            "pending": 0,
+            "compliance_pct": 100.0,
+            "soonest_unmet_deadline": None,
+            "soonest_unmet_sku": None,
+        },
+    }
+
+
+def markdown_sla(db: Session, batch: PriceBatch, now: datetime | None = None) -> dict:
+    """Perishable-markdown reliability, framed as an SLA.
+
+    The SLA: for every perishable markdown, the shelf label (ESL) must
+    acknowledge the approved markdown *before* the sell-through deadline —
+    otherwise in-store shoppers can't see the lower price in time and the
+    inventory risks going unsold at full margin loss.
+
+    Each markdown is classified against real reconciliation state:
+      • ``met``      — ESL is verified; the shelf reflects the markdown now.
+      • ``breached`` — deadline has passed and the ESL still isn't verified.
+      • ``at_risk``  — deadline is inside the at-risk window, ESL not verified.
+      • ``pending``  — ESL not verified yet but the deadline is comfortably out.
+
+    ``compliance_pct`` is the share of perishable markdowns currently met.
+    ``now`` is injectable so tests can pin deterministic deadline math.
+    """
+    now = now or datetime.now(timezone.utc)
+    canary = set(_canary_ids(batch))
+    rows = [
+        a
+        for a in batch.actions
+        if a.is_perishable and a.markdown_deadline and a.store_id in canary
+    ]
+
+    items: list[dict] = []
+    counts = {"met": 0, "at_risk": 0, "breached": 0, "pending": 0}
+    soonest: tuple[datetime, str] | None = None  # most urgent UNMET deadline
+
+    for a in sorted(rows, key=lambda x: (_ensure_utc(x.markdown_deadline), x.store_id)):
+        view = action_view(a)
+        esl = next((c for c in view.channels if c.channel == "esl"), None)
+        esl_verified = esl is not None and esl.status == "verified"
+        deadline = _ensure_utc(a.markdown_deadline)
+        minutes_remaining = (deadline - now).total_seconds() / 60.0
+
+        if esl_verified:
+            status = "met"
+        elif minutes_remaining <= 0:
+            status = "breached"
+        elif minutes_remaining <= SLA_AT_RISK_WINDOW_MINUTES:
+            status = "at_risk"
+        else:
+            status = "pending"
+        counts[status] += 1
+
+        if not esl_verified and (soonest is None or deadline < soonest[0]):
+            soonest = (deadline, a.sku)
+
+        items.append(
+            {
+                "action": view.model_dump(),
+                "markdown_deadline": a.markdown_deadline,
+                "sla_status": status,
+                "esl_verified": esl_verified,
+                "minutes_remaining": round(minutes_remaining, 1),
+            }
+        )
+
+    total = len(items)
+    compliance_pct = round(100 * counts["met"] / total, 1) if total else 100.0
+
+    return {
+        "zone": batch.zone,
+        "markdowns": items,
+        "summary": {
+            "total": total,
+            "met": counts["met"],
+            "at_risk": counts["at_risk"],
+            "breached": counts["breached"],
+            "pending": counts["pending"],
+            "compliance_pct": compliance_pct,
+            "soonest_unmet_deadline": soonest[0].isoformat() if soonest else None,
+            "soonest_unmet_sku": soonest[1] if soonest else None,
+        },
+    }

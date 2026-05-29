@@ -47,6 +47,35 @@ export interface ActionView {
   measurement_eligibility?: MeasurementEligibilityView | null;
 }
 
+// Markdown SLA — perishable-markdown reliability. The shelf label (ESL) must
+// acknowledge the approved markdown before its sell-through deadline.
+export type SlaStatus = "met" | "at_risk" | "breached" | "pending";
+
+export interface MarkdownItem {
+  action: ActionView;
+  markdown_deadline: string;
+  sla_status: SlaStatus;
+  esl_verified: boolean;
+  minutes_remaining: number;
+}
+
+export interface MarkdownSlaSummary {
+  total: number;
+  met: number;
+  at_risk: number;
+  breached: number;
+  pending: number;
+  compliance_pct: number;
+  soonest_unmet_deadline: string | null;
+  soonest_unmet_sku: string | null;
+}
+
+export interface MarkdownsResponse {
+  zone: string | null;
+  markdowns: MarkdownItem[];
+  summary: MarkdownSlaSummary;
+}
+
 export interface BatchSummary {
   id: string;
   external_id: string;
