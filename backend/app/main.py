@@ -15,7 +15,7 @@ from app.middleware import RequestIDMiddleware
 from app.models import ConnectorProfile, PriceBatch, RunMode
 from app.observability import setup_tracing
 from app.rate_limit import get_limiter
-from app.routers import batches, certification, demo, engineering, incidents, operations, pricing, product_graph, scenarios, scraping, storefront
+from app.routers import batches, certification, demo, engineering, incidents, operations, pricing, product_graph, receipts, scenarios, scraping, storefront
 from app.security import auth_enabled
 from app.seed import seed_live
 from app.services import certification as cert_service
@@ -123,6 +123,7 @@ if _limiter is not None:
 app.include_router(batches.router)
 app.include_router(operations.router)
 app.include_router(incidents.router)
+app.include_router(receipts.router)
 app.include_router(engineering.router)
 app.include_router(certification.router)
 app.include_router(scenarios.router)

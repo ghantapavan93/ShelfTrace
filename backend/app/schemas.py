@@ -176,6 +176,83 @@ class StoreTaskView(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Decision Receipt — a derived, read-only evidence chain for one price action.
+#
+# It threads the state the validated core already maintains (upstream signal →
+# product match → batch approval → connector certification → channel dispatch →
+# reconciliation → measurement eligibility → recovery) into ONE causal record.
+# No new tables, no new write paths, no new audit events: every value is read
+# from existing rows. See :mod:`app.services.receipt`.
+# ---------------------------------------------------------------------------
+class ReceiptEvidenceItem(BaseModel):
+    """One labelled fact backing a stage. ``tone`` is a display hint only
+    (verified | danger | warn | violet | muted | None)."""
+
+    label: str
+    value: str
+    tone: str | None = None
+
+
+class ReceiptStageView(BaseModel):
+    """A single node on the evidence rail.
+
+    ``state`` is one of: ``verified`` (chain intact here), ``active`` (in
+    progress), ``pending`` (waiting on evidence), ``failed`` (the verified
+    chain broke here), ``excluded`` (deliberately removed from measurement),
+    ``not_applicable`` (a neutral/optional stage that doesn't apply)."""
+
+    key: str
+    label: str
+    state: str
+    headline: str
+    detail: str
+    evidence: list[ReceiptEvidenceItem] = []
+    at: datetime | None = None
+
+
+class IncidentRefView(BaseModel):
+    """Compact incident reference embedded in a receipt (the full incident has
+    its own endpoint)."""
+
+    id: str
+    type: str
+    severity: str
+    status: str
+    summary: str
+    offending_channel: str | None = None
+    created_at: datetime
+    resolved_at: datetime | None = None
+
+
+class DecisionReceiptView(BaseModel):
+    action_id: str
+    sku: str
+    product_name: str
+    store_id: str
+    zone: str
+    batch_id: str
+    batch_external_id: str
+    approved_price: float
+    prior_price: float
+    reason: str
+    is_kvi: bool
+    is_perishable: bool
+    decision: str
+    # Machine-readable outcome + a one-line plain-English summary.
+    outcome: str
+    headline: str
+    # Key of the first stage whose ``state`` is ``failed`` — where the verified
+    # chain broke. ``None`` when no stage hard-failed.
+    stopped_at_stage: str | None = None
+    channels: list[ChannelView]
+    measurement_eligibility: MeasurementEligibilityView
+    stages: list[ReceiptStageView]
+    incidents: list[IncidentRefView] = []
+    audit: list[AuditEventView] = []
+    generated_at: datetime
+
+
+# ---------------------------------------------------------------------------
 # Certification Lab
 # ---------------------------------------------------------------------------
 class ConnectorProfileView(BaseModel):
