@@ -266,7 +266,7 @@ function StoryStrip({
   status: string;
 }) {
   return (
-    <motion.div whileHover={{ y: -4 }} className="rounded-2xl border border-white/10 bg-[#0b0e16]/72 p-5">
+    <motion.div className="holo-card rounded-2xl p-5">
       <div className="flex items-center justify-between">
         <Icon className="h-5 w-5 text-orange-300" />
         <Pill>{status}</Pill>
@@ -331,7 +331,7 @@ export default function SignalPage() {
                 {chapter === "aisle" ? (
                   <>
                     A price is <span className="text-orange-400">not real</span> until every surface{" "}
-                    <span className="text-orange-400">agrees.</span>
+                    <span className="iris-text">agrees.</span>
                   </>
                 ) : (
                   active.title
@@ -363,7 +363,7 @@ export default function SignalPage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/vision/reliability"
-                className="flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_0_30px_rgba(249,115,22,.28)] transition hover:brightness-110"
+                className="glow-iris flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_0_30px_rgba(249,115,22,.28)] transition hover:brightness-110"
               >
                 Enter Reliability Theater <ChevronRight className="h-4 w-4" />
               </Link>

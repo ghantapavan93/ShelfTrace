@@ -411,7 +411,7 @@ export default function HorizonPage() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="overflow-hidden rounded-[30px] border border-white/10 bg-[#0b0e16]/78"
+            className="holo-card rounded-[30px]"
           >
             <div className="grid min-h-[540px] lg:grid-cols-[.78fr_1.22fr]">
               <div className="p-6 sm:p-8">
@@ -420,7 +420,7 @@ export default function HorizonPage() {
                 <p className="mt-7 text-[10px] font-semibold tracking-[.25em] text-orange-300">
                   {active.kicker}
                 </p>
-                <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-.05em] text-white">
+                <h2 className="iris-text mt-4 text-4xl font-semibold leading-tight tracking-[-.05em]">
                   {active.title}
                 </h2>
                 <p className="mt-5 text-lg leading-8 text-white/76">{active.thesis}</p>
@@ -433,7 +433,7 @@ export default function HorizonPage() {
       </div>
       <div className="relative mt-6 grid gap-4 lg:grid-cols-[1fr_390px]">
         <ArchitectureRail />
-        <div className="rounded-2xl border border-white/10 bg-[#0c111a]/84 p-5">
+        <div className="holo-card rounded-2xl p-5">
           <Pill tone="green">Working today</Pill>
           <ul className="mt-5 space-y-3 text-sm text-white/65">
             {[
@@ -456,7 +456,7 @@ export default function HorizonPage() {
           </ul>
           <Link
             href="/operations"
-            className="mt-6 flex w-full items-center justify-between rounded-xl bg-orange-500 px-5 py-4 text-sm font-semibold text-white transition hover:brightness-110"
+            className="glow-iris mt-6 flex w-full items-center justify-between rounded-xl bg-orange-500 px-5 py-4 text-sm font-semibold text-white transition hover:brightness-110"
           >
             Open ShelfTrace Platform <ArrowUpRight className="h-4 w-4" />
           </Link>

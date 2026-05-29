@@ -208,7 +208,7 @@ export default function CertificationPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white">Connector Certification Lab</h1>
+        <h1 className="text-3xl font-bold text-white">Connector <span className="iris-text">Certification</span> Lab</h1>
         <p className="mt-1 text-slate-400">
           Validate store-system reliability before automated price execution is enabled.
         </p>
@@ -226,8 +226,8 @@ export default function CertificationPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         className={clsx(
-          "relative overflow-hidden rounded-3xl border px-7 py-7",
-          failed ? "border-rose-500/30 bg-gradient-to-br from-rose-950/30 via-ink-900 to-black" : "border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-ink-900 to-black",
+          "iris-border glow-iris relative overflow-hidden rounded-3xl px-7 py-7",
+          failed ? "bg-gradient-to-br from-rose-950/30 via-ink-900 to-black" : "bg-gradient-to-br from-emerald-950/20 via-ink-900 to-black",
         )}
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -377,7 +377,7 @@ function ReliabilityCheckGrid({
   }, [ordered]);
 
   return (
-    <div className="glass-strong overflow-hidden rounded-2xl">
+    <div className="holo-card overflow-hidden rounded-2xl">
       {/* Header + progress bar */}
       <div className="border-b border-white/10 px-5 py-4">
         <div className="flex flex-wrap items-end justify-between gap-3">

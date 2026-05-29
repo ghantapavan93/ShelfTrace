@@ -189,7 +189,7 @@ export default function PricingPage() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Pricing Engine</h1>
+          <h1 className="text-2xl font-bold text-white"><span className="iris-text">Pricing</span> Engine</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-400">
             Econometric price-elasticity estimation + constrained profit
             optimization. OLS log-log fit on 90 days of sales →
@@ -326,7 +326,7 @@ export default function PricingPage() {
       />
 
       {/* Recommendations table */}
-      <section className="glass rounded-2xl p-5">
+      <section className="holo-card glow-iris rounded-2xl p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
             Recommendations
@@ -371,7 +371,7 @@ export default function PricingPage() {
       </section>
 
       {/* Integration hint */}
-      <div className="glass rounded-2xl border border-violet-500/20 p-4">
+      <div className="holo-card rounded-2xl p-4">
         <div className="flex items-start gap-3">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-300" />
           <div className="flex-1">

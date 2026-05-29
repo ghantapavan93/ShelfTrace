@@ -134,7 +134,7 @@ export default function ScrapersPage() {
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Competitor Scraping</h1>
+          <h1 className="text-2xl font-bold text-white">Competitor <span className="iris-text">Scraping</span></h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Production-shaped data extraction pipeline. Fetch → parse →
             validate → normalize → deduplicate → preserve observations. The
@@ -189,7 +189,7 @@ export default function ScrapersPage() {
       {/* ── Source + Run panel ───────────────────────────────────────── */}
       <div className="grid gap-4 xl:grid-cols-[1.1fr_1fr]">
         {/* Left: sources */}
-        <section className="glass rounded-2xl p-5">
+        <section className="holo-card rounded-2xl p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">
             Available sources
           </h2>
@@ -244,7 +244,7 @@ export default function ScrapersPage() {
         </section>
 
         {/* Right: trigger run + recent runs */}
-        <section className="glass rounded-2xl p-5">
+        <section className="holo-card iris-border glow-iris rounded-2xl p-5">
           <div className="flex items-start justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
@@ -426,7 +426,7 @@ export default function ScrapersPage() {
       </div>
 
       {/* ── Products table ──────────────────────────────────────────── */}
-      <section className="glass rounded-2xl p-5">
+      <section className="holo-card rounded-2xl p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
@@ -537,7 +537,7 @@ export default function ScrapersPage() {
       </section>
 
       {/* Cross-page integration hint */}
-      <div className="glass rounded-2xl border border-violet-500/20 p-4">
+      <div className="holo-card rounded-2xl p-4">
         <div className="flex items-start gap-3">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-300" />
           <div className="flex-1">

@@ -46,8 +46,12 @@ const STAGE_ICON: Record<ReceiptStageKey, LucideIcon> = {
   learned: GraduationCap,
 };
 
-/* ── tone per state — reuses the EligibilityPanel colour vocabulary ── */
-type ToneTokens = { badge: string; label: string; state: string; line: string };
+/* ── tone per state — reuses the EligibilityPanel colour vocabulary ──
+   `glow` is a soft semantic halo applied to the node badge: verified nodes
+   carry an emerald glow, the broken node a rose glow, the in-progress node a
+   warm amber. Pending / excluded / N/A stay glow-free so the eye lands on the
+   stages that actually moved. */
+type ToneTokens = { badge: string; label: string; state: string; line: string; glow: string };
 
 const TONE: Record<ReceiptStageState, ToneTokens> = {
   verified: {
@@ -55,36 +59,42 @@ const TONE: Record<ReceiptStageState, ToneTokens> = {
     label: "text-emerald-100/90",
     state: "text-emerald-300/80",
     line: "bg-emerald-500/40",
+    glow: "shadow-glow-verified",
   },
   active: {
     badge: "border-amber-500/50 bg-amber-500/12 text-amber-300",
     label: "text-amber-100/90",
     state: "text-amber-300/80",
     line: "bg-amber-500/35",
+    glow: "shadow-[0_0_26px_-6px_rgba(251,191,36,0.55)]",
   },
   pending: {
     badge: "border-white/15 bg-white/[.04] text-slate-300",
     label: "text-slate-300",
     state: "text-slate-500",
     line: "bg-white/12",
+    glow: "",
   },
   failed: {
     badge: "border-rose-500/60 bg-rose-500/14 text-rose-300",
     label: "text-rose-100",
     state: "text-rose-300/90",
     line: "bg-rose-500/40",
+    glow: "shadow-glow-danger",
   },
   excluded: {
     badge: "border-violet-500/50 bg-violet-500/12 text-violet-300",
     label: "text-violet-100/90",
     state: "text-violet-300/80",
     line: "bg-violet-500/35",
+    glow: "",
   },
   not_applicable: {
     badge: "border-white/10 bg-white/[.02] text-slate-500",
     label: "text-slate-500",
     state: "text-slate-600",
     line: "bg-white/[.06]",
+    glow: "",
   },
 };
 
@@ -171,6 +181,7 @@ export function EvidenceRail({
                 className={clsx(
                   "relative z-10 grid h-11 w-11 place-items-center rounded-full border backdrop-blur transition",
                   tone.badge,
+                  !isDownstream && tone.glow,
                   onSelect && "cursor-pointer hover:scale-[1.06] active:scale-[0.97]",
                   isActive && "ring-2 ring-white/60 ring-offset-2 ring-offset-[#040608]",
                 )}

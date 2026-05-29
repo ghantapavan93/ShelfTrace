@@ -356,7 +356,7 @@ function IntegrationPaths() {
                 transition={{ duration: 0.65, delay: i * 0.08, ease: EASE.outQuart }}
               >
                 <Tilt3DCard className="h-full">
-                  <article className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[.04] to-transparent p-7 transition-shadow duration-300 hover:shadow-[0_30px_80px_-30px_rgba(167,139,250,.4)]">
+                  <article className="holo-card relative h-full rounded-3xl p-7">
                     {/* one-shot particle burst when entering view */}
                     <InViewBurst
                       color={
@@ -740,7 +740,7 @@ function ClosingCta() {
             <h3 className="mt-5 text-[clamp(28px,4vw,64px)] font-semibold leading-[1.04] tracking-[-0.02em] text-white">
               Same engine.
               <br />
-              <span className="bg-gradient-to-r from-violet-200 via-sky-200 to-orange-200 bg-clip-text text-transparent">
+              <span className="iris-text">
                 Any data shape that fits the contract.
               </span>
             </h3>
@@ -765,7 +765,7 @@ function ClosingCta() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: "-80px" }}
             transition={SPRING.gentle}
-            className="rounded-2xl border border-white/10 bg-[#0b0f18]/90 p-5"
+            className="holo-card glow-iris rounded-2xl p-5"
           >
             <p className="text-[10px] tracking-[.2em] text-orange-300 uppercase">Endpoint sample</p>
             <pre className="mt-3 overflow-x-auto rounded-lg bg-black/55 p-3 font-mono text-[10.5px] leading-relaxed text-emerald-300/90">

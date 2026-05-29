@@ -264,7 +264,7 @@ export default function ProductGraphPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-ink-850 via-ink-900 to-black px-7 py-8"
+        className="iris-border glow-iris relative overflow-hidden rounded-3xl bg-gradient-to-br from-ink-850 via-ink-900 to-black px-7 py-8"
       >
         <div className="pointer-events-none absolute right-0 top-0 h-full w-1/2 bg-[radial-gradient(60%_80%_at_80%_30%,rgba(168,85,247,0.18),transparent_70%)]" />
         <div className="relative max-w-3xl">
@@ -272,7 +272,7 @@ export default function ProductGraphPage() {
             <Network className="h-3.5 w-3.5" /> Product Knowledge Graph
           </div>
           <h1 className="mt-3 text-4xl font-bold leading-tight text-white">
-            Cross-source product unification
+            Cross-source product <span className="iris-text">unification</span>
             <span className="block text-2xl font-medium text-slate-400">
               one canonical entity per real-world product, linked to every SKU & competitor source.
             </span>
@@ -366,7 +366,7 @@ export default function ProductGraphPage() {
       {/* Main two-column layout */}
       <section className="grid gap-4 lg:grid-cols-3">
         {/* Categories panel */}
-        <div className="glass rounded-2xl p-5 lg:col-span-1">
+        <div className="holo-card rounded-2xl p-5 lg:col-span-1">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-300">
             <Layers className="h-4 w-4 text-sky-300" />
             Category hierarchy
@@ -394,7 +394,7 @@ export default function ProductGraphPage() {
 
         {/* Entities panel */}
         <div className="lg:col-span-2">
-          <div className="glass rounded-2xl p-5">
+          <div className="holo-card rounded-2xl p-5">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-300">
                 <Boxes className="h-4 w-4 text-violet-300" />
@@ -461,7 +461,7 @@ export default function ProductGraphPage() {
       </section>
 
       {/* Help footer */}
-      <section className="glass rounded-2xl p-5 text-xs text-slate-400">
+      <section className="holo-card rounded-2xl p-5 text-xs text-slate-400">
         <div className="flex items-start gap-3">
           <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-300" />
           <div>
@@ -597,7 +597,7 @@ function EntityRow({
 function EntityDetailCard({ detail }: { detail: EntityDetail }) {
   const { entity, linked_skus, competitor_observations } = detail;
   return (
-    <div className="glass-strong rounded-2xl border border-violet-500/25 p-5">
+    <div className="holo-card rounded-2xl p-5">
       <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-violet-300">
         <Network className="h-4 w-4" /> Entity detail
       </div>

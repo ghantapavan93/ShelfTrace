@@ -250,11 +250,11 @@ function ComplianceHeader({ data }: { data: MarkdownsResponse }) {
     : "text-sky-300";
 
   return (
-    <section className="glass-strong rounded-3xl border border-white/10 p-6">
+    <section className="holo-card rounded-3xl p-6">
       <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
         {/* Compliance dial */}
         <div className="flex items-center gap-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[.03]">
+          <div className="iris-ring grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/[.03]">
             <Gauge className={clsx("h-6 w-6", tone)} />
           </div>
           <div>

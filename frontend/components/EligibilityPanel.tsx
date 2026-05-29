@@ -46,6 +46,7 @@ export function EligibilityPanel({
             tone.ring,
             tone.iconBg,
             tone.iconColor,
+            tone.iconGlow,
           )}
         >
           <Icon className="h-4 w-4" />
@@ -182,6 +183,7 @@ type Tone = {
   iconBg: string;
   iconColor: string;
   text: string;
+  iconGlow: string;
 };
 
 const TONES: Record<MeasurementEligibilityView["status"], Tone> = {
@@ -192,6 +194,7 @@ const TONES: Record<MeasurementEligibilityView["status"], Tone> = {
     iconBg: "bg-emerald-500/15",
     iconColor: "text-emerald-300",
     text: "text-emerald-200",
+    iconGlow: "shadow-glow-verified",
   },
   INELIGIBLE_AWAITING_ACKNOWLEDGEMENT: {
     ring: "border-amber-500/40",
@@ -200,6 +203,7 @@ const TONES: Record<MeasurementEligibilityView["status"], Tone> = {
     iconBg: "bg-amber-500/15",
     iconColor: "text-amber-300",
     text: "text-amber-200",
+    iconGlow: "shadow-[0_0_26px_-6px_rgba(251,191,36,0.55)]",
   },
   INELIGIBLE_EXECUTION_NOT_VERIFIED: {
     ring: "border-rose-500/45",
@@ -208,6 +212,7 @@ const TONES: Record<MeasurementEligibilityView["status"], Tone> = {
     iconBg: "bg-rose-500/15",
     iconColor: "text-rose-300",
     text: "text-rose-200",
+    iconGlow: "shadow-glow-danger",
   },
   EXCLUDED_RECOVERY_INCOMPLETE: {
     ring: "border-violet-500/40",
@@ -216,6 +221,7 @@ const TONES: Record<MeasurementEligibilityView["status"], Tone> = {
     iconBg: "bg-violet-500/15",
     iconColor: "text-violet-300",
     text: "text-violet-200",
+    iconGlow: "shadow-[0_0_26px_-8px_rgba(167,139,250,0.6)]",
   },
 };
 

@@ -1149,7 +1149,7 @@ function CtaRail() {
               ))}
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-[#0b0f18]/90 p-5">
+          <div className="holo-card glow-iris rounded-2xl p-5">
             <p className="text-[10px] tracking-[.2em] text-orange-300 uppercase">Principle</p>
             <p className="mt-3 text-base font-medium leading-snug text-white">
               &ldquo;If it isn&apos;t simulatable, it isn&apos;t operable. Every reliability primitive
@@ -1224,7 +1224,7 @@ export default function OrbitPage() {
           </div>
           <h1 className="mt-6 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl">
             Fly the engine.
-            <span className="bg-gradient-to-r from-orange-300 via-orange-400 to-rose-400 bg-clip-text text-transparent">
+            <span className="iris-text">
               {" "}Inject drift. Watch reliability respond.
             </span>
           </h1>

@@ -121,10 +121,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           : "bg-slate-400";
 
   return (
-    <div className="bg-aurora flex min-h-screen">
+    <div className="bg-aurora relative flex min-h-screen">
+      {/* Global iridescent aurora — fixed backdrop inherited by every working
+          surface. aria-hidden, pointer-transparent, sits behind all content
+          (the shell chrome below carries higher stacking via relative z). */}
+      <div className="aurora-futurist" aria-hidden />
       {/* Sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/5 bg-ink-900/60 px-4 py-5 backdrop-blur-xl lg:flex">
-        <Brand />
+      <aside className="sticky top-0 z-10 hidden h-screen w-64 shrink-0 flex-col border-r border-white/5 bg-ink-900/60 px-4 py-5 backdrop-blur-xl lg:flex">
+        <div className="rounded-2xl px-1 [box-shadow:0_0_44px_-22px_rgba(168,139,250,0.55)]">
+          <Brand />
+        </div>
         <nav className="mt-8 flex flex-col gap-1">
           {NAV.map((n) => {
             const active = n.match.test(pathname);
@@ -134,12 +140,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={n.href}
                 href={n.href}
                 className={clsx(
-                  "group flex items-center gap-3 rounded-xl px-3 py-2.5 transition",
+                  "group relative flex items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 transition",
                   active
-                    ? "bg-brand/15 text-white shadow-[inset_0_0_0_1px_rgba(255,106,43,0.3)]"
+                    ? "bg-brand/15 text-white shadow-[inset_0_0_0_1px_rgba(255,106,43,0.3),0_0_28px_-14px_rgba(168,139,250,0.65)]"
                     : "text-slate-400 hover:bg-white/5 hover:text-white",
                 )}
               >
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-gradient-to-b from-cyan-300 via-violet-400 to-brand-400"
+                  />
+                )}
                 <Icon className={clsx("h-4.5 w-4.5", active && "text-brand-400")} size={18} />
                 <span className="leading-tight">
                   <span className="block text-sm font-medium">{n.label}</span>
@@ -196,7 +208,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/5 bg-ink-950/70 px-4 py-3 backdrop-blur-xl sm:px-5">
           {/* Hamburger — mobile only */}
           <button

@@ -783,7 +783,6 @@ function ClosingCta() {
 export default function ShowcasePage() {
   return (
     <div className="relative bg-[#040608]">
-      <div className="aurora-futurist" aria-hidden />
       <div className="relative z-10">
       <FilmGrain />
       <HeroCinematic />

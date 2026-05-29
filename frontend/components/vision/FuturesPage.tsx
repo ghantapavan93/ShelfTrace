@@ -864,7 +864,7 @@ function FuturesStory({ anchorRef }: { anchorRef: React.RefObject<HTMLDivElement
           <h2 className="mt-5 text-[clamp(30px,4.5vw,60px)] font-semibold leading-[1.05] tracking-[-0.02em] text-white">
             Trace · evaluate · gate · audit —
             <br />
-            same primitives, broader surface.
+            same primitives, <span className="iris-text">broader surface.</span>
           </h2>
         </div>
       </div>
@@ -902,7 +902,7 @@ function TheThread() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-60px" }}
                   transition={{ duration: 0.55, delay: i * 0.06, ease: EASE.outQuart }}
-                  className="rounded-2xl border border-white/10 bg-white/[.025] p-5"
+                  className="holo-card rounded-2xl p-5"
                 >
                   <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[.04] text-orange-300">
                     <Icon className="h-4 w-4" />
@@ -958,7 +958,7 @@ function ClosingCta() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: "-80px" }}
             transition={SPRING.gentle}
-            className="rounded-2xl border border-white/10 bg-[#0b0f18]/90 p-5"
+            className="holo-card glow-iris rounded-2xl p-5"
           >
             <p className="text-[10px] tracking-[.2em] text-orange-300 uppercase">Principle</p>
             <p className="mt-3 text-base font-medium leading-snug text-white">

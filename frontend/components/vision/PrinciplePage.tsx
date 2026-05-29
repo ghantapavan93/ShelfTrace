@@ -580,7 +580,7 @@ function SeatbeltMoment() {
           <h2 className="mt-5 text-[clamp(34px,5.5vw,80px)] font-semibold leading-[1.02] tracking-[-0.025em] text-white">
             Safety that does not slow you down.
             <br />
-            <span className="bg-gradient-to-r from-amber-200 via-orange-300 to-rose-300 bg-clip-text text-transparent">
+            <span className="iris-text">
               Until it has to.
             </span>
           </h2>
@@ -758,7 +758,7 @@ function ClosingCta() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: "-80px" }}
             transition={SPRING.gentle}
-            className="rounded-2xl border border-white/10 bg-[#0b0f18]/90 p-5"
+            className="holo-card glow-iris rounded-2xl p-5"
           >
             <p className="text-[10px] tracking-[.2em] text-orange-300 uppercase">Principle</p>
             <p className="mt-3 text-base font-medium leading-snug text-white">

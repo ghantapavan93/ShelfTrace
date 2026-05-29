@@ -371,7 +371,7 @@ function EmptyState({
   // Differentiate "no incidents exist at all" vs "filter excludes everything"
   if (totalIncidents === 0) {
     return (
-      <div className="glass rounded-2xl border border-emerald-500/25 p-8">
+      <div className="glass rounded-2xl border border-emerald-500/25 p-8 shadow-glow-verified">
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-10 place-items-center rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-verified">
             <ShieldCheck className="h-5 w-5" />

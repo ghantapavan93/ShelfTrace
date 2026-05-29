@@ -362,7 +362,7 @@ function OperationsContent() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className={clsx(
-          "relative overflow-hidden rounded-3xl border px-7 py-8",
+          "iris-border glow-iris relative overflow-hidden rounded-3xl border px-7 py-8",
           allClear
             ? "border-emerald-500/30 bg-gradient-to-br from-[#06120c] via-[#04070b] to-black"
             : "border-white/10 bg-gradient-to-br from-ink-850 via-ink-900 to-black",
@@ -387,7 +387,7 @@ function OperationsContent() {
             )}
           </div>
           <h1 className="mt-3 text-4xl font-bold leading-tight text-white">
-            {hero.title}
+            <span className="iris-text">{hero.title}</span>
             <span className="block text-2xl font-medium text-slate-400">{hero.sub}</span>
           </h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-300">
@@ -465,7 +465,7 @@ function OperationsContent() {
       {/* Critical + side cards */}
       <section className="grid gap-4 xl:grid-cols-3">
         {crit ? (
-          <div className="glass-strong rounded-2xl border border-rose-500/30 p-5 xl:col-span-2">
+          <div className="glass-strong rounded-2xl border border-rose-500/30 p-5 shadow-glow-danger xl:col-span-2">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-danger">
@@ -503,7 +503,7 @@ function OperationsContent() {
           </div>
         ) : (
           /* All-clear state — celebratory, not "no incidents 🎉" */
-          <div className="glass-strong rounded-2xl border border-emerald-500/25 p-6 xl:col-span-2">
+          <div className="glass-strong rounded-2xl border border-emerald-500/25 p-6 shadow-glow-verified xl:col-span-2">
             <div className="flex items-center gap-3">
               <span className="grid h-12 w-12 place-items-center rounded-2xl border border-emerald-500/40 bg-emerald-500/10 text-verified shadow-glow-verified">
                 <ShieldCheck className="h-6 w-6" />
@@ -588,7 +588,7 @@ function OperationsContent() {
 
       {/* Activity + progress + stepper */}
       <section className="grid gap-4 xl:grid-cols-3">
-        <div className="glass rounded-2xl p-5 xl:col-span-2">
+        <div className="holo-card rounded-2xl p-5 xl:col-span-2">
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-300">Recent Activity</h3>
           {data.recent_activity.length > 0 ? (
             <AuditTimeline events={data.recent_activity.slice(0, 6)} />
@@ -698,7 +698,7 @@ function AskShelfTrace() {
   };
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
+    <section className="holo-card rounded-2xl p-5">
       <div className="mb-4 flex items-center gap-2">
         <span className="grid h-7 w-7 place-items-center rounded-lg border border-brand/30 bg-brand/10">
           <Sparkles className="h-3.5 w-3.5 text-brand-300" />

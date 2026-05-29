@@ -217,7 +217,7 @@ export default function ScenarioBuilder() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white">Connector Scenario Builder</h1>
+        <h1 className="text-3xl font-bold text-white">Connector <span className="iris-text">Scenario</span> Builder</h1>
         <p className="mt-1 text-slate-400">
           Create or run a connector test without changing code. Behaviors you configure here drive the same
           PostgreSQL outbox, Redis worker, adapter, reconciliation and audit pipeline.
@@ -231,7 +231,7 @@ export default function ScenarioBuilder() {
       />
 
       {isLive && (
-        <div className="glass-strong rounded-2xl border border-rose-500/25 bg-gradient-to-br from-rose-500/5 to-transparent p-5">
+        <div className="holo-card iris-border glow-iris rounded-2xl bg-gradient-to-br from-rose-500/5 to-transparent p-5">
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-300">
               <Rocket className="h-5 w-5" />
@@ -342,7 +342,7 @@ export default function ScenarioBuilder() {
       />
 
       {/* Saved scenarios — hide seeded ones in LIVE mode so the user only sees their own work */}
-      <section className="glass rounded-2xl p-5">
+      <section className="holo-card rounded-2xl p-5">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">
           Saved Scenarios
           {isLive && (
@@ -388,7 +388,7 @@ export default function ScenarioBuilder() {
       </section>
 
       {/* Scope */}
-      <section className="glass rounded-2xl p-5">
+      <section className="holo-card rounded-2xl p-5">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">Scope</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div><div className={label}>Scenario name</div><input className={input} value={name} onChange={(e) => setName(e.target.value)} /></div>
@@ -447,7 +447,7 @@ export default function ScenarioBuilder() {
       </div>
 
       {/* Price actions */}
-      <section className="glass rounded-2xl p-5">
+      <section className="holo-card rounded-2xl p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Price actions</h2>
@@ -526,7 +526,7 @@ export default function ScenarioBuilder() {
       </section>
 
       {/* Connector behaviors */}
-      <section className="glass rounded-2xl p-5">
+      <section className="holo-card rounded-2xl p-5">
         <div className="mb-1 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Connector behaviors</h2>
           <button onClick={() => setBehaviors([...behaviors, emptyBehavior()])} className="flex items-center gap-1 text-xs text-brand-400 hover:underline"><Plus className="h-3.5 w-3.5" /> Add behavior</button>

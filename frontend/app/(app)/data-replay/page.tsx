@@ -136,7 +136,7 @@ export default function DataReplayPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white">Real Data Replay</h1>
+        <h1 className="text-3xl font-bold text-white">Real Data <span className="iris-text">Replay</span></h1>
         <p className="mt-1 text-slate-400">
           Import public grocery records, preserve source lineage, and test price execution safety through the same
           ShelfTrace reliability engine. Connectors stay simulated; ShelfTrace does not decide the optimal price.
@@ -153,7 +153,7 @@ export default function DataReplayPage() {
           const m = SOURCE_META[c.key];
           const Icon = m.icon;
           return (
-            <div key={c.key} className={clsx("glass rounded-2xl border p-5", m.tone)}>
+            <div key={c.key} className={clsx("holo-card rounded-2xl p-5", m.tone)}>
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-300">
                 <Icon className="h-4 w-4" /> {m.label}
               </div>
@@ -177,7 +177,7 @@ export default function DataReplayPage() {
 
       {/* Imported observations + create-scenario form */}
       <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-        <div className="glass-strong rounded-2xl p-5">
+        <div className="holo-card rounded-2xl p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">Imported observations</h2>
           <div className="space-y-2">
             {observations.length === 0 && (
@@ -214,7 +214,7 @@ export default function DataReplayPage() {
           </div>
         </div>
 
-        <div className="glass rounded-2xl p-5">
+        <div className="holo-card iris-border glow-iris rounded-2xl p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">Create execution scenario</h2>
           {!selected ? (
             <p className="text-xs text-slate-500">Select an observation to build a scenario from it.</p>

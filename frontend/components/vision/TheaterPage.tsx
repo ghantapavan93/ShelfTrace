@@ -310,11 +310,11 @@ export default function TheaterPage() {
       </div>
       <div className="relative mt-7 grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
         <div className="grid content-start gap-4">
-          <div className="rounded-[28px] border border-white/10 bg-[#0b0e16]/78 p-5 sm:p-6">
+          <div className="holo-card rounded-[28px] p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-semibold tracking-[.23em] text-orange-300">{eyebrow}</p>
-                <h2 className="mt-3 text-2xl font-semibold text-white">{title}</h2>
+                <h2 className="iris-text mt-3 text-2xl font-semibold">{title}</h2>
               </div>
               <Pill tone={isTrace ? "green" : "red"}>{status}</Pill>
             </div>
@@ -353,7 +353,7 @@ export default function TheaterPage() {
         </Link>
         <Link
           href="/vision/horizon"
-          className="flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110"
+          className="glow-iris flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110"
         >
           Explore Future Systems <ArrowRight className="h-4 w-4" />
         </Link>

@@ -612,6 +612,73 @@ function AisleShelf({
 
 /* ─────────────────────────────── 0. Store Awakening ──────────────────────── */
 
+/* Channel waypoints along the laser line (left → right, % of viewport width).
+   The approved-price token crosses these in order; each ignites as it passes. */
+const KN_CHANNELS = [
+  { label: "POS", left: 26 },
+  { label: "SHELF", left: 50 },
+  { label: "ECOMMERCE", left: 74 },
+] as const;
+/* Token starts just inside the engine end and lands on the receiving shelf. */
+const KN_TOKEN_START_LEFT = 20; // %
+const KN_TOKEN_LAND_VW = 60; // translateX in vw to reach the shelf (right)
+
+/** One labeled channel node that pops + glows when the price passes it.
+ *  `lit` flips true once the token has left the engine; `igniteDelay`
+ *  staggers each node so they light in sequence as the token crosses. */
+function ChannelNode({
+  label,
+  left,
+  lit,
+  verified,
+  igniteDelay,
+  reduced,
+}: {
+  label: string;
+  left: number;
+  lit: boolean;
+  verified: boolean;
+  igniteDelay: number;
+  reduced: boolean;
+}) {
+  const t = reduced
+    ? { duration: 0 }
+    : { duration: 0.45, ease: EASE.outQuart, delay: lit ? igniteDelay : 0 };
+  return (
+    <div
+      className="pointer-events-none absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+      style={{ left: `${left}%` }}
+    >
+      <motion.span
+        initial={{ opacity: 0.18, scale: 0.7 }}
+        animate={{
+          opacity: lit ? 1 : 0.2,
+          scale: lit ? 1 : 0.7,
+          boxShadow: lit
+            ? verified
+              ? "0 0 18px 2px rgba(52,211,153,.85)"
+              : "0 0 18px 2px rgba(129,140,248,.85)"
+            : "0 0 0 0 rgba(0,0,0,0)",
+        }}
+        transition={t}
+        className={`block h-2.5 w-2.5 rounded-full ${
+          verified ? "bg-emerald-300" : "bg-cyan-300"
+        }`}
+      />
+      <motion.span
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: lit ? 1 : 0.25, y: 0 }}
+        transition={t}
+        className={`absolute left-1/2 top-4 -translate-x-1/2 font-mono text-[9px] uppercase tracking-[.22em] ${
+          verified ? "text-emerald-200/90" : lit ? "text-white/70" : "text-white/30"
+        }`}
+      >
+        {label}
+      </motion.span>
+    </div>
+  );
+}
+
 function StoreAwakening({ onDone }: { onDone: () => void }) {
   const reduced = useReducedMotion();
   const [stage, setStage] = useState(0);
@@ -623,21 +690,33 @@ function StoreAwakening({ onDone }: { onDone: () => void }) {
     }
     const seq = [800, 1400, 2200, 3200, 4200];
     const timers = seq.map((ms, i) => setTimeout(() => setStage(i + 1), ms));
-    const done = setTimeout(onDone, 4800);
+    // Hold a beat longer on the final stage so the land + verify reads.
+    const done = setTimeout(onDone, 5200);
     return () => {
       timers.forEach(clearTimeout);
       clearTimeout(done);
     };
   }, [reduced, onDone]);
 
+  // Price has left the engine and is crossing the channels.
+  const traveling = reduced || stage >= 2;
+  // Price has reached the shelf and been verified.
+  const landed = reduced || stage >= 3;
+
   return (
     <motion.section
       key="awakening"
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[#02030a]"
+      className="fixed inset-0 z-[55] flex items-center justify-center overflow-hidden bg-[#02030a]"
       initial={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.6 }}
     >
+      {/* iridescent aurora glows behind the cold-open */}
+      <div className="aurora-futurist" aria-hidden />
+      {/* floating light-dust — self-gates on reduced-motion (renders null) */}
+      <Particles count={26} color="rgba(186,230,253,.45)" />
+
+      {/* the execution line */}
       <motion.div
         initial={{ opacity: 0, width: 0 }}
         animate={{ opacity: stage >= 1 ? 1 : 0, width: stage >= 1 ? "62%" : 0 }}
@@ -645,23 +724,106 @@ function StoreAwakening({ onDone }: { onDone: () => void }) {
         className="absolute top-1/2 left-1/2 h-[2px] -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-orange-400 to-transparent"
         style={{ boxShadow: "0 0 24px rgba(251,146,60,.7)" }}
       />
-      {[0.18, 0.34, 0.5, 0.66, 0.82].map((x, i) => (
-        <motion.span
-          key={i}
-          initial={{ opacity: 0, scale: 0.4 }}
-          animate={{ opacity: stage >= 2 ? 0.85 : 0, scale: stage >= 2 ? 1 : 0.4 }}
-          transition={{ duration: 0.5, delay: i * 0.08 }}
-          className="absolute top-[20%] h-2 w-12 rounded-full bg-amber-200/80 blur-[2px]"
-          style={{ left: `${x * 100}%`, boxShadow: "0 0 32px rgba(254,243,199,.6)" }}
-        />
-      ))}
+      {/* thin iridescent thread riding the line, tying the channels together */}
+      <motion.div
+        aria-hidden
+        initial={{ opacity: 0, scaleX: 0 }}
+        animate={{ opacity: stage >= 1 ? 0.55 : 0, scaleX: stage >= 1 ? 1 : 0 }}
+        transition={reduced ? { duration: 0 } : { duration: 0.9, ease: EASE.outQuart }}
+        className="absolute top-1/2 left-[20%] h-px w-[60%] origin-left -translate-y-1/2"
+        style={{ background: "var(--iris-soft)" }}
+      />
+
+      {/* receiving shelf glow on the right — where the price lands */}
       <motion.div
         initial={{ opacity: 0 }}
-        animate={{ opacity: stage >= 3 ? 1 : 0 }}
-        transition={{ duration: 0.8 }}
-        className="absolute left-[6%] top-[20%] h-[60%] w-[20%] rounded-3xl bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.22),transparent_70%)]"
+        animate={{ opacity: landed ? 1 : 0 }}
+        transition={{ duration: 0.8, ease: EASE.outQuart }}
+        className="absolute right-[6%] top-[20%] h-[60%] w-[20%] rounded-3xl"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(52,211,153,0.2), transparent 70%)",
+        }}
       />
-      <div className="relative z-10 max-w-xl px-6 text-center">
+
+      {/* channel nodes — ignite in sequence as the token crosses each.
+          delay tracks the token's 1.2s travel from KN_TOKEN_START_LEFT. */}
+      {KN_CHANNELS.map((c) => (
+        <ChannelNode
+          key={c.label}
+          label={c.label}
+          left={c.left}
+          lit={traveling}
+          verified={landed}
+          reduced={!!reduced}
+          igniteDelay={
+            reduced
+              ? 0
+              : Math.max(0, ((c.left - KN_TOKEN_START_LEFT) / KN_TOKEN_LAND_VW) * 1.2 - 0.1)
+          }
+        />
+      ))}
+
+      {/* APPROVED-PRICE TOKEN — leaves the engine, crosses the channels,
+          lands on the shelf and snaps to VERIFIED. transform/opacity only. */}
+      <motion.div
+        className="absolute top-1/2 z-20"
+        style={{ left: `${KN_TOKEN_START_LEFT}%` }}
+        initial={{ opacity: 0, x: 0, y: "-50%", scale: 0.8 }}
+        animate={{
+          opacity: reduced || stage >= 1 ? 1 : 0,
+          x: traveling ? `${KN_TOKEN_LAND_VW}vw` : 0,
+          y: "-50%",
+          scale: reduced || stage >= 1 ? 1 : 0.8,
+        }}
+        transition={
+          reduced
+            ? { duration: 0 }
+            : { x: { duration: 1.2, ease: EASE.outQuart }, default: { duration: 0.5 } }
+        }
+      >
+        {/* comet-tail — short iridescent trail behind the token while it moves */}
+        <motion.span
+          aria-hidden
+          initial={{ opacity: 0 }}
+          animate={{ opacity: traveling && !landed ? 0.9 : 0 }}
+          transition={{ duration: 0.3 }}
+          className="absolute top-1/2 right-full mr-1 h-[3px] w-24 -translate-y-1/2 rounded-full"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, rgba(34,211,238,.0) 4%, rgba(129,140,248,.85), rgba(168,85,247,.95))",
+            filter: "blur(0.5px)",
+          }}
+        />
+        {/* one-shot VERIFIED ring-pulse burst on land (animated path only) */}
+        {landed && !reduced && (
+          <motion.span
+            aria-hidden
+            initial={{ opacity: 0.9, scale: 0.6 }}
+            animate={{ opacity: 0, scale: 2.6 }}
+            transition={{ duration: 0.9, ease: EASE.outQuart }}
+            className="absolute inset-0 -m-1 rounded-full border-2 border-emerald-300/80"
+            style={{ boxShadow: "0 0 30px 6px rgba(52,211,153,.6)" }}
+          />
+        )}
+        {/* the price chip itself */}
+        <motion.div
+          animate={{ scale: landed && !reduced ? [1, 1.14, 1] : 1 }}
+          transition={reduced ? { duration: 0 } : { duration: 0.5, ease: EASE.outQuart }}
+          className={`relative flex items-center justify-center rounded-full border px-4 py-1.5 font-mono text-sm font-semibold tabular-nums backdrop-blur-sm ${
+            landed
+              ? "border-emerald-300/70 bg-emerald-400/10 text-emerald-200 text-glow-verified glow-cyan"
+              : "border-violet-300/60 bg-white/[.06] text-white glow-iris"
+          }`}
+        >
+          {landed && (
+            <BadgeCheck className="mr-1.5 h-3.5 w-3.5 text-emerald-300" strokeWidth={2.4} />
+          )}
+          $5.99
+        </motion.div>
+      </motion.div>
+
+      <div className="pointer-events-none relative z-10 mt-[26vh] max-w-xl px-6 text-center">
         <AnimatePresence mode="wait">
           {stage <= 1 && (
             <motion.p
@@ -675,33 +837,34 @@ function StoreAwakening({ onDone }: { onDone: () => void }) {
               Preparing execution environment…
             </motion.p>
           )}
-          {stage >= 2 && stage <= 3 && (
+          {stage >= 2 && stage <= 2 && (
             <motion.p
-              key="ready"
+              key="online"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.5 }}
               className="font-mono text-sm tracking-[.22em] text-emerald-300/90 uppercase"
             >
-              Store channel simulation ready
+              Channels online
             </motion.p>
           )}
-          {stage >= 4 && (
+          {stage >= 3 && (
             <motion.p
-              key="opening"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="font-mono text-sm tracking-[.22em] text-white/55 uppercase"
+              key="lands"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: EASE.outQuart }}
+              className="text-base font-medium tracking-[.04em] text-white"
             >
-              Opening the aisle…
+              The approved price lands.
             </motion.p>
           )}
         </AnimatePresence>
       </div>
       <button
         onClick={onDone}
-        className="absolute bottom-6 right-6 rounded-full border border-white/15 bg-white/[.04] px-3 py-1.5 text-[11px] tracking-[.18em] text-white/55 uppercase hover:text-white"
+        className="absolute bottom-6 right-6 z-30 rounded-full border border-white/15 bg-white/[.04] px-3 py-1.5 text-[11px] tracking-[.18em] text-white/55 uppercase hover:text-white"
       >
         Skip intro
       </button>

@@ -171,7 +171,7 @@ export default function ReceiptPage({ params }: { params: { actionId: string } }
       <MeasurementGateBanner eligibility={receipt.measurement_eligibility} />
 
       {/* Living lifecycle rail */}
-      <section className="rounded-3xl border border-white/10 bg-[#0a0e18]/85 p-6">
+      <section className="iris-border glow-iris overflow-hidden rounded-3xl bg-[#0a0e18]/85 p-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-[.18em] text-slate-300">
             Action Lifecycle
@@ -210,7 +210,7 @@ export default function ReceiptPage({ params }: { params: { actionId: string } }
           <EligibilityPanel eligibility={receipt.measurement_eligibility} />
 
           {receipt.incidents.length > 0 && (
-            <section className="glass rounded-2xl p-5">
+            <section className="holo-card rounded-2xl p-5">
               <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">
                 Linked Incidents
               </h3>
@@ -240,7 +240,7 @@ export default function ReceiptPage({ params }: { params: { actionId: string } }
           )}
 
           {receipt.audit.length > 0 && (
-            <section className="glass rounded-2xl p-5">
+            <section className="holo-card rounded-2xl p-5">
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-300">
                 Audit Trail
               </h3>

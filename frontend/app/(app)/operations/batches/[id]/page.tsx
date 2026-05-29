@@ -140,9 +140,9 @@ function ChannelHealthStrip({ actions }: { actions: BatchDetail["actions"] }) {
               className={clsx(
                 "rounded-2xl border bg-[#0a0e18]/60 p-4 transition",
                 hasDanger
-                  ? "border-rose-500/25"
+                  ? "border-rose-500/25 shadow-glow-danger"
                   : allClear
-                    ? "border-emerald-500/20"
+                    ? "border-emerald-500/20 shadow-glow-verified"
                     : "border-white/10",
               )}
             >
@@ -391,7 +391,7 @@ export default function BatchPage({ params }: { params: { id: string } }) {
       )}
 
       {/* Verification matrix with search + grouping for large batches */}
-      <div className="glass-strong overflow-hidden rounded-2xl">
+      <div className="holo-card overflow-hidden rounded-2xl">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
           <div>
             <h2 className="text-sm font-semibold text-white">

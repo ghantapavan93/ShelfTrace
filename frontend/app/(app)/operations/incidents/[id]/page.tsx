@@ -206,7 +206,7 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
       <motion.section
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-ink-900 to-black px-6 py-10"
+        className="iris-border relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-ink-900 to-black px-6 py-10"
       >
         {variance != null && Math.abs(variance) > 0.001 && (
           <div className="mx-auto mb-6 w-fit rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-center shadow-glow-danger">
@@ -232,7 +232,7 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
 
       {/* Channel Evidence table — row-level verification status for each
           channel involved in this incident's action. */}
-      <section className="glass rounded-2xl p-5">
+      <section className="holo-card rounded-2xl p-5">
         <div className="mb-4 flex items-center gap-2">
           <BarChart2 className="h-4 w-4 text-brand-400" />
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Channel Evidence</h3>
@@ -365,7 +365,7 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
           </div>
         </section>
       ) : (
-        <section className="glass rounded-2xl p-5">
+        <section className="holo-card rounded-2xl p-5">
           <div className="mb-4 flex items-center gap-2">
             <Wrench className="h-4 w-4 text-brand-400" />
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Recovery Actions</h3>
@@ -440,7 +440,7 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
       {/* Operator notes — session-only scratchpad. Clearly labelled as
           NOT persisted: there is no backend note endpoint, so these are a
           working aid for the current session only. */}
-      <section className="glass rounded-2xl p-5">
+      <section className="holo-card rounded-2xl p-5">
         <div className="mb-3 flex items-center gap-2">
           <StickyNote className="h-4 w-4 text-brand-400" />
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Operator Notes</h3>
@@ -544,7 +544,7 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
       />
 
       {/* Audit timeline */}
-      <section className="glass rounded-2xl p-5">
+      <section className="holo-card rounded-2xl p-5">
         <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-300">Audit Timeline</h3>
         {audit.data && audit.data.length > 0 ? (
           <AuditTimeline events={audit.data} />
@@ -558,7 +558,7 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
 
 function Panel({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
   return (
-    <div className="glass rounded-2xl p-5">
+    <div className="holo-card rounded-2xl p-5">
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
         <Icon className="h-4 w-4 text-brand-400" /> {title}
       </div>

@@ -51,6 +51,7 @@ const PREVIEWS = [
 export default function Landing() {
   return (
     <div className="bg-aurora min-h-screen">
+      <div className="aurora-futurist" aria-hidden />
       <TopNav />
 
       {/* Hero */}
@@ -61,7 +62,7 @@ export default function Landing() {
               Test every connector · Guard every rollout
             </span>
             <h1 className="mt-5 text-5xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl">
-              Trust every price change from test to shelf.
+              Trust every price change from <span className="iris-text">test to shelf.</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-300">
               ShelfTrace{" "}
@@ -71,7 +72,7 @@ export default function Landing() {
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 href="/certification"
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110"
+                className="glow-iris flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110"
               >
                 <Play className="h-4 w-4" /> Run Certification Demo
               </Link>
@@ -157,7 +158,7 @@ export default function Landing() {
       <section className="mx-auto max-w-7xl px-5 py-8">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {FEATURES.map((f) => (
-            <div key={f.n} className="glass rounded-2xl p-5">
+            <div key={f.n} className="holo-card rounded-2xl p-5">
               <div className="flex items-center justify-between">
                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand/15 text-brand-400">
                   <f.Icon className="h-5 w-5" />

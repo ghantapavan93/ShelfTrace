@@ -1035,7 +1035,7 @@ function ArchitectureDepth() {
             return (
               <div
                 key={d.name}
-                className="group relative rounded-2xl border border-white/8 bg-white/[.025] p-4 transition hover:border-white/20 hover:bg-white/[.04]"
+                className="holo-card group rounded-2xl p-4"
               >
                 <div className="flex items-center justify-between">
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[.04] text-orange-300">
@@ -1076,7 +1076,7 @@ function Hero() {
           className="mt-6 max-w-4xl text-4xl font-semibold tracking-tight text-white sm:text-5xl"
         >
           Watch a price travel from approval to shopper&apos;s receipt —
-          <span className="bg-gradient-to-r from-orange-300 via-orange-400 to-rose-400 bg-clip-text text-transparent">
+          <span className="iris-text">
             {" "}live, and accountable at every frame.
           </span>
         </motion.h1>
@@ -1088,7 +1088,7 @@ function Hero() {
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Link
             href="/operations"
-            className="inline-flex items-center gap-2 rounded-xl border border-orange-500/50 bg-orange-500/15 px-4 py-2.5 text-sm font-medium text-orange-200 transition hover:bg-orange-500/25"
+            className="glow-iris inline-flex items-center gap-2 rounded-xl border border-orange-500/50 bg-orange-500/15 px-4 py-2.5 text-sm font-medium text-orange-200 transition hover:bg-orange-500/25"
           >
             Open the working Control Plane <ArrowRight className="h-4 w-4" />
           </Link>

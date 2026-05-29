@@ -72,7 +72,7 @@ export default function EngineeringPage() {
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Engineering Execution Trace</h1>
+          <h1 className="text-2xl font-bold text-white">Engineering Execution <span className="iris-text">Trace</span></h1>
           <p className="text-sm text-slate-400">From approved batch to verified store rollout — the full reliability pipeline (simulated connectors).</p>
         </div>
         <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1 text-xs">
@@ -92,7 +92,7 @@ export default function EngineeringPage() {
       </div>
 
       {/* Shared-engine statement (real run context) */}
-      <div className="glass rounded-2xl border border-violet-500/20 p-4">
+      <div className="holo-card rounded-2xl p-4">
         <div className="mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-widest text-violet-300">
           One shared reliability engine · viewing <span className="text-white">{data.run_mode}</span> ({data.environment === "simulated_production" ? "Simulated Rollout" : data.environment})
           {data.scenario_config_id && (
@@ -108,7 +108,7 @@ export default function EngineeringPage() {
 
       {/* Source lineage: only present when the scenario was created from a real public-data record */}
       {data.source_lineage && (
-        <div className="glass rounded-2xl border border-sky-500/25 p-5">
+        <div className="holo-card rounded-2xl p-5">
           <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-widest text-sky-300">
             Source lineage · public-data replay
           </div>
@@ -165,7 +165,7 @@ export default function EngineeringPage() {
       )}
 
       {/* Connector behavior profiles applied for this run */}
-      <div className="glass rounded-2xl p-5">
+      <div className="holo-card rounded-2xl p-5">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-white">Connector Behavior Profiles Applied</h3>
           {data.incident_from_configured_behavior && (
@@ -209,7 +209,7 @@ export default function EngineeringPage() {
       </div>
 
       {/* Pipeline strip */}
-      <div className="glass-strong rounded-2xl p-5">
+      <div className="holo-card rounded-2xl p-5">
         <div className="flex items-stretch gap-2 overflow-x-auto pb-2">
           {data.pipeline.map((s, i) => (
             <div key={s.stage} className="flex items-center gap-2">
@@ -232,7 +232,7 @@ export default function EngineeringPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Outbox */}
-        <div className="glass rounded-2xl p-5">
+        <div className="holo-card rounded-2xl p-5">
           <h3 className="mb-3 text-sm font-semibold text-white">Outbox Events ({data.outbox_events.length})</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -272,7 +272,7 @@ export default function EngineeringPage() {
         </div>
 
         {/* Test proof */}
-        <div className="glass rounded-2xl p-5">
+        <div className="holo-card iris-border glow-iris rounded-2xl p-5">
           <div className="mb-3 flex items-center gap-2">
             <h3 className="text-sm font-semibold text-white">Test Proof</h3>
             <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-verified">PASSED</span>
@@ -294,7 +294,7 @@ export default function EngineeringPage() {
         </div>
 
         {/* Raw receipt */}
-        <div className="glass rounded-2xl p-5">
+        <div className="holo-card rounded-2xl p-5">
           <h3 className="mb-3 text-sm font-semibold text-white">Simulated Adapter Receipt</h3>
           <Json value={data.raw_receipt} />
         </div>
@@ -311,7 +311,7 @@ export default function EngineeringPage() {
         )}
 
         {/* Reconciliation result */}
-        <div className="glass rounded-2xl p-5">
+        <div className="holo-card rounded-2xl p-5">
           <h3 className="mb-3 text-sm font-semibold text-white">Reconciliation Result</h3>
           <Json value={data.reconciliation_result} />
         </div>
