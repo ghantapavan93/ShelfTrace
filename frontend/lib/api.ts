@@ -737,6 +737,15 @@ export const api = {
   importUsdaAms: () => post<SourceObservation>(`/api/v1/data-sources/import/usda-ams`),
   createScenarioFromObservation: (id: string, body: unknown) =>
     post<ScenarioExecuteResult>(`/api/v1/source-observations/${id}/create-scenario`, body),
+
+  // Ask ShelfTrace — deterministic Q&A over the live operations state
+  explain: (query: string) =>
+    post<{
+      answer: string;
+      evidence_chips: string[];
+      zone_status: Record<string, string>;
+      measurement_gate: string;
+    }>(`/api/v1/operations/explain`, { query }),
 };
 
 export const DEMO_BATCH = "memorial-day-dallas-02";

@@ -27,6 +27,8 @@ import {
   CircleDot,
   ExternalLink,
   FileCheck2,
+  Lock,
+  LockOpen,
   type LucideIcon,
 } from "lucide-react";
 import clsx from "clsx";
@@ -42,6 +44,7 @@ import { EASE, DUR } from "@/lib/motion";
 import type {
   DecisionReceiptView,
   EvidenceTone,
+  MeasurementEligibilityView,
   ReceiptOutcome,
   ReceiptStageKey,
   ReceiptStageState,
@@ -137,6 +140,12 @@ export default function ReceiptPage({ params }: { params: { actionId: string } }
             <p className={clsx("mt-1.5 text-lg font-semibold leading-snug", outcome.text)}>
               {receipt.headline}
             </p>
+            {/* Channel mismatch subtitle — shows actual observed vs approved price for the offending channel */}
+            <ChannelMismatchSubtitle
+              channels={receipt.channels}
+              approvedPrice={receipt.approved_price}
+              outcomeText={outcome.text}
+            />
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-slate-400">
               <Fact label="Prior" value={money(receipt.prior_price)} />
               <Fact label="Approved" value={money(receipt.approved_price)} accent={outcome.text} />
@@ -157,6 +166,9 @@ export default function ReceiptPage({ params }: { params: { actionId: string } }
           </span>
         </div>
       </motion.section>
+
+      {/* Measurement Gate banner */}
+      <MeasurementGateBanner eligibility={receipt.measurement_eligibility} />
 
       {/* Living lifecycle rail */}
       <section className="rounded-3xl border border-white/10 bg-[#0a0e18]/85 p-6">
@@ -341,7 +353,190 @@ function Tag({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ─────────────────────── Measurement Gate banner ─────────────────────── */
+
+/**
+ * Shows the current measurement-gate decision for this price action:
+ * quarantined (rose), awaiting (amber), or eligible (emerald). Reads
+ * directly from the real MeasurementEligibilityView — no hardcoded text.
+ */
+function MeasurementGateBanner({
+  eligibility,
+}: {
+  eligibility: MeasurementEligibilityView;
+}) {
+  const gate = GATE_TONE[eligibility.status] ?? GATE_TONE["default"];
+  const Icon = gate.eligible ? LockOpen : Lock;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: DUR.base, ease: EASE.outQuart, delay: 0.08 }}
+      className={clsx(
+        "rounded-2xl border p-4",
+        gate.border,
+        gate.bg,
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={clsx(
+            "grid h-8 w-8 shrink-0 place-items-center rounded-xl border",
+            gate.iconWrapper,
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span
+              className={clsx(
+                "rounded-full border px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-[.18em]",
+                gate.badge,
+              )}
+            >
+              {gate.label}
+            </span>
+            {eligibility.blocked_channel && (
+              <span className="text-[10px] uppercase tracking-[.12em] text-white/35">
+                blocked at {eligibility.blocked_channel.toUpperCase()}
+              </span>
+            )}
+          </div>
+          <p className={clsx("mt-1.5 text-sm font-medium leading-snug", gate.headlineText)}>
+            {eligibility.summary}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-white/40">
+            {gate.tagline}
+          </p>
+          {/* Reason code pill */}
+          <span className="mt-2 inline-flex items-center rounded border border-white/10 bg-white/[.04] px-2 py-0.5 font-mono text-[10px] text-white/45">
+            {eligibility.reason}
+          </span>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ─────────────── Channel mismatch subtitle on outcome banner ─────────── */
+
+/**
+ * When one or more channels have a mismatch, renders a compact subtitle
+ * line showing the first offending channel's observed vs. approved price.
+ * Renders nothing when all channels are clean.
+ */
+function ChannelMismatchSubtitle({
+  channels,
+  approvedPrice,
+  outcomeText,
+}: {
+  channels: ReceiptView["channels"];
+  approvedPrice: number;
+  outcomeText: string;
+}) {
+  const mismatched = channels.filter(
+    (ch) => ch.status === "mismatch" && ch.observed_price !== null,
+  );
+  if (mismatched.length === 0) return null;
+
+  const first = mismatched[0];
+  const channelLabel = CHANNEL_LABEL[first.channel] ?? first.channel.toUpperCase();
+
+  return (
+    <p className={clsx("mt-1.5 text-sm leading-snug", outcomeText, "opacity-70")}>
+      {channelLabel} returned {money(first.observed_price!)} · approved{" "}
+      {money(approvedPrice)}
+      {mismatched.length > 1 && (
+        <span className="ml-2 text-xs opacity-60">
+          +{mismatched.length - 1} more channel{mismatched.length - 1 > 1 ? "s" : ""}
+        </span>
+      )}
+    </p>
+  );
+}
+
+const CHANNEL_LABEL: Record<string, string> = {
+  pos: "POS checkout",
+  esl: "ESL label",
+  ecommerce: "eCommerce",
+};
+
+/* helper type alias so ChannelMismatchSubtitle can share the prop type */
+type ReceiptView = Pick<DecisionReceiptView, "channels">;
+
 /* ───────────────────────────── tone tables ───────────────────────────── */
+
+/* Gate tone table — keyed by MeasurementEligibilityStatus */
+type GateTone = {
+  eligible: boolean;
+  label: string;
+  tagline: string;
+  border: string;
+  bg: string;
+  badge: string;
+  iconWrapper: string;
+  headlineText: string;
+};
+
+const GATE_TONE: Record<string, GateTone> = {
+  ELIGIBLE_ALL_REQUIRED_CHANNELS_VERIFIED: {
+    eligible: true,
+    label: "Measurement Eligible",
+    tagline:
+      "Verified execution. Sell-through results are being attributed from this action.",
+    border: "border-emerald-500/30",
+    bg: "bg-emerald-500/[.04]",
+    badge: "border-emerald-500/45 bg-emerald-500/12 text-emerald-200",
+    iconWrapper: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+    headlineText: "text-emerald-100/90",
+  },
+  INELIGIBLE_AWAITING_ACKNOWLEDGEMENT: {
+    eligible: false,
+    label: "Measurement Quarantined",
+    tagline:
+      "Sell-through results will be excluded from analytics until acknowledged and reconciled.",
+    border: "border-amber-500/30",
+    bg: "bg-amber-500/[.04]",
+    badge: "border-amber-500/45 bg-amber-500/12 text-amber-200",
+    iconWrapper: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+    headlineText: "text-amber-100/90",
+  },
+  INELIGIBLE_EXECUTION_NOT_VERIFIED: {
+    eligible: false,
+    label: "Measurement Quarantined",
+    tagline:
+      "Sell-through results will be excluded from analytics until verified recovery.",
+    border: "border-rose-500/30",
+    bg: "bg-rose-500/[.04]",
+    badge: "border-rose-500/45 bg-rose-500/12 text-rose-200",
+    iconWrapper: "border-rose-500/40 bg-rose-500/10 text-rose-300",
+    headlineText: "text-rose-100/90",
+  },
+  EXCLUDED_RECOVERY_INCOMPLETE: {
+    eligible: false,
+    label: "Measurement Excluded",
+    tagline:
+      "Sell-through results will be excluded from analytics until the recovery task resolves.",
+    border: "border-violet-500/30",
+    bg: "bg-violet-500/[.04]",
+    badge: "border-violet-500/45 bg-violet-500/12 text-violet-200",
+    iconWrapper: "border-violet-500/40 bg-violet-500/10 text-violet-300",
+    headlineText: "text-violet-100/90",
+  },
+  default: {
+    eligible: false,
+    label: "Measurement Pending",
+    tagline:
+      "Execution evidence is incomplete — not yet eligible for downstream measurement.",
+    border: "border-white/10",
+    bg: "bg-white/[.03]",
+    badge: "border-white/20 bg-white/[.06] text-slate-300",
+    iconWrapper: "border-white/15 bg-white/[.04] text-slate-400",
+    headlineText: "text-slate-200",
+  },
+};
 
 const STATE_WORD: Record<ReceiptStageState, string> = {
   verified: "Verified",

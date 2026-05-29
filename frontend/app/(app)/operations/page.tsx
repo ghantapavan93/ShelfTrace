@@ -17,6 +17,8 @@ import {
   RotateCcw,
   FlaskConical,
   ExternalLink,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import clsx from "clsx";
 import { api, DEMO_BATCH } from "@/lib/api";
@@ -457,6 +459,9 @@ function OperationsContent() {
         />
       </section>
 
+      {/* Ask ShelfTrace — only in demo mode so it never appears on a live rollout */}
+      {!isLiveWorkMode && <AskShelfTrace />}
+
       {/* Critical + side cards */}
       <section className="grid gap-4 xl:grid-cols-3">
         {crit ? (
@@ -636,6 +641,161 @@ function OperationsContent() {
         </div>
       </section>
     </div>
+  );
+}
+
+// ── Ask ShelfTrace — deterministic Q&A panel ──────────────────────────────
+type ExplainResult = {
+  answer: string;
+  evidence_chips: string[];
+  zone_status: Record<string, string>;
+  measurement_gate: string;
+};
+
+type AskState =
+  | { phase: "idle" }
+  | { phase: "loading" }
+  | { phase: "answered"; result: ExplainResult }
+  | { phase: "error"; message: string };
+
+function AskShelfTrace() {
+  const [query, setQuery] = useState("Why is Dallas Zone 2 blocked?");
+  const [state, setState] = useState<AskState>({ phase: "idle" });
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!query.trim()) return;
+    setState({ phase: "loading" });
+    try {
+      const result = await api.explain(query.trim());
+      setState({ phase: "answered", result });
+    } catch (err) {
+      setState({ phase: "error", message: (err as Error).message });
+    }
+  }
+
+  const zoneColor = (status: string) => {
+    const s = status.toLowerCase();
+    if (s.includes("verified") || s.includes("clear")) return "text-emerald-300";
+    if (s.includes("intervention") || s.includes("block") || s.includes("mismatch")) return "text-rose-300";
+    return "text-amber-300";
+  };
+
+  const gatePill = (gate: string) => {
+    const isQuarantined = gate.toUpperCase().includes("QUARANTINE");
+    return (
+      <span
+        className={clsx(
+          "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+          isQuarantined
+            ? "border border-rose-500/40 bg-rose-500/10 text-rose-300"
+            : "border border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+        )}
+      >
+        {gate}
+      </span>
+    );
+  };
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[.025] p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="grid h-7 w-7 place-items-center rounded-lg border border-brand/30 bg-brand/10">
+          <Sparkles className="h-3.5 w-3.5 text-brand-300" />
+        </span>
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[.22em] text-brand-400">
+            Ask ShelfTrace
+          </div>
+          <div className="text-[11px] text-slate-500">
+            Deterministic answers from live operations state
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={submit} className="flex gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Why is Dallas Zone 2 blocked?"
+          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none transition focus:border-brand/40 focus:ring-1 focus:ring-brand/20"
+        />
+        <button
+          type="submit"
+          disabled={state.phase === "loading" || !query.trim()}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-brand/30 bg-brand/10 px-3.5 py-2 text-sm font-medium text-brand-300 transition hover:bg-brand/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {state.phase === "loading" ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5" />
+          )}
+          Ask ShelfTrace →
+        </button>
+      </form>
+
+      {state.phase === "error" && (
+        <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-sm text-rose-300">
+          {state.message}
+        </div>
+      )}
+
+      {state.phase === "answered" && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="mt-4 space-y-4"
+        >
+          {/* Answer text */}
+          <p className="text-sm leading-relaxed text-slate-200">{state.result.answer}</p>
+
+          {/* Evidence chips */}
+          {state.result.evidence_chips.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {state.result.evidence_chips.map((chip) => (
+                <span
+                  key={chip}
+                  className="inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-2.5 py-1 text-[11px] text-brand-300"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Zone status grid */}
+            {Object.keys(state.result.zone_status).length > 0 && (
+              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="mb-2 text-[10px] font-semibold uppercase tracking-[.18em] text-slate-500">
+                  Zone Status
+                </div>
+                <div className="space-y-1.5">
+                  {Object.entries(state.result.zone_status).map(([store, status]) => (
+                    <div key={store} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-mono text-slate-400">{store}</span>
+                      <span className={clsx("font-medium", zoneColor(status))}>{status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Measurement gate */}
+            {state.result.measurement_gate && (
+              <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[.18em] text-slate-500">
+                  Measurement Gate
+                </div>
+                {gatePill(state.result.measurement_gate)}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+    </section>
   );
 }
 

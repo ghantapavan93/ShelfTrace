@@ -428,3 +428,17 @@ class CreateScenarioFromObservationIn(BaseModel):
     previous_price: float | None = None
     reason: str | None = None
     behaviors: list["ConnectorBehaviorIn"] | None = None
+
+
+# ---------------------------------------------------------------------------
+# Ask ShelfTrace — deterministic explain endpoint
+# ---------------------------------------------------------------------------
+class ExplainRequest(BaseModel):
+    query: str = Field(..., description="Plain-English question about batch/zone/product state.")
+
+
+class ExplainResponse(BaseModel):
+    answer: str = Field(..., description="Deterministic, template-driven explanation derived from live DB state.")
+    evidence_chips: list[str] = Field(default_factory=list, description="Labels of the evidence nodes backing the answer.")
+    zone_status: dict[str, str] = Field(default_factory=dict, description="store_id → human-readable status label.")
+    measurement_gate: str = Field(..., description="QUARANTINED | ELIGIBLE | PENDING")

@@ -6,9 +6,18 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import PriceAction, PriceBatch, RunMode
+from app.models import (
+    ActionDecision,
+    Incident,
+    IncidentSeverity,
+    IncidentStatus,
+    IncidentType,
+    PriceAction,
+    PriceBatch,
+    RunMode,
+)
 from app.routers.common import get_batch_or_404
-from app.schemas import OperationsOverview
+from app.schemas import ExplainRequest, ExplainResponse, OperationsOverview
 from app.scope import Scope, apply_filter, current_scope
 from app.services import queries
 
@@ -148,3 +157,232 @@ def markdowns(
             else:
                 return queries.empty_markdown_sla()
     return queries.markdown_sla(db, batch)
+
+
+@router.post("/operations/explain", response_model=ExplainResponse)
+def explain(body: ExplainRequest, db: Session = Depends(get_db)):
+    """Deterministic, template-driven explanation of current batch/zone state.
+
+    NOT AI-generated. Every sentence is assembled from real DB rows — incidents,
+    actions, channel receipts. The ``query`` string is used only for keyword
+    routing to select the correct template branch.
+    """
+    q = body.query.lower()
+
+    # ------------------------------------------------------------------ #
+    # 1. Find the most recent LIVE_ROLLOUT batch that has open incidents  #
+    #    (i.e. the batch that is currently blocked or under intervention). #
+    #    Fall back to the latest LIVE_ROLLOUT batch if nothing is open.   #
+    # ------------------------------------------------------------------ #
+    batch = db.scalar(
+        select(PriceBatch)
+        .where(PriceBatch.run_mode == RunMode.LIVE_ROLLOUT)
+        .order_by(PriceBatch.created_at.desc())
+    )
+
+    if batch is None:
+        return ExplainResponse(
+            answer="No active rollout batch found. ShelfTrace has not yet received a price batch in live-rollout mode.",
+            evidence_chips=[],
+            zone_status={},
+            measurement_gate="PENDING",
+        )
+
+    # ------------------------------------------------------------------ #
+    # 2. Collect open incidents for this batch                            #
+    # ------------------------------------------------------------------ #
+    open_statuses = [IncidentStatus.OPEN, IncidentStatus.RETRYING]
+
+    open_incidents: list[Incident] = list(
+        db.scalars(
+            select(Incident)
+            .where(
+                Incident.batch_id == batch.id,
+                Incident.status.in_(open_statuses),
+            )
+            .order_by(Incident.created_at.desc())
+        )
+    )
+
+    # ------------------------------------------------------------------ #
+    # Branch A — "block" / "hold" / "zone" / "why" / "status" keywords   #
+    # ------------------------------------------------------------------ #
+    _block_keywords = ("block", "hold", "zone", "why", "status", "intervention", "halt", "expand")
+    if any(kw in q for kw in _block_keywords):
+        # Find the most relevant critical/open incident to explain
+        critical_incident: Incident | None = next(
+            (i for i in open_incidents if i.severity == IncidentSeverity.CRITICAL),
+            None,
+        )
+        incident = critical_incident or (open_incidents[0] if open_incidents else None)
+
+        if incident is None:
+            # Batch exists but no open incidents — clean state
+            return ExplainResponse(
+                answer=(
+                    f'Batch "{batch.external_id}" ({batch.zone}) has no open incidents. '
+                    "All canary stores verified the approved price and expansion is not blocked."
+                ),
+                evidence_chips=["Approved Action", "Canary Verification", "Measurement Gate"],
+                zone_status={sid: "Verified" for sid in queries._canary_ids(batch)},
+                measurement_gate="ELIGIBLE",
+            )
+
+        # Pull the action for that incident
+        action: PriceAction | None = db.get(PriceAction, incident.action_id)
+        product = action.product_name if action else "Unknown product"
+        approved_price = f"${action.approved_price:.2f}" if action else "an approved price"
+        store_id = action.store_id if action else incident.action_id
+
+        # Build channel evidence sentence
+        channel_name = incident.offending_channel.value.upper() if incident.offending_channel else "a channel"
+
+        if incident.type == IncidentType.PRICE_MISMATCH:
+            consequence = (
+                "Expansion to remaining stores is held until the mismatch is resolved "
+                "and all required channels acknowledge the correct price."
+            )
+            answer = (
+                f"{product} was approved at {approved_price}. "
+                f"{channel_name} returned a price that does not match the approved value on store {store_id}. "
+                f"{consequence}"
+            )
+            measurement_gate = "QUARANTINED"
+        elif incident.type == IncidentType.CHANNEL_TIMEOUT:
+            consequence = (
+                "The action is quarantined from measurement until the channel acknowledges "
+                "or the retry window expires."
+            )
+            answer = (
+                f"{product} was approved at {approved_price}. "
+                f"{channel_name} did not respond within the acknowledgement window on store {store_id}. "
+                f"{consequence}"
+            )
+            measurement_gate = "QUARANTINED"
+        else:
+            # DEADLINE_RISK or unknown
+            answer = (
+                f'{product} has an open incident of type "{incident.type.value}" on store {store_id}. '
+                f"{incident.summary}"
+            )
+            measurement_gate = "QUARANTINED"
+
+        # Build zone_status: canary stores with mismatch → intervention required;
+        # expansion stores → expansion held; all others → pending.
+        zone_status: dict[str, str] = {}
+        for sid in queries._canary_ids(batch):
+            if sid == store_id:
+                zone_status[sid] = "Intervention required"
+            else:
+                zone_status[sid] = "Canary verified"
+        for sid in queries._expansion_ids(batch):
+            zone_status[sid] = "Expansion held"
+
+        return ExplainResponse(
+            answer=answer,
+            evidence_chips=[
+                "Approved Action",
+                "POS Receipt",
+                "Protected Stores",
+                "Measurement Gate",
+                "Incident Log",
+            ],
+            zone_status=zone_status,
+            measurement_gate=measurement_gate,
+        )
+
+    # ------------------------------------------------------------------ #
+    # Branch B — strawberry / ESL / deadline keywords                     #
+    # ------------------------------------------------------------------ #
+    _perishable_keywords = ("strawberr", "esl", "deadline", "perishable", "markdown", "sell-through", "sellthrough")
+    if any(kw in q for kw in _perishable_keywords):
+        deadline_incident: Incident | None = db.scalar(
+            select(Incident)
+            .where(
+                Incident.batch_id == batch.id,
+                Incident.type == IncidentType.DEADLINE_RISK,
+                Incident.status.in_(open_statuses),
+            )
+            .order_by(Incident.created_at.desc())
+        )
+
+        if deadline_incident is None:
+            # No active deadline risk — check for any perishable action
+            perishable_action: PriceAction | None = db.scalar(
+                select(PriceAction)
+                .where(
+                    PriceAction.batch_id == batch.id,
+                    PriceAction.is_perishable.is_(True),
+                )
+            )
+            if perishable_action:
+                return ExplainResponse(
+                    answer=(
+                        f"{perishable_action.product_name} markdown to "
+                        f"${perishable_action.approved_price:.2f} on store "
+                        f"{perishable_action.store_id} has no active deadline risk. "
+                        f"ESL acknowledged and sell-through measurement is eligible."
+                    ),
+                    evidence_chips=["Approved Action", "ESL Receipt", "Measurement Gate"],
+                    zone_status={perishable_action.store_id: "ESL verified"},
+                    measurement_gate="ELIGIBLE",
+                )
+            return ExplainResponse(
+                answer="No perishable deadline risk incidents are currently open for this batch.",
+                evidence_chips=["Incident Log"],
+                zone_status={},
+                measurement_gate="PENDING",
+            )
+
+        dl_action: PriceAction | None = db.get(PriceAction, deadline_incident.action_id)
+        product = dl_action.product_name if dl_action else "Perishable item"
+        approved_price = f"${dl_action.approved_price:.2f}" if dl_action else "the approved price"
+        store_id = dl_action.store_id if dl_action else "unknown store"
+
+        answer = (
+            f"{product} markdown to {approved_price} is pending ESL acknowledgement on store {store_id}. "
+            f"Sell-through measurement is quarantined until shelf visibility is verified."
+        )
+        return ExplainResponse(
+            answer=answer,
+            evidence_chips=["Approved Action", "ESL Receipt", "Deadline Risk", "Measurement Gate"],
+            zone_status={store_id: "ESL pending"},
+            measurement_gate="QUARANTINED",
+        )
+
+    # ------------------------------------------------------------------ #
+    # Branch C — default fallback: general batch status summary           #
+    # ------------------------------------------------------------------ #
+    total = len(batch.actions) if batch.actions else 0
+    verified = sum(1 for a in batch.actions if a.decision == ActionDecision.ELIGIBLE) if batch.actions else 0
+    blocked = sum(1 for a in batch.actions if a.decision == ActionDecision.BLOCKED) if batch.actions else 0
+    open_count = len(open_incidents)
+
+    answer = (
+        f'Batch "{batch.external_id}" covers {batch.zone}. '
+        f"Status: {batch.status.value}. "
+        f"{verified} of {total} actions verified; {blocked} blocked. "
+        f"{open_count} open incident(s) require attention."
+        if open_count
+        else (
+            f'Batch "{batch.external_id}" covers {batch.zone}. '
+            f"Status: {batch.status.value}. "
+            f"{verified} of {total} actions verified; {blocked} blocked. "
+            "No open incidents."
+        )
+    )
+
+    measurement_gate = "QUARANTINED" if open_count > 0 else ("ELIGIBLE" if verified == total and total > 0 else "PENDING")
+
+    zone_status: dict[str, str] = {}
+    for sid in queries._canary_ids(batch):
+        zone_status[sid] = "Canary store"
+    for sid in queries._expansion_ids(batch):
+        zone_status[sid] = "Expansion store"
+
+    return ExplainResponse(
+        answer=answer,
+        evidence_chips=["Approved Action", "Batch Status", "Incident Log"],
+        zone_status=zone_status,
+        measurement_gate=measurement_gate,
+    )

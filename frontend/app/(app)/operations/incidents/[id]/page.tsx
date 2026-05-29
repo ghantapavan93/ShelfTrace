@@ -14,6 +14,10 @@ import {
   CheckCircle2,
   FileCheck2,
   ArrowRight,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  BarChart2,
 } from "lucide-react";
 import clsx from "clsx";
 import { api, DEMO_BATCH } from "@/lib/api";
@@ -113,6 +117,19 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
           <p className="mt-1 text-slate-400">
             {i.product_name} · Store {i.store_id}
           </p>
+          {/* Potential Shopper Impact — shown only when observed price
+              diverges from approved (price_mismatch type). canary / expansion
+              store counts are on the batch, not the incident view, so only
+              the per-transaction delta is shown here. */}
+          {i.type === "price_mismatch" && i.observed_price != null && Math.abs(i.observed_price - i.approved_price) > 0.001 && (
+            <div className="mt-2 inline-flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/[.07] px-3 py-1.5 text-xs text-rose-200">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-400" />
+              <span>
+                <span className="font-semibold text-rose-100">Potential overcharge: {money(Math.abs(i.observed_price - i.approved_price))} per transaction</span>
+                <span className="ml-1 text-rose-300/70">· store count in Decision Receipt</span>
+              </span>
+            </div>
+          )}
         </div>
         <div className="text-right text-xs text-slate-500">
           <div className="mono text-slate-300">{i.id}</div>
@@ -151,9 +168,73 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
         </div>
       </motion.section>
 
+      {/* Channel Evidence table — row-level verification status for each
+          channel involved in this incident's action. */}
+      <section className="glass rounded-2xl p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <BarChart2 className="h-4 w-4 text-brand-400" />
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Channel Evidence</h3>
+          <span className="ml-auto text-[10px] uppercase tracking-[.18em] text-slate-500">
+            Approved {money(i.approved_price)}
+          </span>
+        </div>
+        <div className="divide-y divide-white/[.06] rounded-xl border border-white/8 overflow-hidden">
+          {(["esl", "pos", "ecommerce"] as const).map((ch) => {
+            const cv = i.channels.find((c) => c.channel === ch);
+            if (!cv) return null;
+            const isVerified = cv.status === "verified";
+            const isMismatch = cv.status === "mismatch";
+            const isTimeout = cv.status === "timeout";
+            const label = ch === "esl" ? "Shelf label (ESL)" : ch === "pos" ? "POS checkout" : "Ecommerce";
+            return (
+              <div key={ch} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+                <span className="w-36 shrink-0 text-slate-400">{label}</span>
+                <span className="font-mono tabular-nums text-white">
+                  {cv.observed_price != null ? money(cv.observed_price) : "—"}
+                </span>
+                <span
+                  className={clsx(
+                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[.18em]",
+                    isVerified
+                      ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-200"
+                      : isMismatch
+                        ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
+                        : "border-amber-500/35 bg-amber-500/10 text-amber-200",
+                  )}
+                >
+                  {isVerified ? (
+                    <CheckCircle className="h-2.5 w-2.5" />
+                  ) : isMismatch ? (
+                    <XCircle className="h-2.5 w-2.5" />
+                  ) : (
+                    <AlertTriangle className="h-2.5 w-2.5" />
+                  )}
+                  {isVerified ? "Verified" : isMismatch ? "Mismatch" : isTimeout ? "Timeout" : cv.status}
+                </span>
+                {isMismatch && cv.observed_price != null && (
+                  <span className="ml-auto text-[11px] text-rose-300/80 font-mono tabular-nums">
+                    {cv.observed_price > i.approved_price ? "+" : ""}
+                    {money(cv.observed_price - i.approved_price)} vs approved
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-[11px] text-slate-500">
+          Full causal chain and per-channel receipt in{" "}
+          <Link href={`/operations/receipts/${i.action_id}`} className="text-orange-300/80 underline-offset-2 hover:text-orange-300 hover:underline">
+            Decision Receipt →
+          </Link>
+        </p>
+      </section>
+
       {/* Execution Measurement Eligibility — derived read-only state.
           Distinct from the rollout-expansion decision shown elsewhere. */}
-      <EligibilityPanel eligibility={i.measurement_eligibility} />
+      <section aria-label="Sell-through measurement gate">
+        <p className="mb-2 text-[10px] uppercase tracking-[.22em] text-slate-500">Sell-through measurement</p>
+        <EligibilityPanel eligibility={i.measurement_eligibility} />
+      </section>
 
       {/* Decision Receipt — the full causal chain for this action. */}
       <Link
