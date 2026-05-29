@@ -12,7 +12,7 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │              WORKING PLATFORM LAYER (Operator)                  │
 │           /operations, /scenarios, /certification               │
-│   (Real-time rollout, live reconciliation, incident mgmt)      │
+│   (Simulated rollout, deterministic reconciliation, incident mgmt)      │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -498,4 +498,4 @@ PriceBatch (root)
 - Actual external pricing API (uses provided approved_price)
 - Actual retailer adapters (uses simulated behaviors)
 
-But the architecture is ready—once those components feed in real data, the demo becomes production.
+But the architecture is designed so real connectors could be added later.

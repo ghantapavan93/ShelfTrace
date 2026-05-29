@@ -73,7 +73,7 @@ export default function EngineeringPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Engineering Execution Trace</h1>
-          <p className="text-sm text-slate-400">From approved batch to verified store rollout — the real pipeline.</p>
+          <p className="text-sm text-slate-400">From approved batch to verified store rollout — the full reliability pipeline (simulated connectors).</p>
         </div>
         <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1 text-xs">
           {(["certification", "live_rollout"] as Mode[]).map((m) => (
@@ -94,7 +94,7 @@ export default function EngineeringPage() {
       {/* Shared-engine statement (real run context) */}
       <div className="glass rounded-2xl border border-violet-500/20 p-4">
         <div className="mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-widest text-violet-300">
-          One shared reliability engine · viewing <span className="text-white">{data.run_mode}</span> ({data.environment})
+          One shared reliability engine · viewing <span className="text-white">{data.run_mode}</span> ({data.environment === "simulated_production" ? "Simulated Rollout" : data.environment})
           {data.scenario_config_id && (
             <span className="mono rounded bg-white/5 px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-slate-400">
               scenario {data.scenario_config_id}
@@ -290,11 +290,12 @@ export default function EngineeringPage() {
               {data.test_proof.passed} passed in {data.test_proof.duration_s}s
             </div>
           </div>
+          <p className="text-[10px] text-slate-500 mt-1">Verification snapshot from current demo codebase — not live retailer integration tests.</p>
         </div>
 
         {/* Raw receipt */}
         <div className="glass rounded-2xl p-5">
-          <h3 className="mb-3 text-sm font-semibold text-white">Raw Adapter Receipt</h3>
+          <h3 className="mb-3 text-sm font-semibold text-white">Simulated Adapter Receipt</h3>
           <Json value={data.raw_receipt} />
         </div>
 

@@ -10,8 +10,8 @@
 | **Working platform** *(live data)* | [shelf-trace.vercel.app/operations](https://shelf-trace.vercel.app/operations) |
 | **Engineering trace** *(pipeline + tests)* | [shelf-trace.vercel.app/engineering](https://shelf-trace.vercel.app/engineering) |
 | **Build your own scenario** | [shelf-trace.vercel.app/scenarios](https://shelf-trace.vercel.app/scenarios) |
-| **Pricing engine** *(elasticity + profit-max)* | [shelf-trace.vercel.app/pricing](https://shelf-trace.vercel.app/pricing) |
-| **Competitor scraping** | [shelf-trace.vercel.app/scrapers](https://shelf-trace.vercel.app/scrapers) |
+| **Pricing engine** *(elasticity demo, synthetic history)* | [shelf-trace.vercel.app/pricing](https://shelf-trace.vercel.app/pricing) |
+| **Scrape technique demo** *(synthetic storefront)* | [shelf-trace.vercel.app/scrapers](https://shelf-trace.vercel.app/scrapers) |
 | **Backend health** | [shelftrace-api.onrender.com/health](https://shelftrace-api.onrender.com/health) |
 
 > ⏱️ **First click may take ~30s** while the free-tier backend wakes from idle. Subsequent navigation is instant. The full backend (FastAPI + PostgreSQL) runs on Render free tier; the frontend (Next.js) is on Vercel. Deploy config in [`render.yaml`](./render.yaml) + [`DEPLOY.md`](./DEPLOY.md).
@@ -148,7 +148,7 @@ curl -X POST http://localhost:8000/api/v1/demo/reset
 - `/operations/batches/[id]` — batch detail + canary verification matrix + Expand control
 - `/operations/incidents/[id]` — incident detail (channel pedestals, explanation, recovery actions, audit)
 - `/operations/markdowns` — perishable markdown reliability
-- `/engineering` — execution trace: outbox events, raw adapter receipt, reconciliation result, test proof
+- `/engineering` — execution trace: outbox events, simulated adapter receipt, reconciliation result, test proof
 
 ---
 

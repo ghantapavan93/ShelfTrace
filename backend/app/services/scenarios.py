@@ -30,6 +30,8 @@ from app.services import orchestrator
 from app.services.ingestion import ingest_batch
 
 MEMORIAL_DAY_NAME = "Memorial Day Dallas Zone 2"
+MILK_HERO_NAME = "Organic Whole Milk — Dallas Zone 2 (Demo)"
+MILK_HERO_EXTERNAL_ID = "milk-hero-dallas-02"
 
 # When a SKU lands via CSV upload it carries no cost — the upload format is
 # intentionally minimal. Without a cost row the margin-target rollup excludes
@@ -54,6 +56,8 @@ def source_run_id_for_config(config: TestRunConfig) -> str:
       • manual/form-built  → user:scenario-<id[:16]>
     """
     if config.is_seeded:
+        if config.name == MILK_HERO_NAME:
+            return "demo:milk-hero"
         return "demo:memorial-day"
     if config.import_source_hash:
         return f"user:{config.import_source_hash[:16]}"
@@ -149,6 +153,83 @@ def ensure_memorial_day(db: Session) -> TestRunConfig:
 
 
 # ---------------------------------------------------------------------------
+# Seeded hero scenario — Organic Whole Milk (primary demo scenario)
+# ---------------------------------------------------------------------------
+def get_milk_hero(db: Session) -> TestRunConfig | None:
+    return db.scalar(select(TestRunConfig).where(TestRunConfig.name == MILK_HERO_NAME))
+
+
+def create_milk_hero(db: Session) -> TestRunConfig:
+    cfg = TestRunConfig(
+        id=new_id("cfg"),
+        name=MILK_HERO_NAME,
+        run_mode=RunMode.LIVE_ROLLOUT,
+        environment=Environment.SIMULATED_PRODUCTION,
+        zone_name="Dallas Zone 2",
+        store_ids_csv="214,302,317,401",
+        canary_store_ids_csv="214",
+        is_seeded=True,
+    )
+    db.add(cfg)
+    db.flush()
+
+    db.add(
+        TestRunAction(
+            id=new_id("tra"),
+            test_run_config_id=cfg.id,
+            product_name="Organic Whole Milk",
+            sku="milk-organic-whole-1gal",
+            previous_price=6.49,
+            approved_price=5.99,
+            reason="Weekly price reset",
+            is_kvi=True,
+        )
+    )
+
+    # Canary store 214: ESL and ecommerce verify cleanly; POS returns stale price
+    # on the first attempt ($6.49) then recovers to the approved price ($5.99) on retry.
+    db.add_all([
+        ConnectorBehaviorProfile(
+            id=new_id("beh"),
+            test_run_config_id=cfg.id,
+            store_id="214",
+            sku="milk-organic-whole-1gal",
+            channel_type=Channel.ESL,
+            behavior_type=BehaviorType.SUCCESS,
+        ),
+        ConnectorBehaviorProfile(
+            id=new_id("beh"),
+            test_run_config_id=cfg.id,
+            store_id="214",
+            sku="milk-organic-whole-1gal",
+            channel_type=Channel.ECOMMERCE,
+            behavior_type=BehaviorType.SUCCESS,
+        ),
+        ConnectorBehaviorProfile(
+            id=new_id("beh"),
+            test_run_config_id=cfg.id,
+            store_id="214",
+            sku="milk-organic-whole-1gal",
+            channel_type=Channel.POS,
+            behavior_type=BehaviorType.STALE_PRICE,
+            configured_observed_price=6.49,
+            retry_success_price=5.99,
+        ),
+    ])
+    db.commit()
+    db.refresh(cfg)
+    return cfg
+
+
+def ensure_milk_hero(db: Session) -> TestRunConfig:
+    config = get_milk_hero(db)
+    if config is None:
+        config = create_milk_hero(db)
+        execute_live(db, config)
+    return config
+
+
+# ---------------------------------------------------------------------------
 # Build a batch payload from a configuration
 # ---------------------------------------------------------------------------
 def build_payload(config: TestRunConfig, run_mode: str, external_id: str, idempotency_key: str) -> PriceBatchIn:
@@ -184,7 +265,11 @@ def build_payload(config: TestRunConfig, run_mode: str, external_id: str, idempo
 
 
 def _live_external_id(config: TestRunConfig) -> str:
-    return DEMO_EXTERNAL_ID if config.name == MEMORIAL_DAY_NAME else f"live-{config.id}"
+    if config.name == MEMORIAL_DAY_NAME:
+        return DEMO_EXTERNAL_ID
+    if config.name == MILK_HERO_NAME:
+        return MILK_HERO_EXTERNAL_ID
+    return f"live-{config.id}"
 
 
 def execute_live(db: Session, config: TestRunConfig) -> PriceBatch:

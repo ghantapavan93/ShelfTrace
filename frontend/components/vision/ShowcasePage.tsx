@@ -35,9 +35,9 @@ import { PriceVerificationAnimation } from "@/components/narrative/PriceVerifica
    possible." Reliability principles replace any quote/testimonial wall.
    Real-repo proof claims only:
      • Configurable Scenario Builder · Certification Lab · Live Control Plane
-     • PostgreSQL Transactional Outbox · Redis Worker
+     • PostgreSQL Transactional Outbox · Outbox Drain
      • Deterministic Reconciliation · Audit-Verified Recovery
-     • 131 PostgreSQL-Backed Tests
+     • PostgreSQL-Backed Test Suite
    ──────────────────────────────────────────────────────────────────────────── */
 
 /* photo set — long-stable Unsplash IDs, CSS gradient fallback if any 404 */
@@ -199,7 +199,7 @@ function MarqueeStrip() {
     "Certification Lab",
     "Live Control Plane",
     "PostgreSQL Outbox",
-    "Redis Worker",
+    "Outbox Drain",
     "Deterministic Reconciliation",
     "Audit-Verified Recovery",
     "Scenario-Driven Connectors",
@@ -262,7 +262,7 @@ function PriceVerificationProof() {
       </motion.div>
       <div className="mt-8 grid gap-6 sm:grid-cols-3">
         <ProofMeta n="01" title="Approve" body="Approved price + dispatch commit in one PostgreSQL transaction. The outbox is the source of truth." />
-        <ProofMeta n="02" title="Execute" body="Redis worker fans the same event to POS, shelf label and ecommerce with safe concurrent locking." />
+        <ProofMeta n="02" title="Execute" body="Drained inline via orchestrator — the same event fans out to POS, shelf label and ecommerce with safe concurrent locking." />
         <ProofMeta n="03" title="Reconcile" body="Acknowledgements reconcile against the approved price. Disagreement raises an incident before expansion." />
       </div>
     </section>
@@ -660,7 +660,7 @@ function HowItWorks() {
     {
       n: "02",
       title: "Dispatch",
-      body: "The Redis worker fans the event out to every channel — shelf label, checkout, ecommerce — under safe concurrent locking.",
+      body: "The Outbox Drain fans the event out to every channel — shelf label, checkout, ecommerce — under safe concurrent locking.",
       icon: Zap,
     },
     {
@@ -803,7 +803,7 @@ export default function ShowcasePage() {
           {
             chip: "02 · dispatch",
             title: "Every channel hears it the same way.",
-            body: "The Redis worker fans the event out to shelf label, checkout and ecommerce — under safe concurrent locking.",
+            body: "The Outbox Drain fans the event out to shelf label, checkout and ecommerce — under safe concurrent locking.",
           },
           {
             chip: "03 · verify",

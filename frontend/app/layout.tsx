@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     template: "%s · ShelfTrace",
   },
   description:
-    "A reliability control plane for approved retail price execution. Canary containment, deterministic reconciliation across shelf, POS and ecommerce, audit-verified recovery — backed by 184 PostgreSQL tests.",
+    "A reliability control plane for approved retail price execution. Canary containment, deterministic reconciliation across shelf, POS and ecommerce, audit-verified recovery — backed by a PostgreSQL-backed test suite.",
   applicationName: "ShelfTrace Control Plane",
   authors: [{ name: "Pavan Kalyan Ghanta" }],
   keywords: [

@@ -2,7 +2,7 @@
 
 ## **The Journey: Founder's View**
 
-When the BetterBasket founder opens ShelfTrace, here's what they see and how it works:
+When a reviewer opens ShelfTrace, here's what they see and how it works:
 
 ---
 
@@ -15,7 +15,7 @@ When the BetterBasket founder opens ShelfTrace, here's what they see and how it 
 - Canary rollout concept explained visually
 - Live demo link to jump into operations
 
-**Why it matters:** Establishes credibility — shows understanding of *execution* (not pricing/demand), the key gap BetterBasket doesn't focus on.
+**Why it matters:** Establishes credibility — shows understanding of *execution* (not pricing/demand), the key gap an AI pricing system doesn't address alone.
 
 ---
 
@@ -185,7 +185,7 @@ These are NOT directly called by the scenario builder. Instead, they're pre-comp
 
 ### **1. Competitor Scraper** (`/operations → backend/app/scrapers/`)
 - **When:** On-demand or scheduled (e.g., every 4 hours)
-- **What:** Fetches competitor prices from Whole Foods, Amazon Fresh
+- **What:** Parses prices from approved public practice sources (Books to Scrape parser-verification fixture).
 - **Output:** Stores in `competitor_products` table + price history
 - **Used by:** Pricing engine (as reference prices)
 
@@ -274,7 +274,7 @@ Founder: "Ah! That's why we need this. Without ShelfTrace, we'd have shopper com
 
 - **Before:** Pricing engine sees `sku_eggs_214` as a standalone SKU
 - **After:** We link it to `ProductEntity(canonical_title="Organic Large Eggs")`
-  - Can now see: competitors pricing same entity across Whole Foods, Amazon, Target
+  - Can now see: competitors pricing same entity across simulated storefront sources
   - Can auto-detect cannibalization: "If eggs ↑ 15%, tofu demand ↑ 10%"
   - Can ask: "What's the full margin for this entity across all my zones?"
 
@@ -321,7 +321,7 @@ effective_cost = compute_effective_cogs(base_cost=2.50, signals=[...])
 - Audit trail: every decision, every retry, every resolution logged
 
 ### **This Morning's Additions (Why It Matters):**
-- **Product graph:** Now knows that "Eggs at Store 214" is the same product entity as "Eggs at Whole Foods"—can track margin across competitors
+- **Product graph:** Now knows that "Eggs at Store 214" is the same product entity as "Eggs at simulated storefront sources"—can track margin across competitors
 - **Cannibalization detection:** Prevents race-to-the-bottom (don't just match competitor egg price if it kills your own substitute sales)
 - **Supply signals:** Preemptive pricing before commodity shocks hit
 
@@ -371,7 +371,7 @@ That's the sell: **Execution safety for AI-approved prices.**
 
 - Real scraper integration (currently stub data)
 - Real pricing engine auto-run (currently seeded)
-- Upstream integration with BetterBasket's actual pricing API
+- Upstream integration with an AI pricing system's approved actions
 - Multi-zone expansion rules
 - Automated rollback triggers
 

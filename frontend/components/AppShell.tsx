@@ -33,14 +33,14 @@ import { api } from "@/lib/api";
 import { EASE } from "@/lib/motion";
 
 const NAV = [
-  { href: "/vision", label: "Vision Studio", sub: "Concept showcase", icon: Sparkles, match: /^\/vision/ },
+  { href: "/vision", label: "Product Story", sub: "Founder thesis", icon: Sparkles, match: /^\/vision/ },
   { href: "/data-replay", label: "Real Data Replay", sub: "Public-source records", icon: Database, match: /^\/data-replay/ },
-  { href: "/scenarios", label: "Scenario Builder", sub: "Configure a test run", icon: SlidersHorizontal, match: /^\/scenarios/ },
-  { href: "/scrapers", label: "Competitor Scraping", sub: "Data extraction pipeline", icon: Globe, match: /^\/scrapers/ },
-  { href: "/product-graph", label: "Knowledge Graph", sub: "Cross-source unification", icon: Network, match: /^\/product-graph/ },
-  { href: "/pricing", label: "Pricing Engine", sub: "Elasticity · profit-max", icon: Brain, match: /^\/pricing/ },
-  { href: "/certification", label: "Certification Lab", sub: "Before go-live", icon: ShieldCheck, match: /^\/certification/ },
-  { href: "/operations", label: "Live Operations", sub: "Command Center", icon: LayoutGrid, match: /^\/operations$/ },
+  { href: "/scenarios", label: "Action Simulator", sub: "Configure synthetic execution", icon: SlidersHorizontal, match: /^\/scenarios/ },
+  { href: "/scrapers", label: "Market Signal Intake", sub: "Public reference extraction", icon: Globe, match: /^\/scrapers/ },
+  { href: "/product-graph", label: "Product Match Workbench", sub: "Seeded relationship review", icon: Network, match: /^\/product-graph/ },
+  { href: "/pricing", label: "Candidate Action Studio", sub: "Synthetic decision replay", icon: Brain, match: /^\/pricing/ },
+  { href: "/certification", label: "Connector Certification", sub: "Before go-live", icon: ShieldCheck, match: /^\/certification/ },
+  { href: "/operations", label: "Execution Assurance", sub: "Operator recovery workspace", icon: LayoutGrid, match: /^\/operations$/ },
   {
     // Batches sidebar entry points at /operations so the BatchPicker can
     // route the user to the right batch for their current mode (most recent
@@ -53,9 +53,9 @@ const NAV = [
     icon: Boxes,
     match: /^\/operations\/batches/,
   },
-  { href: "/operations/incidents", label: "Incidents", sub: "Manage & triage", icon: Bell, match: /^\/operations\/incidents/ },
-  { href: "/operations/markdowns", label: "Markdown SLAs", sub: "Perishable deadlines", icon: Tag, match: /^\/operations\/markdowns/ },
-  { href: "/engineering", label: "Engineering Trace", sub: "Data lineage", icon: GitBranch, match: /^\/engineering/ },
+  { href: "/operations/incidents", label: "Exception Command Center", sub: "Exception resolution workspace", icon: Bell, match: /^\/operations\/incidents/ },
+  { href: "/operations/markdowns", label: "Perishable Deadline Desk", sub: "Fresh inventory deadline monitoring", icon: Tag, match: /^\/operations\/markdowns/ },
+  { href: "/engineering", label: "Evidence & Replay", sub: "Action to verified outcome", icon: GitBranch, match: /^\/engineering/ },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -216,7 +216,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Test before go-live · guard after approval
           </span>
           <div className="ml-auto flex items-center gap-3 text-xs text-slate-400">
-            <ModeBadge />
+            <span title="Independent prototype · sample grocery scenarios · simulated POS, shelf-label and ecommerce connectors · no BetterBasket affiliation · no live retailer systems">
+              <ModeBadge />
+            </span>
             <span className="hidden items-center gap-1.5 sm:flex">
               <span className="h-1.5 w-1.5 rounded-full bg-verified animate-pulse-glow" />
               <span className="hidden md:inline">Live · updates on action</span>

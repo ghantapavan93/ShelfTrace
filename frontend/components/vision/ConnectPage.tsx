@@ -625,7 +625,7 @@ const PIPELINE = [
   { icon: FileUp, label: "Arrives", body: "POST · CSV · DB pull · same engine entry" },
   { icon: ShieldCheck, label: "Validated", body: "Idempotency key + schema + policy checks" },
   { icon: Database, label: "Outbox", body: "Commit to PostgreSQL in one transaction" },
-  { icon: Workflow, label: "Workers", body: "Redis-fanned dispatch · SKIP LOCKED" },
+  { icon: Workflow, label: "Outbox Drain (inline)", body: "Drained inline · SKIP LOCKED" },
   { icon: Cable, label: "Channels", body: "Shelf label · checkout POS · ecommerce" },
   { icon: GitBranch, label: "Reconciled", body: "Acks compared against canonical" },
   { icon: BadgeCheck, label: "Sealed", body: "Audit row · ack < resolve · causal" },
@@ -690,7 +690,7 @@ function ProductionFraming() {
                 A real deployment would plug into approved retailer connectors.
               </h3>
               <p className="mt-5 max-w-xl text-base leading-relaxed text-white/65">
-                Production integration would require secure, scoped access to retailer or BetterBasket
+                Production integration would require secure, scoped access to a retailer's
                 source-of-truth data — not the simulated sample dataset used here. The engine
                 evaluates whatever it receives the same way, but no private data is read or written
                 by the prototype today.

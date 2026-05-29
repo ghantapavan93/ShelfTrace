@@ -51,8 +51,8 @@ import {
    Cinematic polish pass: real photo backdrops (dimmed), chapter rail, chapter
    announcement cards, cursor spotlight on the aisle, ambient particles in dark
    spaces, timecode HUD during the critical moment, line-stagger headline
-   reveals. No vanity stats, no unsupported tech terms. 131 PostgreSQL-backed
-   tests, configurable scenarios, certification lab, live control plane,
+   reveals. No vanity stats, no unsupported tech terms. PostgreSQL-backed test
+   suite, configurable scenarios, certification lab, live control plane,
    deterministic reconciliation, audit-verified recovery. CinePhoto fallback
    to gradient art if any Unsplash photo 404s.
    ──────────────────────────────────────────────────────────────────────────── */
@@ -1269,7 +1269,7 @@ const PROOF_TILES = [
   },
   {
     key: "TECHNICAL PROOF",
-    main: "131 Tests",
+    main: "Full Test Suite",
     sub: "PostgreSQL-backed recovery checks",
     icon: BadgeCheck,
     color: "#22c55e",
@@ -1397,7 +1397,7 @@ function ProofMini({ lit }: { lit: boolean }) {
         </div>
         {lit && (
           <span className="font-mono text-[9px] uppercase tracking-[.18em] text-emerald-300">
-            131 / 131
+            all passed
           </span>
         )}
       </div>
@@ -2343,7 +2343,7 @@ function NightClosing() {
                 "Configurable Scenarios",
                 "Certification + Live Rollout",
                 "Audit-Verified Recovery",
-                "131 PostgreSQL-Backed Tests",
+                "PostgreSQL-Backed Test Suite",
               ].map((chip) => (
                 <span
                   key={chip}

@@ -89,6 +89,12 @@ async def lifespan(app: FastAPI):
                 data_replay_service.import_source(db, SourceDatasetType.USDA_AMS)
             except Exception:
                 logger.exception("Real Data Replay fixture import skipped")
+            # Milk hero: seed the primary POS-mismatch scenario
+            try:
+                from app.services.scenarios import ensure_milk_hero
+                ensure_milk_hero(db)
+            except Exception:
+                logger.exception("Milk hero seeding skipped")
     yield
     # No teardown work for now.
 

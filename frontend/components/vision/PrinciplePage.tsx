@@ -739,7 +739,7 @@ function ClosingCta() {
             <p className="mt-5 max-w-xl text-base leading-relaxed text-white/65">
               The system you saw in the Keynote isn't a different category of tool. It is this
               positioning, made real in code — outbox, reconciliation, canary containment,
-              audit-verified recovery, 131 PostgreSQL-backed tests.
+              audit-verified recovery, PostgreSQL-backed test suite.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <MagneticLink href="/operations" variant="primary">
