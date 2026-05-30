@@ -38,6 +38,12 @@ otel = [
     "opentelemetry-instrumentation-redis==0.44b0",
     "opentelemetry-exporter-otlp==1.23.0",
 ]
+# Opt-in: the agent-facing MCP server (app/mcp_server.py). Kept optional so the
+# core API image stays lean and the test suite never depends on the MCP SDK.
+#   pip install ".[mcp]"   then   python -m app.mcp_server
+mcp = [
+    "mcp>=1.2.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

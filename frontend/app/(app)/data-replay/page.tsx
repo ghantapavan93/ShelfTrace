@@ -43,6 +43,14 @@ const SOURCE_META: Record<
       "Crowdsourced product-price observations. Labeled clearly as community data, replay-only.",
     cta: "Coming soon",
   },
+  authorized_api: {
+    label: "Authorized API Source",
+    icon: ShieldCheck,
+    tone: "border-amber-500/30 bg-amber-500/5",
+    description:
+      "Bring-your-own authorized pricing / POS API (operator credentials). The intake architecture is ready for it — but it is NOT connected in this prototype, and no live retailer integration is claimed.",
+    cta: "Ready · not connected",
+  },
 };
 
 const input =
@@ -149,6 +157,7 @@ export default function DataReplayPage() {
           { key: "usda_fdc", have: haveFdc, onImport: () => importSource("usda_fdc") },
           { key: "usda_ams", have: haveAms, onImport: () => importSource("usda_ams") },
           { key: "open_prices", have: false, onImport: undefined as undefined | (() => void) },
+          { key: "authorized_api", have: false, onImport: undefined as undefined | (() => void) },
         ] as const).map((c) => {
           const m = SOURCE_META[c.key];
           const Icon = m.icon;

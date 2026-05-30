@@ -194,6 +194,44 @@ The configurable engine accepts **real public grocery records** as execution-rep
 
 **ShelfTrace does not decide the optimal price.** Real public data is used to create traceable execution-replay scenarios; store connectors stay simulated. The engineering trace shows full **source lineage** alongside the technical artifacts (outbox events, adapter receipts, reconciliation result, audit). See `/data-replay`.
 
+---
+
+## Agent-ready: the ShelfTrace MCP server
+
+The broader industry direction (which this independent prototype is inspired by, **not** affiliated with) is that grocery-pricing *agents* will increasingly read live operational data through **MCP and streaming infrastructure**, and that decisions must be **explainable and traceable**, not black-box. ShelfTrace is built as exactly that kind of *system underneath the agent* — and it ships an MCP server so an agent can query its reliability layer directly.
+
+`backend/app/mcp_server.py` (FastMCP, stdio) exposes ShelfTrace's **read-only** reliability surface as MCP tools:
+
+| Tool | Answers |
+|---|---|
+| `shelftrace_list_batches` / `shelftrace_get_batch` | discover batches → their action ids |
+| `shelftrace_get_decision_receipt` | the full Signal→…→Learned evidence chain for one action |
+| `shelftrace_is_execution_verified` | did the approved price reach the shopper on **every** channel? |
+| `shelftrace_is_measurement_eligible` | the **quality gate** — is this outcome trustworthy enough to learn from? |
+| `shelftrace_list_regression_cases` | Override Memory — resolved failures that guard future batches |
+| `shelftrace_explain` | a deterministic, evidence-grounded plain-English answer |
+
+It is an **opt-in, isolated** entrypoint (its own module, never imported by the API or the test suite; `mcp` is an optional dependency), and every tool is **read-only** — no tool mutates state. It serves ShelfTrace's own simulated/demo data; there is no retailer or vendor integration.
+
+```bash
+cd backend && pip install ".[mcp]"
+DATABASE_URL=<your shelftrace db> python -m app.mcp_server   # stdio
+```
+
+Register it with any MCP client (e.g. Claude Desktop / Claude Code) by pointing the client at that command. The agent can then *check execution reliability before it acts on, attributes, or learns from a price decision.*
+
+### How the design maps to agent-readiness principles
+
+| Agent-ready principle | ShelfTrace |
+|---|---|
+| **Clean, centralized data** (canonical catalogs, relationship graphs) | Product Match Workbench — canonical entities + relationship graph |
+| **Digitized workflows** with visibility into how decisions are made & executed | Action Simulator + the **Decision Receipt** (one durable record of *how* a price decision was made and executed) |
+| **Real-time market context** (not stale snapshots) | Market Signal Intake + Real Data Replay (public-source observations, provenance preserved) |
+| **Feedback loops → measurable outcomes; a training harness** | **Measurement Quarantine** + **Override Memory / Regression Replay** |
+| **Explainable, traceable decisions** via MCP / streaming | **Decision Receipt + Evidence Rail + Ask ShelfTrace**, now **MCP-accessible** (above) |
+
+The differentiated point ShelfTrace adds on top: *you should only measure or learn from a price action **after its shopper-facing execution is verified*** — the `shelftrace_is_measurement_eligible` gate makes that callable by an agent.
+
 ## What this is — and is not
 
 **Is:** an adjacent prototype exploring safe rollout, verification, and recovery around AI-approved price *execution*, using simulated adapters and sample data.
