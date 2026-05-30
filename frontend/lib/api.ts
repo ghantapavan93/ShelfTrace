@@ -766,13 +766,13 @@ export const api = {
     post<ScenarioExecuteResult>(`/api/v1/source-observations/${id}/create-scenario`, body),
 
   // Ask ShelfTrace — deterministic Q&A over the live operations state
-  explain: (query: string) =>
+  explain: (query: string, scope?: "live" | "demo" | "all") =>
     post<{
       answer: string;
       evidence_chips: string[];
       zone_status: Record<string, string>;
       measurement_gate: string;
-    }>(`/api/v1/operations/explain`, { query }),
+    }>(`/api/v1/operations/explain${scope ? `?scope=${scope}` : ""}`, { query }),
 };
 
 export const DEMO_BATCH = "memorial-day-dallas-02";

@@ -120,12 +120,12 @@ const CHAPTERS: Chapter[] = [
   },
   {
     id: "recover",
-    title: "Recovery — connector twin retries idempotently",
+    title: "Recovery — regression replay retries idempotently",
     tone: "purple",
-    caption: "Synthetic twin replays the failing event before retrying live.",
+    caption: "A shadow run replays the failing event before retrying live.",
     narration: [
-      "[T+3.71] connector.twin: replay sku=mk-dl-02-7741",
-      "[T+3.74] twin.ack: ok · diff=resolved · safe-to-live=true",
+      "[T+3.71] regression.replay: sku=mk-dl-02-7741",
+      "[T+3.74] replay.ack: ok · diff=resolved · safe-to-live=true",
       "[T+3.78] live.retry: pos.ack ok · canonical aligned",
     ],
     shopperX: 78,
@@ -488,7 +488,7 @@ function CinematicAisle() {
                       Canonical $5.49 ✓
                     </text>
                     <text x="610" y="132" fill="#86efac" fontSize="10" fontFamily="ui-monospace, monospace">
-                      twin verified · live aligned
+                      replay verified · live aligned
                     </text>
                   </motion.g>
                 )}
@@ -549,7 +549,7 @@ function CinematicAisle() {
               </div>
               <span className="flex items-center gap-1 text-[10px] text-white/35">
                 <CircleDot className="h-2.5 w-2.5 animate-pulse text-emerald-400" />
-                otel.trace
+                trace events
               </span>
             </div>
             <div
@@ -568,7 +568,7 @@ function CinematicAisle() {
           <div className="grid grid-cols-2 gap-3">
             <Kpi label="Canonical price" value="$5.49" tone="orange" icon={Tag} />
             <Kpi label="Drift window" value={chapter.mismatch ? "open · 120s" : "0s"} tone={chapter.mismatch ? "red" : "green"} icon={Clock4} />
-            <Kpi label="Twin verdict" value={chapter.resolved ? "safe-to-live" : chapter.mismatch ? "investigating" : "warm"} tone={chapter.resolved ? "green" : "neutral"} icon={ShieldCheck} />
+            <Kpi label="Replay verdict" value={chapter.resolved ? "safe-to-live" : chapter.mismatch ? "investigating" : "warm"} tone={chapter.resolved ? "green" : "neutral"} icon={ShieldCheck} />
             <Kpi label="Attribution" value={idx >= 5 ? "released" : "held"} tone={idx >= 5 ? "green" : "purple"} icon={BadgeCheck} />
           </div>
         </div>
@@ -618,7 +618,7 @@ function PosScanMoment() {
     { title: "Scan", sub: "Barcode read · idempotency_key issued", icon: ScanLine },
     { title: "Fetch", sub: "Canonical price hydrated from Aisle Twin", icon: Server },
     { title: "Reconcile", sub: "POS reported vs canonical · drift gate", icon: Repeat },
-    { title: "Resolve", sub: "Twin replay → live retry → audit sealed", icon: BadgeCheck },
+    { title: "Resolve", sub: "Regression replay → live retry → audit sealed", icon: BadgeCheck },
   ];
   return (
     <section className="relative mt-12 overflow-hidden rounded-3xl border border-white/10 bg-[#0a0f1a]/85 p-6">
@@ -859,22 +859,22 @@ const FUTURE: FutureConcept[] = [
   },
   {
     id: "connector",
-    title: "Connector Twin",
+    title: "Connector Certification",
     kicker: "TEST BEFORE LIVE",
     thesis: "Synthetic doubles of every adapter — same contract, no shelf risk.",
     body:
-      "Run new connector versions against recorded ack patterns; only promote when twin verdict + contract test (Pact) pass and SLO budget is healthy.",
+      "Run new connector versions against recorded ack patterns; only promote when the regression verdict + connector certification checks pass and the reliability budget is healthy.",
     icon: FlaskConical,
     tone: "green",
     visual: () => (
       <svg viewBox="0 0 240 90" className="h-full w-full">
         <rect x="10" y="20" width="100" height="50" rx="5" fill="#0c1220" stroke="#22c55e" />
-        <text x="18" y="40" fontSize="10" fill="#86efac" fontFamily="ui-monospace, monospace">twin · vNext</text>
-        <text x="18" y="56" fontSize="9" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace">contract: ok</text>
+        <text x="18" y="40" fontSize="10" fill="#86efac" fontFamily="ui-monospace, monospace">candidate · vNext</text>
+        <text x="18" y="56" fontSize="9" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace">certified: ok</text>
         <path d="M114 45 L130 45" stroke="#22c55e" strokeDasharray="3 3" />
         <rect x="132" y="20" width="100" height="50" rx="5" fill="#0c1220" stroke="#1e2533" />
         <text x="140" y="40" fontSize="10" fill="#e2e8f0" fontFamily="ui-monospace, monospace">live · vCurrent</text>
-        <text x="140" y="56" fontSize="9" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace">slo: 99.93</text>
+        <text x="140" y="56" fontSize="9" fill="rgba(255,255,255,.45)" fontFamily="ui-monospace, monospace">budget: 99.93</text>
       </svg>
     ),
   },
@@ -975,21 +975,21 @@ const DEPTH: Array<{ name: string; sub: string; body: string; icon: ElementType 
     icon: Repeat,
   },
   {
-    name: "Contract tests (Pact)",
+    name: "Connector certification",
     sub: "PROVIDER ↔ CONSUMER",
-    body: "Adapters publish contracts; the engine verifies them in CI. Twin promotion blocks on contract green + SLO budget healthy.",
+    body: "Adapters publish contracts; the engine verifies them in CI. Promotion blocks on certification green + reliability budget healthy.",
     icon: FileSignature,
   },
   {
-    name: "OpenTelemetry traces",
+    name: "Structured trace events",
     sub: "PRICE → ACK → AUDIT",
     body: "Every signal carries a trace_id from model output to shelf-edge ack, so any drift opens with a real causal path attached.",
     icon: Workflow,
   },
   {
-    name: "SLO + error budgets",
+    name: "Reliability + error budgets",
     sub: "ROLLOUT GUARDRAILS",
-    body: "Canary stores burn against a per-connector budget. Auto-pause when the budget tips; auto-resume once twin verdict clears.",
+    body: "Canary stores burn against a per-connector budget. Auto-pause when the budget tips; auto-resume once the regression verdict clears.",
     icon: ShieldCheck,
   },
   {
@@ -1432,7 +1432,7 @@ function CtaRail() {
           </h3>
           <p className="mt-2 max-w-xl text-sm text-white/55">
             Outbox, idempotency, audit causality and scenario-driven adapters already exist in the working repo.
-            Aisle Twin, Connector Twin, the Provenance Graph and Replay Theater extend that surface — they do
+            Aisle Twin, Connector Certification, the Provenance Graph and Replay Theater extend that surface — they do
             not replace it.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">

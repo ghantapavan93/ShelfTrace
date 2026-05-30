@@ -701,16 +701,16 @@ function HeroLaunchConsole({
 
 const SAMPLE_LOGS: { t: string; line: string; tone: "ok" | "warn" | "err" | "info" }[] = [
   { t: "[T-08.0]", line: "preflight: outbox staged · 11 events", tone: "info" },
-  { t: "[T-06.4]", line: "preflight: contract.pact green · pos/esl/web", tone: "ok" },
-  { t: "[T-04.1]", line: "preflight: slo.budget=0.07% headroom", tone: "ok" },
-  { t: "[T-01.2]", line: "preflight: twin.verdict=safe-to-live", tone: "ok" },
+  { t: "[T-06.4]", line: "preflight: certification green · pos/esl/web", tone: "ok" },
+  { t: "[T-04.1]", line: "preflight: reliability.budget=0.07% headroom", tone: "ok" },
+  { t: "[T-01.2]", line: "preflight: regression.verdict=safe-to-live", tone: "ok" },
   { t: "[T+00.0]", line: "GO · dispatching canary {dl-02,dl-04}", tone: "info" },
   { t: "[T+00.4]", line: "outbox.dispatch: 11/11 · skip-locked", tone: "ok" },
   { t: "[T+01.1]", line: "esl.ack: 11/11 · 88ms p50", tone: "ok" },
   { t: "[T+01.4]", line: "pos.ack: 10/11 · 1 retry queued", tone: "warn" },
   { t: "[T+02.2]", line: "drift: au-03 · sku=mk-au-03-2199 +$0.42", tone: "err" },
   { t: "[T+02.3]", line: "incident.open: INC-2147 · sla=120s", tone: "err" },
-  { t: "[T+02.7]", line: "twin.replay: ok · safe-to-live", tone: "ok" },
+  { t: "[T+02.7]", line: "regression.replay: ok · safe-to-live", tone: "ok" },
   { t: "[T+03.0]", line: "live.retry: pos.ack ok · canonical aligned", tone: "ok" },
   { t: "[T+03.4]", line: "audit.seal: ack@T+02.3 < resolve@T+03.0", tone: "ok" },
   { t: "[T+04.0]", line: "attribution: released window verified-only", tone: "ok" },
@@ -720,9 +720,9 @@ const SAMPLE_LOGS: { t: string; line: string; tone: "ok" | "warn" | "err" | "inf
 
 const GATES = [
   { id: "outbox", label: "Outbox staged", at: 0.06 },
-  { id: "contract", label: "Contract tests (Pact)", at: 0.12 },
-  { id: "slo", label: "SLO budget", at: 0.18 },
-  { id: "twin", label: "Connector twin verdict", at: 0.22 },
+  { id: "contract", label: "Connector certification checks", at: 0.12 },
+  { id: "slo", label: "Reliability budget", at: 0.18 },
+  { id: "twin", label: "Regression replay verdict", at: 0.22 },
   { id: "canary", label: "Canary stores ready", at: 0.27 },
   { id: "audit", label: "Audit listener", at: 0.31 },
   { id: "kill", label: "Kill switch armed", at: 0.34 },
@@ -1026,7 +1026,7 @@ function CostOfDrift() {
             <p className="mt-2 max-w-xl text-sm text-white/55">
               Volume × price gap × foot traffic, in the very 15-minute window the drift is open.
               ShelfTrace surfaces it before the weekly recon meeting — and freezes the meter the second
-              the connector twin re-aligns the canonical price.
+              the regression replay re-aligns the canonical price.
             </p>
             <div className="mt-6 flex items-baseline gap-3">
               <div className="font-mono text-6xl font-bold tabular-nums text-white">{formatted}</div>
@@ -1270,7 +1270,7 @@ const RECEIPT_LINES = [
   "  Channel   POS  ESL  WEB  APP",
   "  Acks      10   11   11   11",
   "  Drift     1  → INC-2147 (au-03)",
-  "  Replay    twin  → safe-to-live",
+  "  Replay    regression  → safe-to-live",
   "  Retry     live  → aligned",
   "  Audit     ack@T+02.3 < res@T+03.0",
   "  Verdict   ✓ ATTRIBUTION RELEASED",
@@ -1326,7 +1326,7 @@ function ThermalReceipt() {
             The audit prints in real time. You can tear it off.
           </h3>
           <p className="mt-2 max-w-xl text-sm text-white/55">
-            Every rollout produces a tamper-evident receipt: ack ordering, retries, twin verdicts,
+            Every rollout produces a tamper-evident receipt: ack ordering, retries, regression verdicts,
             attribution gate. It is the same data that backs the working <code className="text-orange-300">/engineering</code>
             {" "}trace — printed here for the operator&apos;s eye.
           </p>
@@ -1404,9 +1404,9 @@ function ThermalReceipt() {
 
 const WATERFALL: { tone: "ok" | "warn" | "err" | "info"; line: string }[] = [
   { tone: "info", line: "preflight.outbox: 11 events staged · skip-locked" },
-  { tone: "ok", line: "preflight.contract: pact verified · pos/esl/web/app" },
-  { tone: "ok", line: "preflight.slo: error_budget_remaining=0.07%" },
-  { tone: "ok", line: "preflight.twin: verdict=safe-to-live · twin_lag=14ms" },
+  { tone: "ok", line: "preflight.certification: verified · pos/esl/web/app" },
+  { tone: "ok", line: "preflight.budget: error_budget_remaining=0.07%" },
+  { tone: "ok", line: "preflight.regression: verdict=safe-to-live · replay_lag=14ms" },
   { tone: "info", line: "dispatch.canary: {dl-02, dl-04} · 11/11" },
   { tone: "ok", line: "ack.esl[dl-02]: 11/11 · p50=88ms" },
   { tone: "ok", line: "ack.pos[dl-02]: 11/11 · p50=104ms" },
@@ -1415,7 +1415,7 @@ const WATERFALL: { tone: "ok" | "warn" | "err" | "info"; line: string }[] = [
   { tone: "warn", line: "ack.pos[au-03]: reported=$5.99 canonical=$5.49" },
   { tone: "err", line: "reconcile.drift: open · INC-2147 · sla=120s" },
   { tone: "info", line: "containment.hold: downstream paused · attribution held" },
-  { tone: "ok", line: "twin.replay[au-03]: ok · safe-to-live=true" },
+  { tone: "ok", line: "regression.replay[au-03]: ok · safe-to-live=true" },
   { tone: "ok", line: "live.retry[au-03]: pos.ack ok · canonical=$5.49" },
   { tone: "ok", line: "audit.seal: causal ok · ack < resolve" },
   { tone: "ok", line: "attribution.release: window=verified-only" },
@@ -1498,9 +1498,9 @@ function MissionLogWaterfall() {
 const PRINCIPLES = [
   { name: "Outbox + SKIP LOCKED", sub: "Postgres", icon: Database },
   { name: "Idempotency keys", sub: "Exactly-once effect", icon: Repeat },
-  { name: "Contract tests (Pact)", sub: "Provider/consumer", icon: FileSignature },
-  { name: "OpenTelemetry", sub: "trace_id end-to-end", icon: Network },
-  { name: "SLO + budgets", sub: "Auto-pause", icon: ShieldCheck },
+  { name: "Connector certification", sub: "Provider/consumer", icon: FileSignature },
+  { name: "Structured trace events", sub: "trace_id end-to-end", icon: Network },
+  { name: "Reliability budgets", sub: "Auto-pause", icon: ShieldCheck },
   { name: "Feature flags", sub: "Per-zone rollout", icon: Cable },
   { name: "ADR-driven", sub: "Decisions of record", icon: FileSignature },
   { name: "Audit causality", sub: "ack < resolve", icon: BadgeCheck },

@@ -593,10 +593,10 @@ function FairnessVisual() {
           ))}
           <div className="ml-2 h-1.5 flex-1 overflow-hidden rounded-full bg-white/5">
             <motion.div
-              className="h-full bg-gradient-to-r from-emerald-400 via-amber-300 to-rose-400"
-              initial={{ width: "0%" }}
-              animate={{ width: "100%" }}
-              transition={{ duration: 2.2, ease: EASE.outQuart }}
+              className="h-full w-full origin-left bg-gradient-to-r from-emerald-400 via-amber-300 to-rose-400"
+              initial={reduced ? false : { scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={reduced ? { duration: 0 } : { duration: 2.2, ease: EASE.outQuart }}
             />
           </div>
         </div>

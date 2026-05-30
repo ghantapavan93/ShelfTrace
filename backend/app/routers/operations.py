@@ -160,7 +160,15 @@ def markdowns(
 
 
 @router.post("/operations/explain", response_model=ExplainResponse)
-def explain(body: ExplainRequest, db: Session = Depends(get_db)):
+def explain(
+    body: ExplainRequest,
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live', 'demo', 'all'. Mirrors /operations so "
+        "Ask ShelfTrace does not surface the seeded demo batch in Live mode.",
+    ),
+    db: Session = Depends(get_db),
+):
     """Deterministic, template-driven explanation of current batch/zone state.
 
     NOT AI-generated. Every sentence is assembled from real DB rows — incidents,
@@ -174,11 +182,16 @@ def explain(body: ExplainRequest, db: Session = Depends(get_db)):
     #    (i.e. the batch that is currently blocked or under intervention). #
     #    Fall back to the latest LIVE_ROLLOUT batch if nothing is open.   #
     # ------------------------------------------------------------------ #
-    batch = db.scalar(
+    # Scope-filter the batch pick exactly like /operations so Ask ShelfTrace
+    # never surfaces the seeded demo batch when the caller is in Live mode.
+    resolved = current_scope(scope)
+    stmt = (
         select(PriceBatch)
         .where(PriceBatch.run_mode == RunMode.LIVE_ROLLOUT)
         .order_by(PriceBatch.created_at.desc())
     )
+    stmt = apply_filter(stmt, PriceBatch.source_run_id, resolved)
+    batch = db.scalar(stmt)
 
     if batch is None:
         return ExplainResponse(

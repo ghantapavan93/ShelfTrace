@@ -36,7 +36,15 @@ def _case_view(case: RegressionCase) -> RegressionCaseView:
 
 @router.get("/regression-cases", response_model=list[RegressionCaseView])
 def list_regression_cases(db: Session = Depends(get_db)):
-    """Every saved Override Memory / regression case, newest first."""
+    """Every saved Override Memory / regression case, newest first.
+
+    Intentionally NOT Live/Demo scope-filtered. Override Memory is global
+    engineering knowledge — a captured failure guards EVERY future batch, not
+    one tenant — so it is surfaced on the engineering trace, which already
+    frames its data as aggregated across all runs (incl. seeded demo). This is
+    the same deliberate non-scoping as the engineering pipeline view, not a
+    Live/Demo leak of tenant data.
+    """
     return [_case_view(c) for c in regression.list_cases(db)]
 
 

@@ -107,8 +107,8 @@ const INITIAL: SimState = {
   driftDollars: 0,
   log: [
     { id: 0, t: 0, tone: "info", line: "sim.boot · ShelfTrace orbital console online" },
-    { id: 1, t: 0.2, tone: "ok", line: "preflight.contract: pact verified · 4 adapters" },
-    { id: 2, t: 0.4, tone: "ok", line: "preflight.slo: budget 99.30% available" },
+    { id: 1, t: 0.2, tone: "ok", line: "preflight.certification: 4 adapters verified" },
+    { id: 2, t: 0.4, tone: "ok", line: "preflight.budget: reliability budget 99.30% available" },
   ],
   incidents: [],
   loads: { core: 0.4, outbox: 0.42, twin: 0.18, esl: 0.31, pos: 0.46, web: 0.32, app: 0.28, kiosk: 0.18, audit: 0.22 },
@@ -654,7 +654,7 @@ function Inspector({
       body = (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
-            <KV label="contract" value="pact ✓" />
+            <KV label="certification" value="verified ✓" />
             <KV label="version" value="v3.4" />
             <KV label="p50" value={`${Math.round(40 + load * 80)}ms`} />
             <KV label="p99" value={`${Math.round(140 + load * 220)}ms`} />
@@ -758,7 +758,7 @@ function HudCorner({ state }: { state: SimState }) {
   return (
     <div className="absolute right-4 top-4 z-30 flex w-[220px] flex-col gap-2">
       <Stat icon={Activity} label="throughput" value={`${state.throughput} ev/s`} tone="orange" />
-      <Stat icon={ShieldCheck} label="slo budget" value={`${(state.sloRemaining * 100).toFixed(2)}%`} tone={state.sloRemaining > 0.99 ? "green" : "amber"} />
+      <Stat icon={ShieldCheck} label="reliability budget" value={`${(state.sloRemaining * 100).toFixed(2)}%`} tone={state.sloRemaining > 0.99 ? "green" : "amber"} />
       <Stat icon={AlertOctagon} label="open incidents" value={String(openCount)} tone={openCount ? "red" : "green"} />
       <Stat icon={Thermometer} label="drift cost" value={fmtDollars(state.driftDollars)} tone={state.driftDollars ? "red" : "neutral"} />
     </div>
@@ -948,7 +948,7 @@ function ConnectorTwinDiff({ state }: { state: SimState }) {
           </h3>
           <p className="mt-2 max-w-2xl text-sm text-white/55">
             The regression run mirrors live traffic, runs the candidate adapter version, and gates promotion on
-            contract-tests-green + SLO-budget-healthy. When the live adapter drifts, the regression run replays
+            certification-checks-green + reliability-budget-healthy. When the live adapter drifts, the regression run replays
             and validates the fix before the live retry.
           </p>
         </div>

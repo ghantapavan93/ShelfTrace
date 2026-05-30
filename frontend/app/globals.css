@@ -227,4 +227,17 @@ body {
     animation: none !important;
     transition: none !important;
   }
+  /* App-wide safety net: also neutralize CSS-class loops Tailwind emits
+     (animate-pulse / ping / bounce / spin / pulse-glow), including the global
+     shell status dot, which the futurist-only rule above does not cover.
+     Standard reduced-motion reset — collapses any animation/transition to a
+     single, instant frame. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

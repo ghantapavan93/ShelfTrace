@@ -659,6 +659,10 @@ type AskState =
   | { phase: "error"; message: string };
 
 function AskShelfTrace() {
+  const { mode, isHydrated } = useWorkMode();
+  // Mirror /operations: in Live mode, scope the explain to live so it never
+  // surfaces the seeded demo batch. undefined (demo/unhydrated) keeps default.
+  const workScope = isHydrated && mode === "live" ? "live" : undefined;
   const [query, setQuery] = useState("Why is Dallas Zone 2 blocked?");
   const [state, setState] = useState<AskState>({ phase: "idle" });
 
@@ -667,7 +671,7 @@ function AskShelfTrace() {
     if (!query.trim()) return;
     setState({ phase: "loading" });
     try {
-      const result = await api.explain(query.trim());
+      const result = await api.explain(query.trim(), workScope);
       setState({ phase: "answered", result });
     } catch (err) {
       setState({ phase: "error", message: (err as Error).message });
@@ -682,14 +686,18 @@ function AskShelfTrace() {
   };
 
   const gatePill = (gate: string) => {
-    const isQuarantined = gate.toUpperCase().includes("QUARANTINE");
+    const g = gate.toUpperCase();
+    // QUARANTINED → rose, ELIGIBLE → emerald, PENDING (or anything else) → amber.
+    const tone = g.includes("QUARANTINE")
+      ? "border border-rose-500/40 bg-rose-500/10 text-rose-300"
+      : g.includes("ELIGIBLE")
+        ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+        : "border border-amber-500/40 bg-amber-500/10 text-amber-200";
     return (
       <span
         className={clsx(
           "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
-          isQuarantined
-            ? "border border-rose-500/40 bg-rose-500/10 text-rose-300"
-            : "border border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+          tone,
         )}
       >
         {gate}
@@ -719,6 +727,7 @@ function AskShelfTrace() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Why is Dallas Zone 2 blocked?"
+          aria-label="Ask ShelfTrace a question about the current rollout"
           className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none transition focus:border-brand/40 focus:ring-1 focus:ring-brand/20"
         />
         <button
