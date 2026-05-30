@@ -23,6 +23,14 @@
         "-y",
         "@upstash/context7-mcp"
       ]
+    },
+    "shelftrace": {
+      "command": "python",
+      "args": ["-m", "app.mcp_server"],
+      "env": {
+        "PYTHONPATH": "backend",
+        "DATABASE_URL": "sqlite:///./backend/shelftrace_dev.db"
+      }
     }
   }
 }

@@ -59,7 +59,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.database import SessionLocal
+from app.database import Base, SessionLocal, engine
 from app.models import PriceAction, PriceBatch
 from app.routers.operations import explain as _explain_endpoint
 from app.schemas import ExplainRequest
@@ -385,7 +385,21 @@ def shelftrace_explain(params: ExplainInput) -> str:
         return f"Error: could not explain: {type(e).__name__}: {e}"
 
 
+def _ensure_schema() -> None:
+    """Idempotently provision any missing tables before serving.
+
+    Unlike the FastAPI app (app/main.py) and the worker (app/worker.py), this
+    standalone entrypoint may be the FIRST thing to touch the database — e.g. an
+    MCP client launches it against a DB file that predates a newer model. Every
+    app.models class is registered on Base.metadata via the imports above, so
+    create_all() adds only missing tables and never alters or drops existing
+    data. This makes the server self-sufficient on a fresh clone or a stale DB.
+    """
+    Base.metadata.create_all(bind=engine)
+
+
 if __name__ == "__main__":  # pragma: no cover - entrypoint
     # stdio transport — the canonical local MCP integration. An MCP client
     # (Claude Desktop / Claude Code / etc.) launches this as a subprocess.
+    _ensure_schema()
     mcp.run()

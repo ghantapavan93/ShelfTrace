@@ -9,16 +9,18 @@ description = "Canary rollout, execution reconciliation, and incident recovery f
 requires-python = ">=3.10"
 
 dependencies = [
-    "fastapi==0.110.0",
-    "uvicorn[standard]==0.27.1",
-    "sqlalchemy==2.0.27",
-    "psycopg2-binary==2.9.9",
-    "pydantic==2.6.1",
-    "pydantic-settings==2.1.0",
+    "fastapi==0.117.1",
+    "uvicorn[standard]==0.48.0",
+    "sqlalchemy==2.0.43",
+    "psycopg2-binary==2.9.10",
+    "pydantic==2.11.1",
+    "pydantic-settings==2.11.0",
     "redis==5.0.1",
-    "python-dotenv==1.0.1",
-    "alembic==1.13.1",
-    "httpx==0.26.0",
+    "python-dotenv==1.1.1",
+    "alembic==1.17.2",
+    # mcp (the [mcp] extra) needs httpx>=0.27.1; <0.28 pins to the line this
+    # stack is verified against (Starlette 0.48 TestClient + mcp 1.27).
+    "httpx>=0.27.1,<0.28",
     "beautifulsoup4==4.12.3",
     "lxml>=5.1,<7",
     "slowapi==0.1.9",
@@ -43,6 +45,12 @@ otel = [
 #   pip install ".[mcp]"   then   python -m app.mcp_server
 mcp = [
     "mcp>=1.2.0",
+    # mcp pulls in sse-starlette; its 3.x line requires starlette>=0.49.1, which
+    # collides with FastAPI's starlette<0.49 cap. Pin <3 so the (opt-in) MCP
+    # server's deps stay compatible with the API's FastAPI/Starlette and
+    # `pip install ".[mcp]"` resolves cleanly. The stdio transport this server
+    # uses doesn't touch sse-starlette at all — this is purely conflict hygiene.
+    "sse-starlette<3",
 ]
 
 [tool.setuptools.packages.find]
