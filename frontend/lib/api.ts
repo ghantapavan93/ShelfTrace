@@ -7,6 +7,7 @@ import type {
   IncidentExplanation,
   IncidentView,
   OperationsOverview,
+  RegressionCase,
   Scenario,
   ScenarioExecuteResult,
   SourceDataset,
@@ -213,6 +214,22 @@ export const api = {
   // the shelf). Re-reconciles server-side; 409 when no open task exists.
   completeStoreTask: (id: string) =>
     post<import("./types").StoreTaskView>(`/api/v1/incidents/${id}/complete-store-task`),
+
+  // Override Memory / Regression Replay — durable knowledge captured from a
+  // recovered incident, re-exercised through the shared certification engine.
+  regressionCases: () => get<RegressionCase[]>(`/api/v1/regression-cases`),
+  createRegressionCase: (incidentId: string) =>
+    post<RegressionCase>(`/api/v1/incidents/${encodeURIComponent(incidentId)}/create-regression-case`),
+  replayRegressionCase: (caseId: string) =>
+    post<{
+      case_id: string;
+      status: string;
+      healed: boolean;
+      certification_run_id: string | null;
+      check_id: string | null;
+      redirect: string;
+      detail: string;
+    }>(`/api/v1/regression-cases/${encodeURIComponent(caseId)}/replay`),
   reset: () => post<BatchSummary>(`/api/v1/demo/reset`),
   systemStatus: () =>
     get<{ label: string; tone: "neutral" | "danger" | "warn" | "verified"; status: string | null }>(

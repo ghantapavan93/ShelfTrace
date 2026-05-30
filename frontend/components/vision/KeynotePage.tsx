@@ -716,12 +716,12 @@ function StoreAwakening({ onDone }: { onDone: () => void }) {
       {/* floating light-dust — self-gates on reduced-motion (renders null) */}
       <Particles count={26} color="rgba(186,230,253,.45)" />
 
-      {/* the execution line */}
+      {/* the execution line — draws out via scaleX (transform-only), gated */}
       <motion.div
-        initial={{ opacity: 0, width: 0 }}
-        animate={{ opacity: stage >= 1 ? 1 : 0, width: stage >= 1 ? "62%" : 0 }}
-        transition={{ duration: 0.9 }}
-        className="absolute top-1/2 left-1/2 h-[2px] -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-orange-400 to-transparent"
+        initial={reduced ? false : { opacity: 0, scaleX: 0 }}
+        animate={{ opacity: stage >= 1 ? 1 : 0, scaleX: stage >= 1 ? 1 : 0 }}
+        transition={reduced ? { duration: 0 } : { duration: 0.9 }}
+        className="absolute top-1/2 left-1/2 h-[2px] w-[62%] origin-center -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-orange-400 to-transparent"
         style={{ boxShadow: "0 0 24px rgba(251,146,60,.7)" }}
       />
       {/* thin iridescent thread riding the line, tying the channels together */}
@@ -1332,15 +1332,13 @@ function ScannerShowstopper({ playRef }: { playRef: React.RefObject<HTMLDivEleme
               </svg>
 
               <motion.div
-                initial={{ left: "5%", top: "32%" }}
+                initial={reduced ? false : { left: "5%", top: "32%" }}
                 animate={
-                  reduced
+                  reduced || stage >= 1
                     ? { left: "60%", top: "44%" }
-                    : stage >= 1
-                      ? { left: "60%", top: "44%" }
-                      : { left: "5%", top: "32%" }
+                    : { left: "5%", top: "32%" }
                 }
-                transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+                transition={reduced ? { duration: 0 } : { duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
                 className="absolute h-[110px] w-[70px]"
               >
                 <MilkBottle glow={stage >= 3} />

@@ -50,6 +50,14 @@ def _provision_schema() -> None:
         cfg.set_main_option("sqlalchemy.url", settings.database_url)
         logger.info("Running Alembic migrations to head")
         command.upgrade(cfg, "head")
+        # Belt-and-suspenders: create_all + additive migrations are idempotent
+        # and only ADD missing tables/columns (never drop or alter). This
+        # guarantees a model added without a matching Alembic revision still
+        # provisions on a real deploy instead of 500-ing in production. The
+        # versioned migrations remain the source of truth — this is a safety
+        # net, not a replacement.
+        Base.metadata.create_all(bind=engine)
+        run_migrations()
     else:
         Base.metadata.create_all(bind=engine)
         run_migrations()

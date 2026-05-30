@@ -85,7 +85,7 @@ const architecture: Array<{ name: string; sub: string; icon: ElementType }> = [
   { name: "Approved Price", sub: "Input", icon: ClipboardCheck },
   { name: "FastAPI", sub: "Ingestion", icon: Zap },
   { name: "PostgreSQL", sub: "Outbox", icon: Database },
-  { name: "Redis", sub: "Worker", icon: Layers3 },
+  { name: "Outbox Drain", sub: "inline · Redis-modeled", icon: Layers3 },
   { name: "Adapters", sub: "POS / ESL / Web", icon: Workflow },
   { name: "Reconcile", sub: "Deterministic", icon: ShieldCheck },
   { name: "Audit", sub: "Recovery", icon: BadgeCheck },

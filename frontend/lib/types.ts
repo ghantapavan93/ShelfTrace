@@ -443,3 +443,24 @@ export interface EngineeringTrace {
   recent_incidents: IncidentView[];
   test_proof: { command: string; passed: number; duration_s: number; tests: string[] };
 }
+
+// ── Override Memory / Regression Replay ─────────────────────────────────
+// A resolved failure (POS mismatch, ESL markdown timeout) captured as durable
+// knowledge: what went wrong (failure_signature) and what must now be
+// guaranteed (expected_behavior). Replaying re-exercises the signature through
+// the shared certification engine. Mirrors backend `schemas.RegressionCaseView`.
+export interface RegressionCase {
+  id: string;
+  case_type: string; // connector_certification | match_relationship | markdown_fallback
+  title: string;
+  origin_incident_id: string | null;
+  origin_action_id: string | null;
+  sku: string | null;
+  store_id: string | null;
+  channel: string | null;
+  expected_behavior: string;
+  failure_signature: string;
+  status: string; // active | replayed | retired
+  created_at: string;
+  last_replayed_at: string | null;
+}

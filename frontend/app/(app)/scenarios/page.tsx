@@ -220,7 +220,7 @@ export default function ScenarioBuilder() {
         <h1 className="text-3xl font-bold text-white">Connector <span className="iris-text">Scenario</span> Builder</h1>
         <p className="mt-1 text-slate-400">
           Create or run a connector test without changing code. Behaviors you configure here drive the same
-          PostgreSQL outbox, Redis worker, adapter, reconciliation and audit pipeline.
+          PostgreSQL outbox, inline outbox drain, adapter, reconciliation and audit pipeline.
         </p>
       </div>
 

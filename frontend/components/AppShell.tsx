@@ -102,7 +102,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       router.refresh();
       const s = await api.systemStatus().catch(() => null);
       if (s) setStatus(s);
-      toast.success("Demo state restored — Memorial Day batch reseeded.");
+      toast.success("Demo restored — Organic Whole Milk hero reseeded.");
     } catch (e) {
       toast.error(`Reset failed: ${(e as Error).message}`);
     } finally {

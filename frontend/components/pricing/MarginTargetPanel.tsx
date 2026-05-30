@@ -22,7 +22,7 @@
 
 import { useMemo } from "react";
 import clsx from "clsx";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Gauge,
   ShieldCheck,
@@ -260,6 +260,7 @@ function MarginRow({
 }) {
   const meta = STATUS_META[category.status];
   const Icon = meta.icon;
+  const reduced = useReducedMotion();
 
   // Axis spans 0% to ~1.3× target so target sits ~75% across the bar by default.
   // Floor at 35% so a tiny target still renders sensibly.
@@ -380,9 +381,9 @@ function MarginRow({
                 "absolute left-0 top-0 h-full rounded-full bg-gradient-to-r",
                 toneFill,
               )}
-              initial={{ width: 0 }}
+              initial={reduced ? false : { width: 0 }}
               animate={{ width: `${currentFillPct}%` }}
-              transition={{ duration: 0.9, ease: EASE.outQuart, delay: stagger + 0.15 }}
+              transition={reduced ? { duration: 0 } : { duration: 0.9, ease: EASE.outQuart, delay: stagger + 0.15 }}
             />
             {/* Target marker */}
             <div

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Incidents",
+  title: "Exception Command Center",
   description: "Triage and recover from every channel mismatch, timeout, or deadline risk. Full audit timeline per incident.",
 };
 

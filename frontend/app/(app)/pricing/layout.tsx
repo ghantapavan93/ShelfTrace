@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pricing Engine",
+  title: "Candidate Action Studio",
   description: "Elasticity-based recommendations with a full constraint chain. Cost floor, KVI lock, perishable urgency, shock cap.",
 };
 

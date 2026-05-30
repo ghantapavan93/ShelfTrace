@@ -132,7 +132,7 @@ export default async function OpenGraphImage() {
             REAL BACKEND
           </span>
           <span style={{ display: "flex" }}>
-            FastAPI · PostgreSQL outbox · Redis worker · full test suite
+            FastAPI · PostgreSQL outbox · Outbox Drain · full test suite
           </span>
         </div>
       </div>

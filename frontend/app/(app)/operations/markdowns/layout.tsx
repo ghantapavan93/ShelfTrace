@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Markdown SLAs",
+  title: "Perishable Deadline Desk",
   description: "Perishable items with deadline pressure — live countdown, escalating urgency, channel verification.",
 };
 

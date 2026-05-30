@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 // description reflect the actual surface (the page itself can't export
 // metadata because it's a "use client" component).
 export const metadata: Metadata = {
-  title: "Scenario Builder",
+  title: "Action Simulator",
   description: "Configure a connector test without changing code. Upload a CSV, set the canary, run the rollout.",
 };
 

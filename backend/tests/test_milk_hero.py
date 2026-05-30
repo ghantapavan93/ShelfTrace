@@ -193,3 +193,36 @@ def test_milk_hero_live_mode_isolation(db):
     )
 
 
+# ---------------------------------------------------------------------------
+# 6. Reset restores milk as the primary live-rollout target
+# ---------------------------------------------------------------------------
+def test_reset_restores_milk_as_primary_target(db):
+    """The demo reset must restore Memorial Day AND re-run the milk hero last,
+    so the milk POS-mismatch batch is the reset target and the freshest
+    live-rollout batch (what /operations defaults to) — not Memorial Day."""
+    from app.seed import seed_live
+    from app.services.scenarios import MILK_HERO_EXTERNAL_ID
+
+    # Replicate the /api/v1/demo/reset service sequence exactly.
+    seed_live(db)
+    milk_config = scenarios.ensure_milk_hero(db)
+    milk_batch = scenarios.execute_live(db, milk_config)
+
+    # The reset target is the milk hero batch, in its blocked POS-mismatch state.
+    assert milk_batch.external_id == MILK_HERO_EXTERNAL_ID
+    assert milk_batch.status == BatchStatus.BLOCKED
+    assert milk_batch.scenario_config_id == milk_config.id
+
+    # It must be the freshest live-rollout batch — the one operations defaults to.
+    newest_live = (
+        db.query(PriceBatch)
+        .filter(PriceBatch.run_mode == RunMode.LIVE_ROLLOUT)
+        .order_by(PriceBatch.created_at.desc())
+        .first()
+    )
+    assert newest_live is not None
+    assert newest_live.id == milk_batch.id, (
+        "Milk hero must be the newest live-rollout batch after reset"
+    )
+
+

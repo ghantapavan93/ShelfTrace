@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Competitor Scraping",
+  title: "Market Signal Intake",
   description: "Production-shaped data extraction pipeline — fetch, parse, validate, dedupe, upsert.",
 };
 

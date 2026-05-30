@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import clsx from "clsx";
-import { ChevronRight, CheckCircle2 } from "lucide-react";
+import { ChevronRight, CheckCircle2, BookMarked, RotateCcw, ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/useLive";
 import { timeOf } from "@/lib/format";
 import { EligibilityPanel } from "@/components/EligibilityPanel";
 import { BlurTextAnimation } from "@/components/text/BlurTextAnimation";
 import { DetailSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 import { useWorkMode } from "@/components/ModeProvider";
 import { SandboxStrip } from "@/components/LiveModeNotice";
-import type { EngineeringTrace } from "@/lib/types";
+import type { EngineeringTrace, RegressionCase } from "@/lib/types";
 
 function Json({ value }: { value: unknown }) {
   return (
@@ -36,6 +38,32 @@ export default function EngineeringPage() {
   }, []);
 
   const { data, error } = useLive<EngineeringTrace>(() => api.engineering({ runMode: mode }), [mode]);
+
+  // Override Memory — durable regression cases captured from recovered incidents.
+  const router = useRouter();
+  const { toast } = useToast();
+  const [regCases, setRegCases] = useState<RegressionCase[]>([]);
+  const [replaying, setReplaying] = useState<string | null>(null);
+  useEffect(() => {
+    api.regressionCases().then(setRegCases).catch(() => {});
+  }, []);
+  async function replayCase(id: string) {
+    setReplaying(id);
+    try {
+      const res = await api.replayRegressionCase(id);
+      toast.success(
+        res.healed
+          ? "Replayed — regression healed through the shared engine."
+          : "Replayed through the certification engine.",
+      );
+      api.regressionCases().then(setRegCases).catch(() => {});
+      if (res.redirect) router.push(res.redirect);
+    } catch (e) {
+      toast.error(`Replay failed: ${(e as Error).message}`);
+    } finally {
+      setReplaying(null);
+    }
+  }
 
   if (error)
     return (
@@ -163,6 +191,65 @@ export default function EngineeringPage() {
           </p>
         </div>
       )}
+
+      {/* Override Memory — durable regression cases learned from recovered incidents */}
+      <div className="holo-card rounded-2xl border border-violet-500/25 p-5">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <BookMarked className="h-4 w-4 text-violet-300" />
+          <h3 className="text-sm font-semibold text-white">Override Memory · Regression Cases</h3>
+          <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-200">
+            {regCases.length} saved
+          </span>
+        </div>
+        {regCases.length === 0 ? (
+          <p className="text-xs leading-relaxed text-slate-500">
+            No regression cases yet — resolve an incident and save it as one. A captured
+            failure replays through the shared certification engine to guard future batches.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {regCases.map((rc) => (
+              <div key={rc.id} className="rounded-xl border border-white/10 bg-white/[.025] p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-violet-200">
+                    {rc.case_type.replace(/_/g, " ")}
+                  </span>
+                  <span className="text-sm font-medium text-white">{rc.title}</span>
+                  <span
+                    className={clsx(
+                      "rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide",
+                      rc.status === "replayed"
+                        ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                        : "border border-white/15 bg-white/[.04] text-slate-300",
+                    )}
+                  >
+                    {rc.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-rose-200/80">
+                  <span className="text-slate-500">Failure:</span> {rc.failure_signature}
+                </p>
+                <p className="mt-1 text-xs text-emerald-200/80">
+                  <span className="text-slate-500">Now guaranteed:</span> {rc.expected_behavior}
+                </p>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-500">
+                    {rc.last_replayed_at ? `Last replayed ${timeOf(rc.last_replayed_at)}` : "Not yet replayed"}
+                  </span>
+                  <button
+                    onClick={() => replayCase(rc.id)}
+                    disabled={replaying !== null}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200 transition hover:bg-violet-500/20 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <RotateCcw className={clsx("h-3.5 w-3.5", replaying === rc.id && "animate-spin")} />
+                    Replay as Certification Case
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Connector behavior profiles applied for this run */}
       <div className="holo-card rounded-2xl p-5">

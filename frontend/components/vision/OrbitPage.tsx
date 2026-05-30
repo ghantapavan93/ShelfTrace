@@ -73,7 +73,7 @@ type SimState = {
 const NODES = [
   { id: "core", label: "Approved Price", icon: Sparkles, color: "#fb923c", angle: 0 },
   { id: "outbox", label: "Outbox", icon: Database, color: "#fb923c", angle: 0 },
-  { id: "twin", label: "Connector Twin", icon: Layers3, color: "#a78bfa", angle: 45 },
+  { id: "twin", label: "Regression Replay", icon: Layers3, color: "#a78bfa", angle: 45 },
   { id: "esl", label: "ESL adapter", icon: Tag, color: "#a78bfa", angle: 90 },
   { id: "pos", label: "POS adapter", icon: ScanLine, color: "#fb923c", angle: 135 },
   { id: "web", label: "WEB adapter", icon: Globe2, color: "#60a5fa", angle: 180 },
@@ -151,7 +151,7 @@ function reducer(state: SimState, action: Action): SimState {
       const incidents = state.incidents.map((inc) => {
         const elapsed = t - inc.opened;
         if (inc.state === "open" && elapsed > 1.5) {
-          log = pushLog({ ...state, log }, "ok", `twin.replay[${inc.store}]: ok · safe-to-live`);
+          log = pushLog({ ...state, log }, "ok", `regression.replay[${inc.store}]: ok · safe-to-live`);
           return { ...inc, state: "twin" as IncidentState };
         }
         if (inc.state === "twin" && elapsed > 2.5) {
@@ -245,7 +245,7 @@ function reducer(state: SimState, action: Action): SimState {
         if (inc) {
           return {
             ...state,
-            log: pushLog(state, "info", `manual.replay[${inc.store}] · twin spawned`),
+            log: pushLog(state, "info", `manual.replay[${inc.store}] · regression spawned`),
             incidents: state.incidents.map((i) => (i.id === inc.id ? { ...i, state: "twin", opened: state.t - 1.5 } : i)),
           };
         }
@@ -942,13 +942,13 @@ function ConnectorTwinDiff({ state }: { state: SimState }) {
     <section className="relative mt-12 mx-auto max-w-[1500px] px-4 sm:px-6">
       <div className="flex items-end justify-between">
         <div>
-          <Pill tone="purple">Connector twin</Pill>
+          <Pill tone="purple">Regression replay</Pill>
           <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white">
             Synthetic double, running the same contract — no shelf risk.
           </h3>
           <p className="mt-2 max-w-2xl text-sm text-white/55">
-            The twin mirrors live traffic, runs the candidate adapter version, and gates promotion on
-            contract-tests-green + SLO-budget-healthy. When the live adapter drifts, the twin replays
+            The regression run mirrors live traffic, runs the candidate adapter version, and gates promotion on
+            contract-tests-green + SLO-budget-healthy. When the live adapter drifts, the regression run replays
             and validates the fix before the live retry.
           </p>
         </div>
@@ -962,7 +962,7 @@ function ConnectorTwinDiff({ state }: { state: SimState }) {
           ack={state.mode === "drift" ? 0.91 : 0.997}
         />
         <DiffCard
-          title="TWIN · vNext"
+          title="REGRESSION · vNext"
           tone="green"
           latency={twinLatency}
           drift={twinDriftRate}
@@ -1128,7 +1128,7 @@ function CtaRail() {
             </h3>
             <p className="mt-2 max-w-xl text-sm text-white/55">
               The orbital console renders state from a reducer that mirrors what the working
-              ShelfTrace backend already enforces: outbox dispatch, idempotency, twin verdicts,
+              ShelfTrace backend already enforces: outbox dispatch, idempotency, regression verdicts,
               audit causality, attribution gates. Every CTA below jumps to that surface.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
@@ -1494,7 +1494,7 @@ export default function OrbitPage() {
                 <kbd className="rounded bg-white/[.06] px-1">T</kbd>{" "}
                 <kbd className="rounded bg-white/[.06] px-1">R</kbd>{" "}
                 <kbd className="rounded bg-white/[.06] px-1">X</kbd>) — the simulation reacts in real time:
-                log streams update, dollar counters move, twin spawns, audit seals. Drag the sphere to
+                log streams update, dollar counters move, regression spawns, audit seals. Drag the sphere to
                 rotate; click any node or store to inspect.
               </p>
             </div>

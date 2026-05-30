@@ -292,7 +292,7 @@ export default function DataReplayPage() {
               </button>
               <p className="text-[10px] text-slate-500">
                 Creates a scenario carrying this source observation&apos;s lineage and routes it through the same
-                PostgreSQL outbox, Redis worker, adapter, reconciliation and audit pipeline. You&apos;ll land on the
+                PostgreSQL outbox, Outbox Drain (inline), adapter, reconciliation and audit pipeline. You&apos;ll land on the
                 generated incident or certification report.
               </p>
             </div>

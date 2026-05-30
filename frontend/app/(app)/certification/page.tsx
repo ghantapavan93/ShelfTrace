@@ -289,7 +289,7 @@ export default function CertificationPage() {
           href="/operations"
           className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10"
         >
-          Open Live Operations <ArrowRight className="h-4 w-4" />
+          Open Execution Assurance <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
 
@@ -384,7 +384,7 @@ function ReliabilityCheckGrid({
           <div>
             <div className="text-sm font-semibold text-white">Reliability Checks</div>
             <div className="mt-0.5 text-[11px] text-slate-500">
-              Six pre-flight safety tests against the same engine that runs production rollouts.
+              Six pre-flight safety tests against the same simulated reliability workflow used in the operations demo.
             </div>
           </div>
           <div className="font-mono text-xs text-slate-400 tabular-nums">

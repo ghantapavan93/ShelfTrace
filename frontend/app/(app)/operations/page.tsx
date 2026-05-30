@@ -178,7 +178,7 @@ function OperationsContent() {
     try {
       await api.reset();
       await reload();
-      toast.success("Demo state reset — Memorial Day batch reseeded.");
+      toast.success("Demo reset — Organic Whole Milk hero reseeded.");
     } catch (e) {
       toast.error(`Reset failed: ${(e as Error).message}`);
     } finally {

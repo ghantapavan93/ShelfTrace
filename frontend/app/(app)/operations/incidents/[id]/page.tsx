@@ -22,6 +22,7 @@ import {
   StickyNote,
   Send,
   Wrench,
+  BookMarked,
 } from "lucide-react";
 import clsx from "clsx";
 import { api, DEMO_BATCH } from "@/lib/api";
@@ -73,7 +74,7 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
   const exp = useLive<IncidentExplanation>(() => api.explanation(id), [id]);
   const audit = useLive<AuditEventView[]>(() => api.incidentAudit(id), [id]);
 
-  async function act(kind: "retry" | "rollback" | "resolve" | "task" | "complete") {
+  async function act(kind: "retry" | "rollback" | "resolve" | "task" | "complete" | "regression") {
     setBusy(kind);
     try {
       if (kind === "retry") await api.retry(id);
@@ -88,6 +89,11 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
         // Task is closed server-side; drop the open-task affordance.
         setStoreTask(null);
       }
+      // Capture this recovered incident as durable Override Memory. Idempotent
+      // server-side — re-saving the same incident returns the existing case.
+      if (kind === "regression") {
+        await api.createRegressionCase(id);
+      }
       // Re-fetch the incident view, explanation, and audit timeline so the
       // page visibly reflects the new state — POS receipt, RESOLVED status,
       // and the measurement gate all re-render from fresh data.
@@ -101,7 +107,9 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
               ? "Incident resolved."
               : kind === "complete"
                 ? "Verification confirmed — shelf re-reconciled."
-                : "Store verification task created.",
+                : kind === "regression"
+                  ? "Regression case saved — this failure now guards future batches."
+                  : "Store verification task created.",
       );
     } catch (e) {
       toast.error((e as Error).message);
@@ -351,17 +359,46 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
           Evidence table, POS receipt and measurement gate above re-render
           to reflect the new state. */}
       {resolved ? (
-        <section className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-5 py-4">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-verified" />
-          <div className="text-sm">
-            <div className="font-medium text-verified">
-              {i.status === "rolled_back"
-                ? "Shelf label rolled back — incident closed"
-                : `${(i.offending_channel ?? "channel").toUpperCase()} verified at ${money(i.approved_price)}`}
+        <section className="space-y-3">
+          <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-5 py-4">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-verified" />
+            <div className="text-sm">
+              <div className="font-medium text-verified">
+                {i.status === "rolled_back"
+                  ? "Shelf label rolled back — incident closed"
+                  : `${(i.offending_channel ?? "channel").toUpperCase()} verified at ${money(i.approved_price)}`}
+              </div>
+              <div className="text-xs text-slate-400">
+                Recovery actions are closed for this incident. The audit timeline below is preserved.
+              </div>
             </div>
-            <div className="text-xs text-slate-400">
-              Recovery actions are closed for this incident. The audit timeline below is preserved.
+          </div>
+
+          {/* Override Memory — capture this recovered failure as a durable
+              regression case so it guards future batches. Violet per the
+              design system's override-memory tone. Idempotent server-side. */}
+          <div className="holo-card flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-500/25 bg-violet-500/[.05] px-5 py-4">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-violet-500/30 bg-violet-500/10 text-violet-200">
+                <BookMarked className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 text-sm">
+                <div className="font-medium text-violet-100">Override Memory</div>
+                <div className="text-xs text-slate-400">
+                  Capture this resolved failure as a durable regression case — it then guards future
+                  batches and can be replayed from Engineering Proof.
+                </div>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => act("regression")}
+              disabled={busy !== null}
+              className="flex shrink-0 items-center gap-2 rounded-xl border border-violet-500/40 bg-violet-500/10 px-4 py-2.5 text-sm font-medium text-violet-100 transition hover:bg-violet-500/20 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
+            >
+              <BookMarked className={clsx("h-4 w-4 shrink-0", busy === "regression" && "animate-pulse")} />
+              <span className="leading-tight">Save as Regression Case</span>
+            </button>
           </div>
         </section>
       ) : (

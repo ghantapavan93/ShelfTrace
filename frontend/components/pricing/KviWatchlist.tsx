@@ -17,7 +17,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Target,
   ShieldCheck,
@@ -330,6 +330,7 @@ function KviBandTrack({
   const bandHalfWidth = (tolerancePct / RANGE) * 50;
   const bandLeft = 50 - bandHalfWidth;
   const bandWidth = bandHalfWidth * 2;
+  const reduced = useReducedMotion();
 
   return (
     <div className="mt-2 pl-10">
@@ -348,7 +349,7 @@ function KviBandTrack({
         <motion.div
           initial={false}
           animate={{ left: `${dotLeftPct}%` }}
-          transition={{ type: "spring", stiffness: 200, damping: 25 }}
+          transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 200, damping: 25 }}
           className={clsx(
             "absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-[#0a0e18]",
           )}
