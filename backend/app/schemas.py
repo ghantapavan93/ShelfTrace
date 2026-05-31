@@ -489,3 +489,42 @@ class RegressionReplayResult(BaseModel):
     )
     redirect: str = Field(..., description="Suggested UI redirect target for the replay result.")
     detail: str = Field(..., description="Plain-English summary of the replay outcome.")
+
+
+# ---------------------------------------------------------------------------
+# CPI integrity — is each competitor-index input built on the price that rang?
+# ---------------------------------------------------------------------------
+class CpiIntegrityItem(BaseModel):
+    """One competitor-index input and whether the retailer's own price in it is
+    execution-verified.
+
+    ``status`` is one of ``verified`` (every required channel confirmed the
+    approved price), ``mismatch`` (a channel rang a different price than the
+    index assumes — ``observed_price`` carries it), or ``unverified`` (no
+    verified receipt yet / not executed). ``intended_price`` is the approved
+    price the index uses as "My Price".
+    """
+
+    entity_id: str
+    canonical_title: str
+    sku: str | None = None
+    store_id: str | None = None
+    intended_price: float | None = None
+    observed_price: float | None = None
+    status: str
+
+
+class CpiIntegrityView(BaseModel):
+    """Aggregate CPI integrity over every competitor-index input in scope.
+
+    Counts plus a deterministic one-line summary derived purely from them, so
+    the UI can show "index built on verified prices" with verified vs
+    unverified/mismatch tallies and surface observed-vs-intended per item.
+    """
+
+    total_inputs: int
+    verified: int
+    unverified: int
+    mismatch: int
+    summary: str
+    items: list[CpiIntegrityItem]
