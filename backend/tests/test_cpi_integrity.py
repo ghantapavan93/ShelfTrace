@@ -47,11 +47,14 @@ def _attach_competitor(db, *, sku: str, title: str, price: float, scope: str = "
     """Make `sku` a CPI input: a canonical entity, a SKU link, and one competitor
     observation (the row that makes the entity part of an index)."""
     entity = pg.create_product_entity(db, canonical_title=title)
-    pg.link_sku_to_entity(db, sku=sku, entity_id=entity.id, confidence=1.0)
+    pg.link_sku_to_entity(db, sku=sku, entity_id=entity.id)
     cp = CompetitorProduct(
         id=f"cp_{sku}",
-        competitor_product_id=f"ext_{sku}",
+        source_id="test-source",
+        external_id=f"ext_{sku}",
+        stable_key=f"key_{sku}",
         title=f"Competitor {title}",
+        price=price,
         category="Grocery",
     )
     db.add(cp)
@@ -60,7 +63,7 @@ def _attach_competitor(db, *, sku: str, title: str, price: float, scope: str = "
         id=f"obs_{sku}",
         competitor_product_id=cp.id,
         entity_id=entity.id,
-        observed_price=price,
+        price=price,
         source_run_id=scope,
     )
     db.add(obs)
