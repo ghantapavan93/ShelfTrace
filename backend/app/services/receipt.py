@@ -344,6 +344,21 @@ def _stage_certified(profile: ConnectorProfile | None) -> ReceiptStageView:
     )
 
 
+def action_published(action: PriceAction) -> bool:
+    """True when this action's price has been dispatched to its channels.
+
+    The single predicate behind the *Published* stage: deliveries exist and
+    none are still queued in the outbox (``DeliveryStatus.PENDING``). A timeout
+    leaves the delivery un-acked but it has still *left* the outbox, so it
+    counts as published. Reused by the batch-level lifecycle rollup so the
+    batch view can never disagree with the per-action Decision Receipt.
+    """
+    deliveries = action.deliveries
+    return bool(deliveries) and not any(
+        d.status == DeliveryStatus.PENDING for d in deliveries
+    )
+
+
 def _stage_published(action: PriceAction, channels: list[ChannelView]) -> ReceiptStageView:
     deliveries = list(action.deliveries)
     if not deliveries:

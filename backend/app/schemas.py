@@ -82,6 +82,29 @@ class ActionView(BaseModel):
     measurement_eligibility: MeasurementEligibilityView | None = None
 
 
+class BatchLifecycleView(BaseModel):
+    """Batch-level rollup of the post-export execution journey.
+
+    Competitor pricing tools treat a batch as *done* at ``Exported``. The real
+    journey continues for days after export: each price must publish to its
+    channels, get verified per channel, and only then become eligible for
+    downstream performance measurement. This view surfaces how far past
+    ``Exported`` a whole batch actually got, derived entirely from the same
+    per-action predicates the Decision Receipt uses — it never introduces a
+    second source of truth for published / verified / measured.
+
+    Stages are monotonically nested: ``measured <= verified <= published <=
+    exported == total`` (an action can't be measured without being verified,
+    nor verified without being published)."""
+
+    exported: int  # every action accepted into the control plane (== total)
+    published: int  # actions dispatched to their channels via the outbox
+    verified: int  # actions whose required channels all reconciled to the approved price
+    measured: int  # actions eligible for downstream performance measurement
+    total: int  # total actions in the batch (alias of exported, for ratio math)
+    summary: str  # deterministic one-line rollup assembled from the counts
+
+
 class BatchSummary(BaseModel):
     id: str
     external_id: str
@@ -102,6 +125,10 @@ class BatchSummary(BaseModel):
     retry_actions: int
     critical_incidents: int
     deadline_risks: int
+    # Optional post-export lifecycle rollup. Forward-compatible: clients that
+    # don't request/know it simply omit it (default None keeps existing
+    # serialization + tests unchanged).
+    lifecycle: BatchLifecycleView | None = None
 
 
 class BatchDetail(BatchSummary):

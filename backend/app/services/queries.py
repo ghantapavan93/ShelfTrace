@@ -20,6 +20,7 @@ from app.schemas import (
     ActionView,
     AuditEventView,
     BatchDetail,
+    BatchLifecycleView,
     BatchSummary,
     ChannelView,
     IncidentExplanation,
@@ -28,6 +29,7 @@ from app.schemas import (
     OperationsOverview,
 )
 from app.services import measurement
+from app.services.measurement import MeasurementEligibility
 
 CHANNEL_ORDER = {"pos": 0, "esl": 1, "ecommerce": 2}
 
@@ -157,6 +159,71 @@ def batch_summary(db: Session, batch: PriceBatch) -> BatchSummary:
     )
 
 
+def batch_lifecycle(db: Session, batch: PriceBatch) -> BatchLifecycleView:
+    """Roll the per-action lifecycle up to the batch level — the post-export view.
+
+    Pure derivation, identical discipline to :mod:`app.services.measurement` and
+    :mod:`app.services.receipt`: no new tables, no writes, no audit events. Every
+    count reuses an existing per-action predicate so the batch view can never
+    disagree with the Decision Receipt:
+
+      * ``published`` — :func:`app.services.receipt.action_published` (deliveries
+        exist and none are still queued in the outbox). One shared predicate, so
+        the rail's *Published* stage and this count always agree.
+      * ``verified``  — every *required* channel reconciled to the approved price,
+        read from the same eligibility derivation the *Verified* stage uses
+        (``verified_channels == required_channels`` with at least one channel).
+      * ``measured``  — ``ELIGIBLE_ALL_REQUIRED_CHANNELS_VERIFIED`` from
+        :func:`measurement.derive_eligibility_for_batch` (two bounded queries).
+
+    Counts span every action in the batch (canary + expansion), so ``exported``
+    is the full approved set and the post-export shrinkage is visible. An
+    expansion action that hasn't been dispatched yet has no deliveries, so it
+    counts toward ``exported`` but not ``published`` — exactly the gap this view
+    exists to surface. Empty batches return all-zero counts (no div-by-zero)."""
+    from app.services.receipt import action_published
+
+    # One bounded pair of queries for the whole batch — no N+1 in the loop.
+    eligibility_map = measurement.derive_eligibility_for_batch(db, batch)
+
+    total = len(batch.actions)
+    published = 0
+    verified = 0
+    measured = 0
+    for a in batch.actions:
+        elig = eligibility_map.get(a.id)
+        if action_published(a):
+            published += 1
+        # Verified reuses the eligibility derivation's channel tally so it stays
+        # in lockstep with the receipt's Verified stage: all required channels
+        # reconciled, at least one channel required.
+        if (
+            elig is not None
+            and elig.required_channels
+            and len(elig.verified_channels) == len(elig.required_channels)
+        ):
+            verified += 1
+        if (
+            elig is not None
+            and elig.status
+            == MeasurementEligibility.ELIGIBLE_ALL_REQUIRED_CHANNELS_VERIFIED
+        ):
+            measured += 1
+
+    summary = (
+        f"{total} exported · {published} published · "
+        f"{verified} verified · {measured} measurement-eligible"
+    )
+    return BatchLifecycleView(
+        exported=total,
+        published=published,
+        verified=verified,
+        measured=measured,
+        total=total,
+        summary=summary,
+    )
+
+
 def batch_detail(db: Session, batch: PriceBatch) -> BatchDetail:
     summary = batch_summary(db, batch)
     canary = set(_canary_ids(batch))
@@ -176,6 +243,7 @@ def batch_detail(db: Session, batch: PriceBatch) -> BatchDetail:
     return BatchDetail(
         **summary.model_dump(),
         actions=[action_view(a, eligibility_map.get(a.id)) for a in actions],
+        lifecycle=batch_lifecycle(db, batch),
     )
 
 

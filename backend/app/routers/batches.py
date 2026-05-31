@@ -15,7 +15,7 @@ from app.models import (
 )
 from app.rate_limit import limit_write
 from app.routers.common import get_batch_or_404
-from app.schemas import BatchDetail, BatchSummary, PriceBatchIn
+from app.schemas import BatchDetail, BatchLifecycleView, BatchSummary, PriceBatchIn
 from app.scope import apply_filter, current_scope
 from app.security import Identity, require_operator
 from app.services import orchestrator, queries
@@ -60,6 +60,16 @@ def list_batches(
 def get_batch(external_id: str, db: Session = Depends(get_db)):
     batch = get_batch_or_404(db, external_id)
     return queries.batch_detail(db, batch)
+
+
+@router.get("/batches/{external_id}/lifecycle", response_model=BatchLifecycleView)
+def get_batch_lifecycle(external_id: str, db: Session = Depends(get_db)):
+    """Post-export lifecycle rollup for one batch: Exported → Published →
+    Verified → Measured. A competitor tool stops at *Exported*; this surfaces
+    how far past it the batch actually got. Pure derivation from existing
+    per-action state — mirrors the detail route's scope/404 contract."""
+    batch = get_batch_or_404(db, external_id)
+    return queries.batch_lifecycle(db, batch)
 
 
 @router.get("/batches/{external_id}/audit")
