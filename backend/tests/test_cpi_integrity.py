@@ -163,6 +163,7 @@ def test_no_competitor_inputs_is_empty_not_error(db):
 def test_endpoint_returns_shape_and_flags_mismatch(db):
     seed_live_demo(db)
     _attach_competitor(db, sku="egg-cage-free-brown-12", title="Eggs", price=4.10)
+    db.commit()  # the HTTP request runs in its own session — make writes visible
 
     client = TestClient(app)
     resp = client.get("/api/v1/product-graph/cpi-integrity")
@@ -182,6 +183,7 @@ def test_endpoint_scope_live_excludes_demo_scoped_inputs(db):
     _attach_competitor(
         db, sku="egg-cage-free-brown-12", title="Eggs", price=4.10, scope="demo:test"
     )
+    db.commit()  # the HTTP request runs in its own session — make writes visible
     client = TestClient(app)
 
     demo_resp = client.get("/api/v1/product-graph/cpi-integrity?scope=demo")
