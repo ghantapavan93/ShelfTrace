@@ -98,8 +98,27 @@ export interface BatchSummary {
   deadline_risks: number;
 }
 
+// ── Batch lifecycle — the post-export reliability ladder ────────────────
+// Exported → Published → Verified → Measured. The post-export segment
+// (Published → Verified → Measured) is the differentiator competitors lack:
+// proof that an approved price actually published, reconciled across every
+// channel, and became eligible for measurement. Mirrors backend
+// `schemas.BatchLifecycleView`. Derived read-only, no new write paths.
+export interface BatchLifecycle {
+  exported: number;
+  published: number;
+  verified: number;
+  measured: number;
+  total: number;
+  summary: string;
+}
+
 export interface BatchDetail extends BatchSummary {
   actions: ActionView[];
+  // Forward-compatible: present when the batch detail endpoint inlines the
+  // lifecycle rollup, otherwise fetched from /batches/{id}/lifecycle. Clients
+  // that don't know about this field ignore it.
+  lifecycle?: BatchLifecycle | null;
 }
 
 export interface IncidentView {
@@ -478,4 +497,31 @@ export interface RegressionCase {
   status: string; // active | replayed | retired
   created_at: string;
   last_replayed_at: string | null;
+}
+
+// ── CPI Integrity — is the competitor price index built on the price that
+// actually rang? Each linked index input is one of:
+//   • verified   — observed price at the register matched the intended price
+//   • unverified — linked, but execution not yet reconciled / no observation
+//   • mismatch   — the price that rang differs from the price the index assumes
+// Mirrors backend `schemas.CpiIntegrityItem` / `CpiIntegrityView`. Read-only.
+export type CpiIntegrityStatus = "verified" | "unverified" | "mismatch";
+
+export interface CpiIntegrityItem {
+  entity_id: string;
+  canonical_title: string;
+  sku: string | null;
+  store_id: string | null;
+  intended_price: number | null;
+  observed_price: number | null;
+  status: CpiIntegrityStatus;
+}
+
+export interface CpiIntegrity {
+  total_inputs: number;
+  verified: number;
+  unverified: number;
+  mismatch: number;
+  summary: string;
+  items: CpiIntegrityItem[];
 }

@@ -45,6 +45,7 @@ import { useWorkMode } from "@/components/ModeProvider";
 import { EntityGraphVisualization } from "@/components/product-graph/EntityGraphVisualization";
 import { SubstitutesPanel } from "@/components/product-graph/SubstitutesPanel";
 import { TierLadder } from "@/components/product-graph/TierLadder";
+import { CpiIntegrityBadge } from "@/components/CpiIntegrityBadge";
 
 type EntitySummary = {
   id: string;
@@ -141,6 +142,11 @@ export default function ProductGraphPage() {
     [reloadKey, isLiveWorkMode],
   );
   const categories = useLive(() => api.graphCategories(), [reloadKey]);
+  // CPI Integrity — scope-aware so Live mode never counts demo-seeded inputs.
+  const cpiIntegrity = useLive(
+    () => api.cpiIntegrity(isLiveWorkMode ? "live" : undefined),
+    [reloadKey, isLiveWorkMode],
+  );
 
   const [detail, setDetail] = useState<EntityDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -330,6 +336,11 @@ export default function ProductGraphPage() {
           )}
         </div>
       </motion.section>
+
+      {/* Competitor index integrity — is the CPI built on the price that
+          actually rang? Null-guarded; the badge renders its own calm empty
+          state when no inputs are linked yet. */}
+      {cpiIntegrity.data && <CpiIntegrityBadge data={cpiIntegrity.data} />}
 
       {/* Metric tiles */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">

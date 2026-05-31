@@ -1,8 +1,10 @@
 import type {
   BatchDetail,
+  BatchLifecycle,
   BatchSummary,
   BulkImportPreviewResponse,
   CertificationReport,
+  CpiIntegrity,
   EngineeringTrace,
   IncidentExplanation,
   IncidentView,
@@ -140,6 +142,11 @@ export const api = {
     get<BatchSummary[]>(`/api/v1/batches${scope ? `?scope=${scope}` : ""}`),
   batch: (externalId: string) => get<BatchDetail>(`/api/v1/batches/${externalId}`),
   batchAudit: (externalId: string) => get<unknown[]>(`/api/v1/batches/${externalId}/audit`),
+  // Post-export lifecycle rollup for one batch: Exported → Published →
+  // Verified → Measured. Mirrors the BatchDetail.lifecycle field; used as the
+  // dedicated fetch when the detail payload omits it to stay lean.
+  batchLifecycle: (externalId: string) =>
+    get<BatchLifecycle>(`/api/v1/batches/${encodeURIComponent(externalId)}/lifecycle`),
   channelHistory: (externalId: string, actionId: string, channel: "pos" | "esl" | "ecommerce") =>
     get<{
       action: {
@@ -657,6 +664,13 @@ export const api = {
       `/api/v1/product-graph/sku/${encodeURIComponent(sku)}/competitor-prices${
         scope ? `?scope=${scope}` : ""
       }`,
+    ),
+  // CPI Integrity — for every entity feeding the competitor price index, was
+  // its intended price actually verified at the register? Scope-aware so a
+  // Live-mode surface never counts demo-seeded inputs.
+  cpiIntegrity: (scope?: "live" | "demo" | "all") =>
+    get<CpiIntegrity>(
+      `/api/v1/product-graph/cpi-integrity${scope ? `?scope=${scope}` : ""}`,
     ),
   pricingWhatIfFit: (sku: string, storeId: string, scope?: "live" | "demo" | "all") =>
     get<{

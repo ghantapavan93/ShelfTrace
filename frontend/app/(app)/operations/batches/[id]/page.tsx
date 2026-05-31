@@ -20,7 +20,8 @@ import { DetailSkeleton } from "@/components/Skeleton";
 import { CellHistoryDrawer } from "@/components/batches/CellHistoryDrawer";
 import { useWorkMode } from "@/components/ModeProvider";
 import { FlaskConical } from "lucide-react";
-import type { BatchDetail, ChannelView } from "@/lib/types";
+import { BatchLifecycleStepper } from "@/components/BatchLifecycleStepper";
+import type { BatchDetail, BatchLifecycle, ChannelView } from "@/lib/types";
 
 function Cell({
   c,
@@ -211,6 +212,14 @@ export default function BatchPage({ params }: { params: { id: string } }) {
     () => api.batch(id),
     [id],
   );
+  // Post-export lifecycle rollup. The batch detail payload stays lean and
+  // omits this, so we fetch it from the dedicated endpoint; if a future
+  // payload inlines `b.lifecycle`, we prefer that and skip the round-trip.
+  const { data: lifecycleFetched } = useLive<BatchLifecycle>(
+    () => api.batchLifecycle(id),
+    [id],
+  );
+  const lifecycle: BatchLifecycle | null = b?.lifecycle ?? lifecycleFetched;
   const [expanding, setExpanding] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -323,6 +332,11 @@ export default function BatchPage({ params }: { params: { id: string } }) {
           <StatusPill value={b.status} label={b.status.replace(/_/g, " ")} />
         </div>
       </div>
+
+      {/* Post-export lifecycle ladder — Exported → Published → Verified →
+          Measured. Null-guarded: absent until the lifecycle endpoint resolves,
+          so existing rendering is unaffected when it's not present. */}
+      {lifecycle && <BatchLifecycleStepper lifecycle={lifecycle} />}
 
       {/* Summary tiles */}
       <div className="grid grid-cols-3 gap-3 md:grid-cols-6">
