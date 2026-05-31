@@ -19,6 +19,7 @@ from app.models import (
     SKUProductLink,
     utcnow,
 )
+from app.schemas import CpiIntegrityView
 from app.scope import DEMO_MEMORIAL_DAY, Scope, apply_filter, current_scope
 from app.services import entity_matcher, product_graph
 
@@ -803,3 +804,31 @@ def get_competitor_prices_for_sku(
             for o in sorted(observations, key=lambda x: x.observed_at, reverse=True)
         ],
     }
+
+
+@router.get("/cpi-integrity", response_model=CpiIntegrityView)
+def get_cpi_integrity(
+    scope: Optional[str] = Query(
+        None,
+        description="Data scope: 'live', 'demo', 'all'. Only competitor-index inputs "
+        "on the requested side of the Live/Demo boundary are evaluated, so a Live "
+        "index integrity check never inherits a demo SKU's verified verdict.",
+    ),
+    db: Session = Depends(get_db),
+) -> CpiIntegrityView:
+    """Whether each competitor-index (CPI) input is built on an execution-verified price.
+
+    A CPI compares the retailer's own approved "My Price" to competitor
+    observations for the same canonical entity. The approved price is the
+    *intended* price, not necessarily the one a channel verified on-shelf — if
+    POS still rings the old price the index misstates competitive position.
+    This endpoint flags, per index input, whether the approved price the index
+    assumes is verified (``verified``), contradicted by a channel
+    (``mismatch``, with the observed ringing price), or not yet confirmed
+    (``unverified``), plus aggregate counts and a deterministic summary.
+
+    Pure derivation — reuses the measurement-eligibility verdict and the
+    reconciliation receipts already persisted; no new tables or writes.
+    """
+    resolved_scope = current_scope(scope)
+    return CpiIntegrityView(**product_graph.compute_cpi_integrity(db, scope=resolved_scope))

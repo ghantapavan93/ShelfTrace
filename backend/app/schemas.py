@@ -82,6 +82,29 @@ class ActionView(BaseModel):
     measurement_eligibility: MeasurementEligibilityView | None = None
 
 
+class BatchLifecycleView(BaseModel):
+    """Batch-level rollup of the post-export execution journey.
+
+    Competitor pricing tools treat a batch as *done* at ``Exported``. The real
+    journey continues for days after export: each price must publish to its
+    channels, get verified per channel, and only then become eligible for
+    downstream performance measurement. This view surfaces how far past
+    ``Exported`` a whole batch actually got, derived entirely from the same
+    per-action predicates the Decision Receipt uses — it never introduces a
+    second source of truth for published / verified / measured.
+
+    Stages are monotonically nested: ``measured <= verified <= published <=
+    exported == total`` (an action can't be measured without being verified,
+    nor verified without being published)."""
+
+    exported: int  # every action accepted into the control plane (== total)
+    published: int  # actions dispatched to their channels via the outbox
+    verified: int  # actions whose required channels all reconciled to the approved price
+    measured: int  # actions eligible for downstream performance measurement
+    total: int  # total actions in the batch (alias of exported, for ratio math)
+    summary: str  # deterministic one-line rollup assembled from the counts
+
+
 class BatchSummary(BaseModel):
     id: str
     external_id: str
@@ -102,6 +125,10 @@ class BatchSummary(BaseModel):
     retry_actions: int
     critical_incidents: int
     deadline_risks: int
+    # Optional post-export lifecycle rollup. Forward-compatible: clients that
+    # don't request/know it simply omit it (default None keeps existing
+    # serialization + tests unchanged).
+    lifecycle: BatchLifecycleView | None = None
 
 
 class BatchDetail(BatchSummary):
@@ -508,3 +535,42 @@ class RegressionReplayResult(BaseModel):
     )
     redirect: str = Field(..., description="Suggested UI redirect target for the replay result.")
     detail: str = Field(..., description="Plain-English summary of the replay outcome.")
+
+
+# ---------------------------------------------------------------------------
+# CPI integrity — is each competitor-index input built on the price that rang?
+# ---------------------------------------------------------------------------
+class CpiIntegrityItem(BaseModel):
+    """One competitor-index input and whether the retailer's own price in it is
+    execution-verified.
+
+    ``status`` is one of ``verified`` (every required channel confirmed the
+    approved price), ``mismatch`` (a channel rang a different price than the
+    index assumes — ``observed_price`` carries it), or ``unverified`` (no
+    verified receipt yet / not executed). ``intended_price`` is the approved
+    price the index uses as "My Price".
+    """
+
+    entity_id: str
+    canonical_title: str
+    sku: str | None = None
+    store_id: str | None = None
+    intended_price: float | None = None
+    observed_price: float | None = None
+    status: str
+
+
+class CpiIntegrityView(BaseModel):
+    """Aggregate CPI integrity over every competitor-index input in scope.
+
+    Counts plus a deterministic one-line summary derived purely from them, so
+    the UI can show "index built on verified prices" with verified vs
+    unverified/mismatch tallies and surface observed-vs-intended per item.
+    """
+
+    total_inputs: int
+    verified: int
+    unverified: int
+    mismatch: int
+    summary: str
+    items: list[CpiIntegrityItem]
