@@ -75,16 +75,19 @@ import { BlurRevealHeading } from "@/components/narrative/BlurRevealHeading";
    drift gently with scrollYProgress for parallax.
    Reduced-motion: tokens land in their final row, the horizon is a static glow,
    no parallax, no swell. transform + opacity only. */
+/* The on-thesis ShelfTrace chain — an approved price must reach the shopper on
+   every channel. Rendered as a clean, left-aligned row INSIDE the hero content
+   flow (never an absolutely-positioned layer) so it stays aligned and never
+   collides with the hero copy on any viewport. */
+const CHAIN: { label: string; icon: ElementType; tone: string }[] = [
+  { label: "approved price", icon: BadgeCheck, tone: "from-orange-300/90 to-amber-200/70 text-orange-100 border-orange-300/40" },
+  { label: "POS", icon: ScanLine, tone: "from-cyan-300/80 to-sky-200/60 text-cyan-50 border-cyan-300/40" },
+  { label: "shelf-label", icon: Package, tone: "from-violet-300/85 to-fuchsia-200/60 text-violet-50 border-violet-300/40" },
+  { label: "ecommerce", icon: Wifi, tone: "from-emerald-300/85 to-teal-200/60 text-emerald-50 border-emerald-300/40" },
+];
+
 function DawnHorizon({ parallaxY }: { parallaxY: MotionValue<number> }) {
   const reduced = useReducedMotion();
-
-  // The ShelfTrace promise, read left-to-right as it rises from the horizon.
-  const tokens: { label: string; icon: ElementType; tone: string }[] = [
-    { label: "approved price", icon: BadgeCheck, tone: "from-orange-300/90 to-amber-200/70 text-orange-100 border-orange-300/40" },
-    { label: "POS", icon: ScanLine, tone: "from-cyan-300/80 to-sky-200/60 text-cyan-50 border-cyan-300/40" },
-    { label: "shelf-label", icon: Package, tone: "from-violet-300/85 to-fuchsia-200/60 text-violet-50 border-violet-300/40" },
-    { label: "ecommerce", icon: Wifi, tone: "from-emerald-300/85 to-teal-200/60 text-emerald-50 border-emerald-300/40" },
-  ];
 
   return (
     <motion.div
@@ -145,42 +148,44 @@ function DawnHorizon({ parallaxY }: { parallaxY: MotionValue<number> }) {
           }}
         />
       </div>
-
-      {/* Concept tokens rising up OUT of the horizon line, staggered. */}
-      <div className="absolute inset-x-0 bottom-[27%] flex justify-center">
-        <div className="flex flex-wrap items-center justify-center gap-2.5 px-6 sm:gap-3.5">
-          {tokens.map((t, i) => {
-            const TokenIcon = t.icon;
-            const isLast = i === tokens.length - 1;
-            return (
-              <div key={t.label} className="flex items-center gap-2.5 sm:gap-3.5">
-                <motion.span
-                  initial={reduced ? false : { opacity: 0, y: 34, scale: 0.92 }}
-                  whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.8, ease: EASE.outQuart, delay: reduced ? 0 : 0.55 + i * 0.16 }}
-                  className={`inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-b ${t.tone} px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[.16em] backdrop-blur-md`}
-                  style={{ boxShadow: "0 10px 30px -14px rgba(129,140,248,.6)" }}
-                >
-                  <TokenIcon className="h-3 w-3" />
-                  {t.label}
-                </motion.span>
-                {!isLast && (
-                  <motion.span
-                    initial={reduced ? false : { opacity: 0, scale: 0.4 }}
-                    whileInView={{ opacity: 0.7, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, ease: EASE.outQuart, delay: reduced ? 0 : 0.63 + i * 0.16 }}
-                  >
-                    <ArrowRight className="h-3.5 w-3.5 text-white/40" />
-                  </motion.span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </motion.div>
+  );
+}
+
+/* The channel chain, rendered in-flow under the hero copy. Staggered lift on
+   entrance; reduced-motion lands it in place. transform + opacity only. */
+function ChannelChain() {
+  const reduced = useReducedMotion();
+  return (
+    <div className="mt-9 flex flex-wrap items-center gap-x-2.5 gap-y-2 sm:gap-x-3">
+      {CHAIN.map((t, i) => {
+        const TokenIcon = t.icon;
+        const isLast = i === CHAIN.length - 1;
+        return (
+          <div key={t.label} className="flex items-center gap-x-2.5 gap-y-2 sm:gap-x-3">
+            <motion.span
+              initial={reduced ? false : { opacity: 0, y: 14, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.6, ease: EASE.outQuart, delay: reduced ? 0 : 0.75 + i * 0.12 }}
+              className={`inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-b ${t.tone} px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[.16em] backdrop-blur-md`}
+              style={{ boxShadow: "0 10px 30px -14px rgba(129,140,248,.6)" }}
+            >
+              <TokenIcon className="h-3 w-3" />
+              {t.label}
+            </motion.span>
+            {!isLast && (
+              <motion.span
+                initial={reduced ? false : { opacity: 0, scale: 0.4 }}
+                animate={{ opacity: 0.6, scale: 1 }}
+                transition={{ duration: 0.4, ease: EASE.outQuart, delay: reduced ? 0 : 0.83 + i * 0.12 }}
+              >
+                <ArrowRight className="h-3.5 w-3.5 text-white/40" />
+              </motion.span>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -238,6 +243,7 @@ function Hero({ onScroll }: { onScroll: () => void }) {
           future-state surfaces that extend the same primitives — each shown with a real
           product-mockup visual, not an abstract chart. All labeled as vision, not built today.
         </motion.p>
+        <ChannelChain />
         <motion.div
           initial={reduced ? false : MOTION_VARIANTS.fadeUp.initial}
           animate={MOTION_VARIANTS.fadeUp.animate}
