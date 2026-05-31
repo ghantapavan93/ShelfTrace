@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.ids import new_id
@@ -332,6 +332,8 @@ class ScenarioValidationError(ValueError):
 
 
 def validate_scenario(payload: ScenarioIn) -> None:
+    # Store ids are free-form labels (there is no store master to validate
+    # against) — we only enforce non-empty stores and canary ⊆ stores below.
     if not payload.store_ids:
         raise ScenarioValidationError("At least one store is required.")
     if not payload.canary_store_ids:
@@ -438,6 +440,12 @@ def delete_config(db: Session, config: TestRunConfig) -> None:
     batches = db.scalars(select(PriceBatch).where(PriceBatch.scenario_config_id == config.id)).all()
     for b in batches:
         wipe_batch(db, b.external_id)
+    # Reclaim the ProductCost rows create_config seeded inline via
+    # _ensure_cost_for_action — they carry this config's data scope, so a
+    # delete keyed on source_run_id removes exactly this scenario's costs
+    # without touching any other scenario's catalog. (Costs are stamped, not
+    # FK-linked to the config, so the cascade below won't reach them.)
+    db.execute(delete(ProductCost).where(ProductCost.source_run_id == source_run_id_for_config(config)))
     db.delete(config)  # cascades actions + behaviors
     db.commit()
 

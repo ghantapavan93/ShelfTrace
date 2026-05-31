@@ -11,6 +11,7 @@ from app.models import (
     IncidentType,
     PriceAction,
     PricingRecommendation,
+    ProductCost,
     ReceiptStatus,
     TestRunConfig,
 )
@@ -179,3 +180,22 @@ def test_seeded_scenario_cannot_be_deleted(db):
     cfg = scenarios.ensure_memorial_day(db)
     with pytest.raises(scenarios.ScenarioValidationError):
         scenarios.delete_config(db, cfg)
+
+
+def test_delete_scenario_removes_seeded_product_costs(db):
+    """create_config seeds a ProductCost per SKU (via _ensure_cost_for_action),
+    stamped with the config's data scope. delete_config must reclaim those rows
+    so an uploaded scenario leaves no orphan costs behind once it's gone."""
+    payload = _milk_scenario([])
+    payload.import_source_hash = "c" * 64
+    payload.import_source_name = "uploaded-price-actions.csv"
+    cfg = scenarios.create_config(db, payload)
+    scope_id = scenarios.source_run_id_for_config(cfg)
+
+    # The upload seeded a cost row for the milk SKU under this scope.
+    seeded = db.query(ProductCost).filter(ProductCost.source_run_id == scope_id).all()
+    assert seeded, "expected create_config to seed a ProductCost for the uploaded SKU"
+
+    scenarios.delete_config(db, cfg)
+
+    assert db.query(ProductCost).filter(ProductCost.source_run_id == scope_id).count() == 0

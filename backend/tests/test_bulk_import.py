@@ -183,6 +183,33 @@ def test_negative_approved_price_is_invalid():
     assert any("approved_price must be > 0" in e for e in result.rows[0].errors)
 
 
+def test_negative_prior_price_is_invalid():
+    """prior_price < 0 must fail preview. Mirrors validate_scenario which
+    requires previous_price >= 0; pinned so a refactor can't weaken it."""
+    csv_data = (
+        "sku,product_name,prior_price,approved_price\n"
+        "neg-prior,Negative Prior,-2.99,4.99\n"
+    )
+    result = bulk_import.preview("csv", csv_data)
+    assert result.summary["invalid"] == 1
+    row = result.rows[0]
+    assert row.valid is False
+    assert any("prior_price must be ≥ 0" in e for e in row.errors)
+
+
+def test_missing_approved_price_is_required():
+    """An empty approved_price cell is a required-field error, not a silent 0."""
+    csv_data = (
+        "sku,product_name,prior_price,approved_price\n"
+        "no-approved,Missing Approved,5.99,\n"
+    )
+    result = bulk_import.preview("csv", csv_data)
+    assert result.summary["invalid"] == 1
+    row = result.rows[0]
+    assert row.valid is False
+    assert any("approved_price is required" in e for e in row.errors)
+
+
 def test_duplicate_sku_marks_second_row_invalid():
     """Two rows with the same SKU would create an ambiguous batch.
     The first stays valid, the second is flagged so the user knows to fix it."""
