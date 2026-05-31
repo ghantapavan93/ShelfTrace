@@ -125,14 +125,15 @@ class BatchSummary(BaseModel):
     retry_actions: int
     critical_incidents: int
     deadline_risks: int
-    # Optional post-export lifecycle rollup. Forward-compatible: clients that
-    # don't request/know it simply omit it (default None keeps existing
-    # serialization + tests unchanged).
-    lifecycle: BatchLifecycleView | None = None
 
 
 class BatchDetail(BatchSummary):
     actions: list[ActionView]
+    # Optional post-export lifecycle rollup (detail-only — a per-batch derivation,
+    # not part of the lightweight list summary). Forward-compatible: clients that
+    # don't request/know it simply omit it (default None keeps existing
+    # serialization + tests unchanged).
+    lifecycle: BatchLifecycleView | None = None
 
 
 class IncidentView(BaseModel):
