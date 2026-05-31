@@ -234,6 +234,19 @@ export interface DecisionReceiptView {
   generated_at: string;
 }
 
+// Batch-level integrity rollup of the affected cohort: verified-affected (safe
+// to attribute) vs execution-failed (must be excluded from measurement), with a
+// per-status breakdown and a deterministic summary line. Derived server-side,
+// read-only. Mirrors backend `schemas.MeasurementIntegrityView`.
+export interface MeasurementIntegrity {
+  total_affected: number;
+  verified_affected: number;
+  execution_failed: number;
+  verified_rate: number;
+  breakdown: Record<string, number>;
+  summary: string;
+}
+
 export interface OperationsOverview {
   batch: BatchSummary;
   critical_incident: IncidentView | null;
@@ -247,6 +260,8 @@ export interface OperationsOverview {
     total: number;
     verified_pct: number;
   };
+  // Optional for backward compatibility with the backend schema default.
+  measurement_integrity?: MeasurementIntegrity | null;
 }
 
 export interface ConnectorProfile {

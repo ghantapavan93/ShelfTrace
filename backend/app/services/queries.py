@@ -25,6 +25,7 @@ from app.schemas import (
     IncidentExplanation,
     IncidentView,
     MeasurementEligibilityView,
+    MeasurementIntegrityView,
     OperationsOverview,
 )
 from app.services import measurement
@@ -333,6 +334,8 @@ def operations_overview(db: Session, batch: PriceBatch) -> OperationsOverview:
         "verified_pct": round(100 * verified / total, 1),
     }
 
+    integrity = measurement.summarize_batch_integrity(db, batch)
+
     return OperationsOverview(
         batch=summary,
         critical_incident=incident_view(db, critical) if critical else None,
@@ -342,6 +345,7 @@ def operations_overview(db: Session, batch: PriceBatch) -> OperationsOverview:
         ),
         recent_activity=recent_audit(db, batch.id),
         rollout_progress=progress,
+        measurement_integrity=MeasurementIntegrityView(**integrity.to_dict()),
     )
 
 

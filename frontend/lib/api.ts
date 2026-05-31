@@ -6,6 +6,7 @@ import type {
   EngineeringTrace,
   IncidentExplanation,
   IncidentView,
+  MeasurementIntegrity,
   OperationsOverview,
   RegressionCase,
   Scenario,
@@ -123,6 +124,17 @@ export const api = {
         ? `?scope=${scope}`
         : "";
     return get<OperationsOverview>(`/api/v1/operations${qs}`);
+  },
+  // Batch-level measurement-integrity rollup. Mirrors `operations`: external_id
+  // is the escape hatch and bypasses scope; otherwise scope is forwarded and the
+  // backend 404s in Live mode when no live batch exists.
+  measurementIntegrity: (externalId?: string, scope?: "live" | "demo" | "all") => {
+    const qs = externalId
+      ? `?external_id=${externalId}`
+      : scope
+        ? `?scope=${scope}`
+        : "";
+    return get<MeasurementIntegrity>(`/api/v1/operations/measurement-integrity${qs}`);
   },
   batches: (scope?: "live" | "demo" | "all") =>
     get<BatchSummary[]>(`/api/v1/batches${scope ? `?scope=${scope}` : ""}`),

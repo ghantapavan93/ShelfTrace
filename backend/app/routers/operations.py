@@ -17,9 +17,14 @@ from app.models import (
     RunMode,
 )
 from app.routers.common import get_batch_or_404
-from app.schemas import ExplainRequest, ExplainResponse, OperationsOverview
+from app.schemas import (
+    ExplainRequest,
+    ExplainResponse,
+    MeasurementIntegrityView,
+    OperationsOverview,
+)
 from app.scope import Scope, apply_filter, current_scope
-from app.services import queries
+from app.services import measurement, queries
 
 router = APIRouter(prefix="/api/v1", tags=["operations"])
 
@@ -118,6 +123,53 @@ def operations(
                     detail=f"No batch found in scope '{resolved.value}'",
                 )
     return queries.operations_overview(db, batch)
+
+
+@router.get("/operations/measurement-integrity", response_model=MeasurementIntegrityView)
+def measurement_integrity(
+    external_id: str | None = None,
+    scope: str | None = Query(
+        None,
+        description="Data scope: 'live' (user uploads only), 'demo' (seeded only), 'all'. "
+        "Applied only when external_id is omitted — explicit URL lookups remain the "
+        "documented escape hatch and bypass the filter.",
+    ),
+    db: Session = Depends(get_db),
+):
+    """Batch-level measurement-integrity rollup for the batch in the requested scope.
+
+    Splits the affected cohort into verified-affected (safe to attribute) vs
+    execution-failed (must be excluded) so a downstream measurement layer can
+    attribute impact only to prices that actually executed. Mirrors the EXACT
+    scope-resolution + batch-pick + 404 contract of ``GET /operations``.
+    """
+    if external_id:
+        # Explicit URL → honor the escape hatch contract (a Live-mode user who
+        # navigates directly to the demo batch by id still gets it).
+        batch = get_batch_or_404(db, external_id)
+    else:
+        # Implicit default → pick the latest batch that matches the scope filter.
+        resolved = current_scope(scope)
+        stmt = (
+            select(PriceBatch)
+            .where(PriceBatch.run_mode == RunMode.LIVE_ROLLOUT)
+            .order_by(PriceBatch.created_at.desc())
+        )
+        stmt = apply_filter(stmt, PriceBatch.source_run_id, resolved)
+        batch = db.scalar(stmt)
+        if batch is None:
+            # Same fallback contract as /operations: ALL falls back to the
+            # unfiltered latest; LIVE/DEMO raise 404 rather than silently
+            # crossing the boundary.
+            if resolved == Scope.ALL:
+                batch = get_batch_or_404(db, None)
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No batch found in scope '{resolved.value}'",
+                )
+    integrity = measurement.summarize_batch_integrity(db, batch)
+    return MeasurementIntegrityView(**integrity.to_dict())
 
 
 @router.get("/markdowns")

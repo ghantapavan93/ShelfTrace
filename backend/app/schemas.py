@@ -157,6 +157,22 @@ class OutboxEventView(BaseModel):
     created_at: datetime
 
 
+class MeasurementIntegrityView(BaseModel):
+    """Batch-level integrity rollup of the affected cohort.
+
+    Splits affected actions into verified-affected (safe to attribute) vs
+    execution-failed (must be excluded from measurement), with a per-status
+    breakdown and a deterministic summary line. Derived, never persisted.
+    See :func:`app.services.measurement.summarize_batch_integrity`."""
+
+    total_affected: int
+    verified_affected: int
+    execution_failed: int
+    verified_rate: float
+    breakdown: dict[str, int]
+    summary: str
+
+
 class OperationsOverview(BaseModel):
     batch: BatchSummary
     critical_incident: IncidentView | None
@@ -164,6 +180,9 @@ class OperationsOverview(BaseModel):
     eligible_action: ActionView | None
     recent_activity: list[AuditEventView]
     rollout_progress: dict
+    # Optional + default for backward compatibility: existing clients that
+    # don't know about this field keep working when it's absent.
+    measurement_integrity: MeasurementIntegrityView | None = None
 
 
 class StoreTaskView(BaseModel):

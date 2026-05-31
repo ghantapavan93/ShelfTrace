@@ -286,3 +286,124 @@ def derive_eligibility_for_action(db: Session, action: PriceAction) -> Eligibili
             )
         )
     return derive_eligibility(action, incidents, open_tasks)
+
+
+# ---------------------------------------------------------------------------
+# Batch-level integrity rollup — aggregates per-action eligibility into the
+# verified-affected vs execution-failed cohort split a downstream measurement
+# layer needs. Pure derivation: reuses derive_eligibility_for_batch, counts in
+# memory, writes nothing. No new tables, no migrations, no audit events.
+# ---------------------------------------------------------------------------
+
+# Statuses that disqualify an action from measurement. Mirrors the precedence in
+# :func:`derive_eligibility`: only the all-channels-verified status is safe to
+# attribute to; every other status is an execution failure a downstream layer
+# must exclude / quarantine.
+_FAILED_STATUSES: tuple[MeasurementEligibility, ...] = (
+    MeasurementEligibility.INELIGIBLE_EXECUTION_NOT_VERIFIED,
+    MeasurementEligibility.INELIGIBLE_AWAITING_ACKNOWLEDGEMENT,
+    MeasurementEligibility.EXCLUDED_RECOVERY_INCOMPLETE,
+)
+
+# Short fragments for the deterministic summary line, keyed by the failing
+# status. Assembled from counts only — never free text.
+_FAILED_PHRASES: dict[MeasurementEligibility, str] = {
+    MeasurementEligibility.INELIGIBLE_AWAITING_ACKNOWLEDGEMENT: "awaiting ack",
+    MeasurementEligibility.INELIGIBLE_EXECUTION_NOT_VERIFIED: "mismatch",
+    MeasurementEligibility.EXCLUDED_RECOVERY_INCOMPLETE: "recovery",
+}
+
+
+@dataclass(frozen=True)
+class IntegritySummary:
+    """Batch-level rollup of measurement integrity for the affected cohort.
+
+    A downstream measurement / attribution layer compares an *affected* cohort
+    against a control. That comparison is only valid for actions whose execution
+    is verified at every required shopper-facing channel. This rollup splits the
+    affected cohort into **verified-affected** (safe to attribute) and
+    **execution-failed** (must be excluded), with a per-status breakdown and a
+    deterministic summary line.
+
+    Plain frozen dataclass, no DB binding — same shape convention as
+    :class:`EligibilityResult`.
+    """
+
+    total_affected: int
+    verified_affected: int
+    execution_failed: int
+    verified_rate: float
+    breakdown: dict[str, int]
+    summary: str
+
+    def to_dict(self) -> dict:
+        return {
+            "total_affected": self.total_affected,
+            "verified_affected": self.verified_affected,
+            "execution_failed": self.execution_failed,
+            "verified_rate": self.verified_rate,
+            "breakdown": dict(self.breakdown),
+            "summary": self.summary,
+        }
+
+
+def _integrity_summary_line(
+    total: int, verified: int, failed: int, breakdown: dict[str, int]
+) -> str:
+    """Build the deterministic summary sentence from counts only.
+
+    Example: ``"12 of 18 affected actions verified across all channels; 6
+    excluded from measurement (3 awaiting ack, 2 mismatch, 1 recovery)."`` The
+    trailing parenthetical lists only the failure kinds that are present, in
+    precedence order. With zero affected actions the line is a fixed string.
+    """
+    if total == 0:
+        return "no affected actions in this batch."
+
+    head = (
+        f"{verified} of {total} affected action{'' if total == 1 else 's'} "
+        f"verified across all channels"
+    )
+    if failed == 0:
+        return f"{head}; none excluded from measurement."
+
+    parts = [
+        f"{breakdown[status.value]} {_FAILED_PHRASES[status]}"
+        for status in _FAILED_STATUSES
+        if breakdown.get(status.value, 0) > 0
+    ]
+    return f"{head}; {failed} excluded from measurement ({', '.join(parts)})."
+
+
+def summarize_batch_integrity(db: Session, batch: PriceBatch) -> IntegritySummary:
+    """Aggregate per-action eligibility into a batch-level integrity rollup.
+
+    Reuses :func:`derive_eligibility_for_batch` (two bounded queries) and counts
+    in memory. ``verified_rate`` is the verified-affected fraction, guarded to
+    ``0.0`` when the batch has no affected actions. ``breakdown`` is keyed by
+    every :class:`MeasurementEligibility` value (zero-filled) so the shape is
+    stable regardless of which statuses are present.
+    """
+    results = derive_eligibility_for_batch(db, batch)
+
+    breakdown: dict[str, int] = {status.value: 0 for status in MeasurementEligibility}
+    for result in results.values():
+        breakdown[result.status.value] += 1
+
+    total_affected = len(results)
+    verified_affected = breakdown[
+        MeasurementEligibility.ELIGIBLE_ALL_REQUIRED_CHANNELS_VERIFIED.value
+    ]
+    execution_failed = sum(breakdown[s.value] for s in _FAILED_STATUSES)
+    verified_rate = verified_affected / total_affected if total_affected else 0.0
+
+    return IntegritySummary(
+        total_affected=total_affected,
+        verified_affected=verified_affected,
+        execution_failed=execution_failed,
+        verified_rate=verified_rate,
+        breakdown=breakdown,
+        summary=_integrity_summary_line(
+            total_affected, verified_affected, execution_failed, breakdown
+        ),
+    )
