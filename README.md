@@ -161,7 +161,7 @@ pip install -e ".[dev]"
 # SQLite (fast; the Postgres-only concurrency tests auto-skip):
 pytest
 
-# Against the docker Postgres — full suite (353 tests, including row-lock concurrency):
+# Against the docker Postgres — full suite (355 tests, including row-lock concurrency):
 DATABASE_URL=postgresql+psycopg2://shelftrace:shelftrace@localhost:5432/shelftrace_db pytest
 ```
 
