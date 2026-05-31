@@ -15,6 +15,7 @@ import {
   useTransform,
 } from "framer-motion";
 import { EASE, MOTION_VARIANTS, PRESET, SPRING } from "@/lib/motion";
+import { TEST_COUNT } from "@/lib/constants";
 import {
   ArrowRight,
   ArrowUpRight,

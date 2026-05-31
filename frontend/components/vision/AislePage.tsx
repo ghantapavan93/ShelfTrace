@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { BackgroundOrbits, Pill } from "./Shell";
 import { EASE, SPRING } from "@/lib/motion";
+import { TEST_COUNT } from "@/lib/constants";
 
 /* ──────────────────────────────────────────────────────────────────────────────
    Cinematic Aisle — six chapters, scrubbable, with decision-stream narration.
