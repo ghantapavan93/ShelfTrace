@@ -32,6 +32,7 @@ import { OperationsSkeleton } from "@/components/Skeleton";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { useWorkMode } from "@/components/ModeProvider";
+import MeasurementIntegrityCard from "@/components/MeasurementIntegrityCard";
 import type { ChannelView } from "@/lib/types";
 
 const CH_ICON = { esl: Tag, pos: ScanLine, ecommerce: Globe } as const;
@@ -458,6 +459,13 @@ function OperationsContent() {
           tone={b.expansion_blocked ? "danger" : "verified"}
         />
       </section>
+
+      {/* Measurement integrity — verified-affected vs execution-failed cohort.
+          Only a measurement layer fed by verified execution can attribute impact
+          honestly; this surfaces how much of the affected cohort actually landed. */}
+      {data.measurement_integrity && (
+        <MeasurementIntegrityCard data={data.measurement_integrity} />
+      )}
 
       {/* Ask ShelfTrace — only in demo mode so it never appears on a live rollout */}
       {!isLiveWorkMode && <AskShelfTrace />}
