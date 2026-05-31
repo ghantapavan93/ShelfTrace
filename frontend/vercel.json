@@ -5,5 +5,10 @@
   "installCommand": "npm install",
   "devCommand": "next dev",
   "outputDirectory": ".next",
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_API_URL": "https://shelftrace-api.onrender.com"
+    }
+  }
 }

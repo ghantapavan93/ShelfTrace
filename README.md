@@ -78,7 +78,7 @@ Every transition is written to the audit trail. The exact API responses for this
  PostgreSQL ── batch + actions + canary/expansion rollout groups + OUTBOX events
             │
             ▼
- Outbox worker (Redis-modeled)  ── drains pending events
+ Outbox drain (inline on POST; optional Redis worker) ── processes pending events
             │
    ┌────────┼─────────────┐
    ▼        ▼             ▼
@@ -106,7 +106,7 @@ Every transition is written to the audit trail. The exact API responses for this
 |---|---|
 | Frontend | Next.js 14 (App Router), React, TypeScript, Tailwind, Framer Motion |
 | Backend | FastAPI, SQLAlchemy 2, Pydantic v2 |
-| Data | PostgreSQL (transactional state + outbox), Redis (delivery worker) |
+| Data | PostgreSQL (transactional state + outbox). Redis is optional — used by the standalone outbox worker and rate limiting; the API drains the outbox inline on POST, so the demo runs without it (`REDIS_ENABLED=false`). |
 | Infra | Docker Compose; Azure-ready |
 
 ### Backend design highlights
@@ -158,10 +158,10 @@ curl -X POST http://localhost:8000/api/v1/demo/reset
 cd backend
 pip install -e ".[dev]"
 
-# SQLite (fast, 13 tests; the 2 Postgres-only concurrency tests skip):
+# SQLite (fast; the Postgres-only concurrency tests auto-skip):
 pytest
 
-# Against the docker Postgres (all 15, including row-lock concurrency):
+# Against the docker Postgres — full suite (353 tests, including row-lock concurrency):
 DATABASE_URL=postgresql+psycopg2://shelftrace:shelftrace@localhost:5432/shelftrace_db pytest
 ```
 

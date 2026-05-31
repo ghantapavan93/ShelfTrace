@@ -1428,7 +1428,8 @@ function CtaRail() {
         <div>
           <Pill tone="orange">Built beside the working engine</Pill>
           <h3 className="mt-3 text-2xl font-semibold text-white tracking-tight">
-            Every concept here mounts on what already passes 32 tests.
+            Every concept here mounts on what already passes {TEST_COUNT}{" "}
+            PostgreSQL-backed tests.
           </h3>
           <p className="mt-2 max-w-xl text-sm text-white/55">
             Outbox, idempotency, audit causality and scenario-driven adapters already exist in the working repo.

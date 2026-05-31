@@ -1530,36 +1530,36 @@ function SafetyMini({ lit }: { lit: boolean }) {
 }
 
 function ProofMini({ lit }: { lit: boolean }) {
-  const reduced = useReducedMotion();
-  // Render a 55-dot grid (24 cols × ~3 rows) that fills emerald sequentially.
+  // Show the real, single-source-of-truth test count (not a countable dot grid
+  // that a reviewer could misread as the suite size). TEST_COUNT lives in
+  // lib/constants so every surface cites the same verified number.
   return (
     <div className="relative h-[78px] overflow-hidden rounded-xl border border-emerald-500/35 bg-[#0a1410]/95 px-3 py-2">
-      <div className="flex items-center gap-3">
-        <BadgeCheck className="h-5 w-5 text-emerald-300" />
+      <div className="flex h-full items-center gap-3">
+        <BadgeCheck className="h-5 w-5 shrink-0 text-emerald-300" />
         <div className="flex-1">
           <p className="text-[9px] uppercase tracking-[.22em] text-emerald-300">
             pytest · postgres
           </p>
-          <div className="mt-1 grid grid-cols-[repeat(24,1fr)] gap-[2px]">
-            {Array.from({ length: 131 }).map((_, i) => (
-              <motion.span
-                key={i}
-                initial={{ opacity: 0.18 }}
-                animate={lit ? { opacity: [0.18, 1, 0.85] } : undefined}
-                transition={
-                  lit && !reduced
-                    ? { duration: 0.5, delay: 0.5 + i * 0.025, times: [0, 0.6, 1] }
-                    : undefined
-                }
-                className="block h-[6px] rounded-[1px] bg-emerald-400/85"
-              />
-            ))}
-          </div>
+          <p className="mt-0.5 font-mono text-xl font-bold leading-none tabular-nums text-white">
+            {TEST_COUNT}
+            <span className="ml-1 text-sm font-medium text-emerald-300/70">
+              /{TEST_COUNT}
+            </span>
+          </p>
+          <p className="mt-0.5 text-[9px] text-white/45">
+            backend tests passing
+          </p>
         </div>
         {lit && (
-          <span className="font-mono text-[9px] uppercase tracking-[.18em] text-emerald-300">
+          <motion.span
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={SPRING.bouncy}
+            className="font-mono text-[9px] uppercase tracking-[.18em] text-emerald-300"
+          >
             all passed
-          </span>
+          </motion.span>
         )}
       </div>
     </div>

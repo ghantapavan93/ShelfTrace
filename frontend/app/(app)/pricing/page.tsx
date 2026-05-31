@@ -204,7 +204,7 @@ export default function PricingPage() {
             <Brain className="h-3 w-3" /> Pure-Python OLS
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[.18em] text-violet-200">
-            <ShieldCheck className="h-3 w-3" /> 29 backend tests
+            <ShieldCheck className="h-3 w-3" /> {TEST_COUNT} backend tests
           </span>
         </div>
       </div>

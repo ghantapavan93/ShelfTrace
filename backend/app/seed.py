@@ -92,3 +92,33 @@ def seed_live(db: Session) -> PriceBatch:
 
 # Backwards-compatible alias.
 seed_demo = seed_live
+
+
+# The two seeded "hero" live-rollout demos. (MILK_HERO_EXTERNAL_ID mirrors the
+# constant in services/scenarios.py; duplicated here as a literal to avoid a
+# circular import — scenarios.py already imports wipe_batch from this module.)
+MILK_HERO_EXTERNAL_ID = "milk-hero-dallas-02"
+SEED_LIVE_EXTERNAL_IDS = {DEMO_EXTERNAL_ID, MILK_HERO_EXTERNAL_ID}
+
+
+def purge_non_seed_live_batches(db: Session) -> int:
+    """Remove executed LIVE_ROLLOUT batches that aren't one of the seeded hero
+    demos, so a reset restores a bounded, debris-free Operations view.
+
+    This is what makes demo reset idempotent: two consecutive resets leave the
+    SAME set of live batches (the two heroes), instead of letting realistic-scale
+    runs and prior-session scenarios accumulate. Saved scenario CONFIGS are
+    preserved — only their stale executed batches are cleared, so a reviewer's
+    saved scenarios survive a reset and can be re-run. Returns the count removed.
+    """
+    from app.models import RunMode  # local import keeps module load order simple
+
+    stale = db.scalars(
+        select(PriceBatch).where(
+            PriceBatch.run_mode == RunMode.LIVE_ROLLOUT,
+            PriceBatch.external_id.notin_(SEED_LIVE_EXTERNAL_IDS),
+        )
+    ).all()
+    for batch in stale:
+        wipe_batch(db, batch.external_id)
+    return len(stale)
