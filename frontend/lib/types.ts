@@ -140,6 +140,11 @@ export interface IncidentView {
   created_at: string;
   resolved_at: string | null;
   channels: ChannelView[];
+  // Real operator acknowledgement: who took ownership of the incident and when.
+  // `acknowledged` is the boolean the UI gates the Acknowledge banner on.
+  acknowledged?: boolean;
+  acknowledged_at?: string | null;
+  acknowledged_by?: string | null;
   measurement_eligibility?: MeasurementEligibilityView | null;
 }
 

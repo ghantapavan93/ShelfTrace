@@ -155,6 +155,11 @@ class IncidentView(BaseModel):
     created_at: datetime
     resolved_at: datetime | None
     channels: list[ChannelView]
+    # Real operator acknowledgement (who took ownership + when). `acknowledged`
+    # is the derived boolean the UI gates on; the timestamp/actor back it up.
+    acknowledged: bool = False
+    acknowledged_at: datetime | None = None
+    acknowledged_by: str | None = None
     # Forward-compatible.
     measurement_eligibility: MeasurementEligibilityView | None = None
 

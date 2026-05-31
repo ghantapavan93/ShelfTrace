@@ -74,9 +74,10 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
   const exp = useLive<IncidentExplanation>(() => api.explanation(id), [id]);
   const audit = useLive<AuditEventView[]>(() => api.incidentAudit(id), [id]);
 
-  async function act(kind: "retry" | "rollback" | "resolve" | "task" | "complete" | "regression") {
+  async function act(kind: "ack" | "retry" | "rollback" | "resolve" | "task" | "complete" | "regression") {
     setBusy(kind);
     try {
+      if (kind === "ack") await api.acknowledge(id);
       if (kind === "retry") await api.retry(id);
       if (kind === "rollback") await api.rollback(id);
       if (kind === "resolve") await api.resolve(id);
@@ -99,7 +100,9 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
       // and the measurement gate all re-render from fresh data.
       await Promise.all([inc.reload(), exp.reload(), audit.reload()]);
       toast.success(
-        kind === "retry"
+        kind === "ack"
+          ? "Incident acknowledged — you own the recovery."
+          : kind === "retry"
           ? "Retry sent — channels re-verified."
           : kind === "rollback"
             ? "Shelf label rolled back to match checkout."
@@ -403,6 +406,40 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
         </section>
       ) : (
         <section className="holo-card rounded-2xl p-5">
+          {/* Acknowledgement gate — the human takes ownership before recovery.
+              Shown until the incident carries an acknowledgement; once owned, a
+              compact "acknowledged by X" confirmation replaces it. Recovery
+              actions still auto-acknowledge server-side if skipped, so this is a
+              prompt, not a hard block. */}
+          {i.acknowledged ? (
+            <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-sky-500/25 bg-sky-500/[.06] px-4 py-2.5 text-sm text-sky-200">
+              <UserCheck className="h-4 w-4 shrink-0 text-sky-300" />
+              <span>
+                Acknowledged{i.acknowledged_by ? <> by <span className="font-medium text-sky-100">{i.acknowledged_by}</span></> : ""}
+                {i.acknowledged_at ? (
+                  <span className="text-sky-300/60"> · {new Date(i.acknowledged_at).toLocaleTimeString()}</span>
+                ) : null}
+                <span className="ml-1 text-sky-300/70">— you own this incident.</span>
+              </span>
+            </div>
+          ) : (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[.06] px-4 py-3">
+              <UserCheck className="h-4 w-4 shrink-0 text-amber-300" />
+              <p className="flex-1 text-sm text-amber-200/90">
+                Take ownership before recovering — acknowledging records who is on this
+                incident, the first step of the recovery workflow.
+              </p>
+              <button
+                type="button"
+                onClick={() => act("ack")}
+                disabled={busy !== null}
+                className="flex shrink-0 items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-400/15 px-4 py-2 text-sm font-medium text-amber-100 transition hover:bg-amber-400/25 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
+              >
+                <UserCheck className={clsx("h-4 w-4 shrink-0", busy === "ack" && "animate-pulse")} />
+                Acknowledge
+              </button>
+            </div>
+          )}
           <div className="mb-4 flex items-center gap-2">
             <Wrench className="h-4 w-4 text-brand-400" />
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Recovery Actions</h3>

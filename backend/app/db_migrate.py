@@ -32,6 +32,14 @@ _OUTBOX_COLUMNS = [
     ("last_error", "TEXT"),
 ]
 
+# Incidents: real operator acknowledgement (who took ownership + when).
+# Mirrors Alembic 0009_incident_acknowledgement so the non-Alembic demo path
+# leaves the DB in the same shape.
+_INCIDENT_COLUMNS = [
+    ("acknowledged_at", "TIMESTAMP WITH TIME ZONE"),
+    ("acknowledged_by", "VARCHAR(128)"),
+]
+
 _TEST_RUN_CONFIG_COLUMNS = [
     ("import_source_hash", "VARCHAR(64)"),
     ("import_source_name", "VARCHAR(256)"),
@@ -314,6 +322,8 @@ def run_migrations() -> None:
             conn.execute(text(f"ALTER TABLE price_batches ADD COLUMN IF NOT EXISTS {name} {ddl}"))
         for name, ddl in _OUTBOX_COLUMNS:
             conn.execute(text(f"ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS {name} {ddl}"))
+        for name, ddl in _INCIDENT_COLUMNS:
+            conn.execute(text(f"ALTER TABLE incidents ADD COLUMN IF NOT EXISTS {name} {ddl}"))
         for name, ddl in _TEST_RUN_CONFIG_COLUMNS:
             conn.execute(text(f"ALTER TABLE test_run_configs ADD COLUMN IF NOT EXISTS {name} {ddl}"))
         conn.execute(

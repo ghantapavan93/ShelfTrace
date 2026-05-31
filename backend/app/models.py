@@ -316,6 +316,13 @@ class Incident(Base):
     offending_channel: Mapped[Channel | None] = mapped_column(Enum(Channel), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Operator acknowledgement (human-in-the-loop ownership). Modeled as a
+    # timestamp + actor rather than an IncidentStatus value so an incident can
+    # be acknowledged AND still retrying (PagerDuty-style — ack is orthogonal to
+    # the recovery lifecycle). The reliability guarantee: no incident leaves the
+    # OPEN state via a recovery action without an acknowledgement on record.
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    acknowledged_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
 
 class StoreTask(Base):

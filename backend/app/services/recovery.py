@@ -45,14 +45,73 @@ def _delivery_for(db: Session, action_id: str, channel: Channel) -> ChannelDeliv
     )
 
 
+def _ensure_acknowledged(
+    db: Session, incident: Incident, action: PriceAction, actor: str, *, via: str | None = None
+) -> bool:
+    """Stamp an acknowledgement on the incident if it has none yet.
+
+    This is the enforcement point for the reliability guarantee: every incident
+    that is acted on (retry / rollback / resolve / store-task close) carries an
+    acknowledgement record — who took ownership and when — even if the operator
+    skipped the explicit Acknowledge button and went straight to recovery
+    ("taking ownership by acting"). Returns True if it stamped a new ack.
+
+    Idempotent: an already-acknowledged incident keeps its original actor/time.
+    """
+    if incident.acknowledged_at is not None:
+        return False
+    incident.acknowledged_at = utcnow()
+    incident.acknowledged_by = actor
+    detail = (
+        f"{actor} acknowledged the incident for {action.product_name} at "
+        f"Store {action.store_id}, taking ownership of recovery."
+    )
+    if via:
+        detail += f" (auto-acknowledged via {via})"
+    record_audit(
+        db,
+        incident_id=incident.id,
+        action_id=action.id,
+        batch_id=action.batch_id,
+        event="Incident acknowledged",
+        detail=detail,
+        actor=actor,
+    )
+    return True
+
+
+def acknowledge_incident(db: Session, incident_id: str, actor: str = "operator") -> Incident:
+    """Operator takes ownership of an open incident (the human-in-the-loop gate).
+
+    Explicit first step of the recovery workflow: OPEN incident → acknowledged.
+    Records actor + timestamp + audit. Idempotent (re-acknowledging is a no-op
+    that preserves the original owner). Rejected once the incident is terminal —
+    you cannot acknowledge an already-closed incident.
+    """
+    incident = _lock_incident(db, incident_id)
+    if incident.status in TERMINAL:
+        raise RecoveryError(
+            f"Incident already {incident.status.value}; nothing to acknowledge."
+        )
+    action = db.get(PriceAction, incident.action_id)
+    _ensure_acknowledged(db, incident, action, actor)
+    db.commit()
+    db.refresh(incident)
+    return incident
+
+
 def retry_incident(db: Session, incident_id: str, actor: str = "operator") -> Incident:
     incident = _lock_incident(db, incident_id)
     if incident.status in TERMINAL:
         raise RecoveryError(f"Incident already {incident.status.value}; cannot retry.")
 
-    incident.status = IncidentStatus.RETRYING
     action = db.get(PriceAction, incident.action_id)
     channel = incident.offending_channel or Channel.POS
+    # Every recovery action implies the operator owns the incident. Stamp the
+    # acknowledgement first (no-op if they already clicked Acknowledge), so the
+    # audit trail always reads ack -> retry, never an un-owned recovery.
+    _ensure_acknowledged(db, incident, action, actor, via="retry")
+    incident.status = IncidentStatus.RETRYING
 
     record_audit(
         db,
@@ -91,6 +150,7 @@ def rollback_incident(db: Session, incident_id: str, actor: str = "operator") ->
         raise RecoveryError(f"Incident already {incident.status.value}; cannot roll back.")
 
     action = db.get(PriceAction, incident.action_id)
+    _ensure_acknowledged(db, incident, action, actor, via="rollback")
     # Temporarily restore the shelf label to the prior price so it matches checkout
     # until the mismatch is fixed at the source.
     ADAPTERS["esl"].rollback_price_change(
@@ -176,6 +236,7 @@ def complete_store_task(db: Session, incident_id: str, actor: str = "operator") 
         )
 
     action = db.get(PriceAction, incident.action_id)
+    _ensure_acknowledged(db, incident, action, actor, via="store-task")
     task.status = StoreTaskStatus.DONE
     record_audit(
         db,
@@ -228,6 +289,9 @@ def resolve_incident(db: Session, incident_id: str, actor: str = "operator") -> 
             "Cannot resolve: channels still disagree. Retry the failing channel first."
         )
 
+    # Guarantee an acknowledgement is on record before closing — no incident is
+    # ever resolved without an owner. (No-op if already acknowledged.)
+    _ensure_acknowledged(db, incident, action, actor, via="resolve")
     incident.status = IncidentStatus.RESOLVED
     incident.resolved_at = utcnow()
     batch = db.get(PriceBatch, action.batch_id)

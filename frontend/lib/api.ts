@@ -219,6 +219,10 @@ export const api = {
     get<import("./types").DecisionReceiptView>(
       `/api/v1/incidents/${encodeURIComponent(incidentId)}/receipt`,
     ),
+  // Operator takes ownership of the incident (the human-in-the-loop gate).
+  // First step of the recovery workflow; recovery actions auto-acknowledge if
+  // the operator skips this, so an incident is never recovered un-owned.
+  acknowledge: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/acknowledge`),
   retry: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/retry`),
   rollback: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/rollback`),
   resolve: (id: string) => post<IncidentView>(`/api/v1/incidents/${id}/resolve`),

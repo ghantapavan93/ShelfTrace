@@ -338,6 +338,14 @@ def validate_scenario(payload: ScenarioIn) -> None:
         raise ScenarioValidationError("At least one store is required.")
     if not payload.canary_store_ids:
         raise ScenarioValidationError("At least one canary store is required.")
+    # Store ids are free-form labels by design (ShelfTrace has no store master),
+    # but they must be WELL-FORMED: non-blank and unique. This catches real
+    # CSV/whitespace mistakes without pretending to verify a store exists.
+    for sid in [*payload.store_ids, *payload.canary_store_ids]:
+        if not sid or not sid.strip():
+            raise ScenarioValidationError("Store ids cannot be blank or whitespace.")
+    if len(payload.store_ids) != len(set(payload.store_ids)):
+        raise ScenarioValidationError("Duplicate store ids are not allowed.")
     stores = set(payload.store_ids)
     extra = set(payload.canary_store_ids) - stores
     if extra:

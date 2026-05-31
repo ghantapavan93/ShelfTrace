@@ -279,6 +279,9 @@ def incident_view(db: Session, incident: Incident) -> IncidentView:
         created_at=incident.created_at,
         resolved_at=incident.resolved_at,
         channels=channels,
+        acknowledged=incident.acknowledged_at is not None,
+        acknowledged_at=incident.acknowledged_at,
+        acknowledged_by=incident.acknowledged_by,
         measurement_eligibility=MeasurementEligibilityView(**eligibility.to_dict()),
     )
 

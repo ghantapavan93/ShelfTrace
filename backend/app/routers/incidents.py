@@ -99,6 +99,17 @@ def _recover(fn, db, incident_id, actor: str):
         raise HTTPException(status_code=409, detail=str(exc))
 
 
+@router.post("/incidents/{incident_id}/acknowledge", response_model=IncidentView)
+def acknowledge(
+    incident_id: str,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
+    """Operator takes ownership of the incident (first step of recovery)."""
+    incident = _recover(recovery.acknowledge_incident, db, incident_id, identity.actor)
+    return queries.incident_view(db, incident)
+
+
 @router.post("/incidents/{incident_id}/retry", response_model=IncidentView)
 def retry(
     incident_id: str,
