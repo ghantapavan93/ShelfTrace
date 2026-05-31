@@ -84,6 +84,7 @@ def _seed_kvi_with_competitor(db, *, sku, store_id, our_price, comp_price, sourc
         raw_attributes={},
     )
     db.add(cp)
+    db.flush()  # parent competitor_products row must exist before FK children (PG enforces FKs; SQLite doesn't)
     db.add(CompetitorProductEntity(
         id=f"cpe_{sku}",
         competitor_product_id=cp.id,

@@ -171,6 +171,7 @@ def test_competitor_price_observations(db):
         price=10.00,
     )
     db.add(comp)
+    db.flush()  # parent competitor_products row must exist before the observation (PG enforces FKs; SQLite doesn't)
 
     obs = CompetitorPriceObservation(
         id="obs_1",

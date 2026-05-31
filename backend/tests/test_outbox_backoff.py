@@ -1,7 +1,7 @@
 """Exponential backoff + dead-letter for the outbox worker."""
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -66,7 +66,12 @@ def test_failed_event_schedules_retry_then_dead_letters(db):
         assert event.status == OutboxStatus.RETRYING
         assert event.attempts == 1
         assert event.next_attempt_at is not None
-        assert event.next_attempt_at > utcnow().replace(tzinfo=None)
+        # PG returns tz-aware datetimes, SQLite returns naive. Normalize the
+        # value read back from the DB to aware so this works on both backends.
+        next_at = event.next_attempt_at
+        if next_at.tzinfo is None:
+            next_at = next_at.replace(tzinfo=timezone.utc)
+        assert next_at > utcnow()
         assert "simulated downstream failure" in (event.last_error or "")
         assert mock_alert.call_count == 0  # not yet
 
