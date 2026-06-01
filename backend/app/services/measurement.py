@@ -176,6 +176,27 @@ def derive_eligibility(
 
     # 3 — mismatch / blocked.
     if action.decision == ActionDecision.BLOCKED or mismatch_delivery is not None:
+        # A blocked action held by the pre-execution plausibility gate is a DATA
+        # error, not a channel disagreement — every channel agrees on the wrong
+        # approved price. Report it accurately instead of "channel reports a
+        # different price" (which would be false here). Same ineligible status.
+        from app.models import IncidentType
+
+        if mismatch_delivery is None and any(
+            i.type == IncidentType.IMPLAUSIBLE_PRICE for i in incidents
+        ):
+            return EligibilityResult(
+                status=MeasurementEligibility.INELIGIBLE_EXECUTION_NOT_VERIFIED,
+                reason="IMPLAUSIBLE_APPROVED_PRICE",
+                required_channels=required_channels,
+                verified_channels=verified_channels,
+                blocked_channel=None,
+                summary=(
+                    "The approved price was flagged as a likely data error and held "
+                    "before execution. Ineligible for downstream performance "
+                    "measurement until the price is corrected or rolled back."
+                ),
+            )
         ch = (
             mismatch_delivery.channel.value
             if mismatch_delivery

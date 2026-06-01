@@ -309,6 +309,24 @@ def incident_explanation(db: Session, incident: Incident) -> IncidentExplanation
             "Confirm all three channels are aligned.",
             "Resolve the incident to make this action eligible for expansion.",
         ]
+    elif incident.type == IncidentType.IMPLAUSIBLE_PRICE:
+        what = (
+            f"The approved price of ${action.approved_price:.2f} for {action.product_name} at "
+            f"Store {action.store_id} was flagged as a likely data error before execution — it is "
+            f"implausible versus its prior price and/or its sibling stores. Every channel would apply "
+            f"it identically, so reconciliation alone would not catch it."
+        )
+        why = (
+            "Pushing a wrong-but-consistent price (e.g. a decimal slip) charges every shopper the "
+            "wrong amount and would corrupt downstream lift measurement. The batch is held until a "
+            "human confirms or corrects the price."
+        )
+        actions = [
+            "Review the flagged price against its prior value and sibling stores.",
+            "If it is wrong, correct the approved price upstream and re-run the batch.",
+            "Or roll back this action to restore the prior price.",
+            "Retry and Resolve are disabled — re-pushing the same price cannot fix a data error.",
+        ]
     elif incident.type == IncidentType.DEADLINE_RISK:
         what = (
             f"The markdown to ${action.approved_price:.2f} for {action.product_name} was confirmed on "
