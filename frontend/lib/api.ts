@@ -142,6 +142,13 @@ export const api = {
     get<BatchSummary[]>(`/api/v1/batches${scope ? `?scope=${scope}` : ""}`),
   batch: (externalId: string) => get<BatchDetail>(`/api/v1/batches/${externalId}`),
   batchAudit: (externalId: string) => get<unknown[]>(`/api/v1/batches/${externalId}/audit`),
+  // Plausibility guard — flags approved prices that look like data errors
+  // (below-cost, decimal slip, cross-store outlier) before they reach a shopper.
+  // A CRITICAL finding holds the batch; this returns the full report for display.
+  batchPlausibility: (externalId: string) =>
+    get<import("./types").PlausibilityReport>(
+      `/api/v1/batches/${encodeURIComponent(externalId)}/plausibility`,
+    ),
   // Post-export lifecycle rollup for one batch: Exported → Published →
   // Verified → Measured. Mirrors the BatchDetail.lifecycle field; used as the
   // dedicated fetch when the detail payload omits it to stay lean.

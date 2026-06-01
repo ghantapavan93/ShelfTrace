@@ -121,13 +121,35 @@ export interface BatchDetail extends BatchSummary {
   lifecycle?: BatchLifecycle | null;
 }
 
+// Plausibility guard — approved prices that look like DATA ERRORS, flagged
+// before they reach a shopper. From GET /batches/{id}/plausibility.
+export interface PlausibilityFinding {
+  action_id: string;
+  sku: string;
+  store_id: string;
+  product_name: string;
+  approved_price: number;
+  code: "below_cost" | "extreme_swing" | "cross_store_outlier";
+  severity: "critical" | "warning";
+  message: string;
+  evidence: Record<string, unknown>;
+}
+
+export interface PlausibilityReport {
+  batch_external_id: string;
+  checked_actions: number;
+  flagged_actions: number;
+  critical_count: number;
+  findings: PlausibilityFinding[];
+}
+
 export interface IncidentView {
   id: string;
   batch_id: string;
   batch_external_id: string;
   zone: string;
   action_id: string;
-  type: "price_mismatch" | "channel_timeout" | "deadline_risk";
+  type: "price_mismatch" | "channel_timeout" | "deadline_risk" | "implausible_price";
   severity: "critical" | "urgent" | "warning";
   status: "open" | "retrying" | "resolved" | "rolled_back";
   summary: string;
@@ -217,7 +239,7 @@ export interface ReceiptStageView {
 
 export interface IncidentRefView {
   id: string;
-  type: "price_mismatch" | "channel_timeout" | "deadline_risk";
+  type: "price_mismatch" | "channel_timeout" | "deadline_risk" | "implausible_price";
   severity: "critical" | "urgent" | "warning";
   status: "open" | "retrying" | "resolved" | "rolled_back";
   summary: string;

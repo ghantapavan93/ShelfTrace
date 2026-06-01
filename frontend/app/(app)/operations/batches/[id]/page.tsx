@@ -21,7 +21,13 @@ import { CellHistoryDrawer } from "@/components/batches/CellHistoryDrawer";
 import { useWorkMode } from "@/components/ModeProvider";
 import { FlaskConical } from "lucide-react";
 import { BatchLifecycleStepper } from "@/components/BatchLifecycleStepper";
-import type { BatchDetail, BatchLifecycle, ChannelView } from "@/lib/types";
+import { PlausibilityPanel } from "@/components/batches/PlausibilityPanel";
+import type {
+  BatchDetail,
+  BatchLifecycle,
+  ChannelView,
+  PlausibilityReport,
+} from "@/lib/types";
 
 function Cell({
   c,
@@ -220,6 +226,13 @@ export default function BatchPage({ params }: { params: { id: string } }) {
     [id],
   );
   const lifecycle: BatchLifecycle | null = b?.lifecycle ?? lifecycleFetched;
+  // Pre-execution plausibility guard — flags approved prices that look like
+  // data errors (decimal slip, below cost, cross-store outlier). Separate
+  // round-trip so the batch payload stays lean; null until it resolves.
+  const { data: plausibility } = useLive<PlausibilityReport>(
+    () => api.batchPlausibility(id),
+    [id],
+  );
   const [expanding, setExpanding] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -337,6 +350,11 @@ export default function BatchPage({ params }: { params: { id: string } }) {
           Measured. Null-guarded: absent until the lifecycle endpoint resolves,
           so existing rendering is unaffected when it's not present. */}
       {lifecycle && <BatchLifecycleStepper lifecycle={lifecycle} />}
+
+      {/* Pre-execution plausibility guard — the integrity layer a pricing AI's
+          push→measure loop lacks. Shows flagged data-error prices (or a clean
+          all-screened note). Null-guarded; absent until the endpoint resolves. */}
+      <PlausibilityPanel report={plausibility} />
 
       {/* Summary tiles */}
       <div className="grid grid-cols-3 gap-3 md:grid-cols-6">
