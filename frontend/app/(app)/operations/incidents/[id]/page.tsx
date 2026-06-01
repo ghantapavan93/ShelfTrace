@@ -138,6 +138,11 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
   if (!inc.data) return <DetailSkeleton />;
 
   const i = inc.data;
+  // An implausible-price incident is a DATA error (the approved price itself
+  // looks wrong), not a channel failure — it has no offending_channel, and the
+  // backend refuses retry/resolve on it. The UI mirrors that: rollback (or an
+  // upstream price correction) is the only valid recovery.
+  const isImplausible = i.type === "implausible_price";
   const offending = i.channels.find((c) => c.channel === i.offending_channel);
   const variance = offending?.observed_price != null ? offending.observed_price - i.approved_price : null;
   const resolved = i.status === "resolved" || i.status === "rolled_back";
@@ -170,7 +175,9 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-bold text-white">Price Integrity Incident</h1>
+            <h1 className="text-3xl font-bold text-white">
+              {isImplausible ? "Implausible Price — Held Pre-Execution" : "Price Integrity Incident"}
+            </h1>
             {resolved ? (
               <span className="inline-flex items-center gap-2">
                 <StatusPill value={i.status} />
@@ -447,44 +454,85 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
               Operator-gated · audited
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <ActionButton
-              primary
-              icon={RotateCcw}
-              label={retryLabel}
-              loading={busy === "retry"}
-              disabled={busy !== null}
-              onClick={() => setConfirmRetry(true)}
-            />
-            <ActionButton
-              icon={Undo2}
-              label="Roll Back Action"
-              loading={busy === "rollback"}
-              disabled={busy !== null}
-              onClick={() => setConfirmRollback(true)}
-            />
-            <ActionButton
-              icon={ClipboardList}
-              label="Assign Human Verification"
-              loading={busy === "task"}
-              disabled={busy !== null || storeTask !== null}
-              onClick={() => act("task")}
-            />
-            <ActionButton
-              icon={UserCheck}
-              label="Mark Verification Complete"
-              loading={busy === "complete"}
-              disabled={busy !== null || storeTask === null}
-              onClick={() => act("complete")}
-            />
-            <ActionButton
-              icon={CheckCircle2}
-              label="Resolve"
-              loading={busy === "resolve"}
-              disabled={busy !== null}
-              onClick={() => setConfirmResolve(true)}
-            />
-          </div>
+
+          {isImplausible ? (
+            // Data-error path: retry/resolve are meaningless (re-pushing or
+            // re-checking the same wrong price can't fix it, and the backend
+            // refuses them). Offer only the valid exits.
+            <>
+              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-500/25 bg-rose-500/[.06] px-4 py-3 text-sm text-rose-200/90">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
+                <p>
+                  This price was flagged as a likely <span className="font-medium text-rose-100">data error</span>,
+                  not a channel failure. Retrying or resolving can&apos;t fix it — every channel already
+                  agrees on the wrong number. Roll back, or correct the approved price upstream and re-run the batch.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+                <ActionButton
+                  primary
+                  icon={Undo2}
+                  label="Roll Back Action"
+                  loading={busy === "rollback"}
+                  disabled={busy !== null}
+                  onClick={() => setConfirmRollback(true)}
+                />
+                <ActionButton
+                  icon={ClipboardList}
+                  label="Assign Human Verification"
+                  loading={busy === "task"}
+                  disabled={busy !== null || storeTask !== null}
+                  onClick={() => act("task")}
+                />
+                <ActionButton
+                  icon={UserCheck}
+                  label="Mark Verification Complete"
+                  loading={busy === "complete"}
+                  disabled={busy !== null || storeTask === null}
+                  onClick={() => act("complete")}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <ActionButton
+                primary
+                icon={RotateCcw}
+                label={retryLabel}
+                loading={busy === "retry"}
+                disabled={busy !== null}
+                onClick={() => setConfirmRetry(true)}
+              />
+              <ActionButton
+                icon={Undo2}
+                label="Roll Back Action"
+                loading={busy === "rollback"}
+                disabled={busy !== null}
+                onClick={() => setConfirmRollback(true)}
+              />
+              <ActionButton
+                icon={ClipboardList}
+                label="Assign Human Verification"
+                loading={busy === "task"}
+                disabled={busy !== null || storeTask !== null}
+                onClick={() => act("task")}
+              />
+              <ActionButton
+                icon={UserCheck}
+                label="Mark Verification Complete"
+                loading={busy === "complete"}
+                disabled={busy !== null || storeTask === null}
+                onClick={() => act("complete")}
+              />
+              <ActionButton
+                icon={CheckCircle2}
+                label="Resolve"
+                loading={busy === "resolve"}
+                disabled={busy !== null}
+                onClick={() => setConfirmResolve(true)}
+              />
+            </div>
+          )}
 
           {/* Field-verification task — appears once dispatched this session.
               The "Mark Verification Complete" button above closes it. */}
