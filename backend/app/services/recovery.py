@@ -11,6 +11,7 @@ from app.models import (
     ChannelDelivery,
     Incident,
     IncidentStatus,
+    IncidentType,
     PriceAction,
     PriceBatch,
     StoreTask,
@@ -104,6 +105,17 @@ def retry_incident(db: Session, incident_id: str, actor: str = "operator") -> In
     incident = _lock_incident(db, incident_id)
     if incident.status in TERMINAL:
         raise RecoveryError(f"Incident already {incident.status.value}; cannot retry.")
+    # An implausible-price incident is a DATA error, not a channel failure. Every
+    # channel already agrees on the (wrong) approved price, so re-publishing it
+    # would "resolve" the incident while leaving the bad price live — defeating
+    # the gate. Re-pushing the same number can never fix it; the only valid exits
+    # are a rollback or correcting the approved price upstream and re-running.
+    if incident.type == IncidentType.IMPLAUSIBLE_PRICE:
+        raise RecoveryError(
+            "This price was flagged as a likely data error, not a channel failure. "
+            "Retrying re-publishes the same approved price and cannot fix it. "
+            "Roll back, or correct the approved price upstream and re-run the batch."
+        )
 
     action = db.get(PriceAction, incident.action_id)
     channel = incident.offending_channel or Channel.POS
@@ -279,6 +291,15 @@ def resolve_incident(db: Session, incident_id: str, actor: str = "operator") -> 
     incident = _lock_incident(db, incident_id)
     if incident.status in TERMINAL:
         raise RecoveryError(f"Incident already {incident.status.value}; nothing to resolve.")
+    # Same reasoning as retry: a flagged-as-implausible price can't be "resolved"
+    # by re-checking channels (they all agree on the wrong number). It clears
+    # only via rollback or an upstream price correction — never a plain resolve.
+    if incident.type == IncidentType.IMPLAUSIBLE_PRICE:
+        raise RecoveryError(
+            "This price was flagged as a likely data error. It can't be resolved by "
+            "re-checking channels (they agree on the wrong price). Roll back, or "
+            "correct the approved price upstream and re-run the batch."
+        )
 
     action = db.get(PriceAction, incident.action_id)
     # Re-verify before resolving so we never close on a stale view.

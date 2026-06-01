@@ -21,15 +21,18 @@ This file is the honest stress test. It does THREE things:
 """
 from __future__ import annotations
 
+import pytest
+
 from app.models import (
     ActionDecision,
     BatchStatus,
     Incident,
+    IncidentStatus,
     IncidentType,
     PriceAction,
 )
 from app.schemas import ConnectorBehaviorIn, ScenarioActionIn, ScenarioIn
-from app.services import bulk_import, scenarios
+from app.services import bulk_import, recovery, scenarios
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -243,3 +246,42 @@ def test_decimal_slip_is_now_gated_before_execution(db):
     assert batch.status == BatchStatus.BLOCKED
     action = db.query(PriceAction).filter(PriceAction.batch_id == batch.id).one()
     assert action.decision == ActionDecision.BLOCKED
+
+
+def test_implausible_price_incident_cannot_be_retried_or_resolved_away(db):
+    """The gate must not be defeatable in one click. An IMPLAUSIBLE_PRICE incident
+    is a DATA error: every channel already agrees on the wrong approved price, so
+    retry (re-publish) or resolve (re-check channels) would falsely clear it and
+    let the bad price roll out. Both must be refused; rollback stays the valid
+    exit. (Regression guard for the gate-defeat bug found in review.)"""
+    payload = ScenarioIn(
+        name="Slip Recovery Guard", run_mode="live_rollout", zone_name="Region 7",
+        store_ids=["store-A"], canary_store_ids=["store-A"],
+        actions=[
+            ScenarioActionIn(product_name="Whole Milk 1gal", sku="milk-slip-guard",
+                             previous_price=4.90, approved_price=0.49),
+        ],
+        behaviors=[],
+    )
+    cfg = scenarios.create_config(db, payload)
+    batch = scenarios.execute_live(db, cfg)
+    inc = db.query(Incident).filter(
+        Incident.batch_id == batch.id, Incident.type == IncidentType.IMPLAUSIBLE_PRICE
+    ).one()
+
+    # Retry is refused — re-publishing the same wrong price can't fix a data error.
+    with pytest.raises(recovery.RecoveryError):
+        recovery.retry_incident(db, inc.id, actor="reviewer")
+    db.refresh(inc)
+    assert inc.status == IncidentStatus.OPEN  # untouched, still held
+
+    # Resolve is refused too — channels agreeing on the wrong number isn't a fix.
+    with pytest.raises(recovery.RecoveryError):
+        recovery.resolve_incident(db, inc.id, actor="reviewer")
+    db.refresh(inc)
+    assert inc.status == IncidentStatus.OPEN
+
+    # Rollback IS allowed — it's the legitimate exit (restore the prior price).
+    recovery.rollback_incident(db, inc.id, actor="reviewer")
+    db.refresh(inc)
+    assert inc.status == IncidentStatus.ROLLED_BACK
