@@ -123,16 +123,21 @@ def _check_extreme_swing(action: PriceAction) -> PlausibilityFinding | None:
     if prior is None or prior <= 0 or approved <= 0:
         return None
     ratio = approved / prior
+    # These thresholds (>=80% drop, >=5x jump) are already far beyond any normal
+    # promo or markup, so an extreme swing is a probable DATA ERROR — critical,
+    # and it gates the rollout. The textbook case is a decimal slip ($4.90 typed
+    # as $0.49). A subtler "is this right?" band would be a separate warning;
+    # here, crossing the extreme line means stop-and-check.
     if ratio <= EXTREME_DROP_RATIO:
         drop_pct = round((1 - ratio) * 100, 1)
         return PlausibilityFinding(
             action_id=action.id, sku=action.sku, store_id=action.store_id,
             product_name=action.product_name, approved_price=approved,
-            code="extreme_swing", severity="warning",
+            code="extreme_swing", severity="critical",
             message=(
                 f"{action.product_name} at Store {action.store_id} drops {drop_pct:.0f}% — "
                 f"approved ${approved:.2f} vs prior ${prior:.2f}. Beyond a normal promo; "
-                f"possible decimal slip (e.g. ${prior:.2f} typed as ${approved:.2f})."
+                f"likely a decimal slip (e.g. ${prior:.2f} typed as ${approved:.2f})."
             ),
             evidence={"approved_price": approved, "prior_price": prior, "ratio": round(ratio, 4)},
         )
@@ -141,11 +146,11 @@ def _check_extreme_swing(action: PriceAction) -> PlausibilityFinding | None:
         return PlausibilityFinding(
             action_id=action.id, sku=action.sku, store_id=action.store_id,
             product_name=action.product_name, approved_price=approved,
-            code="extreme_swing", severity="warning",
+            code="extreme_swing", severity="critical",
             message=(
                 f"{action.product_name} at Store {action.store_id} jumps {jump_x}× — "
                 f"approved ${approved:.2f} vs prior ${prior:.2f}. Beyond a normal change; "
-                f"possible fat-finger or decimal slip."
+                f"likely a fat-finger or decimal slip."
             ),
             evidence={"approved_price": approved, "prior_price": prior, "ratio": round(ratio, 4)},
         )
@@ -221,3 +226,88 @@ def check_batch(db: Session, batch: PriceBatch) -> PlausibilityReport:
     """Convenience wrapper: plausibility report for every action in a batch."""
     actions = db.scalars(select(PriceAction).where(PriceAction.batch_id == batch.id)).all()
     return check_actions(db, list(actions), batch_external_id=batch.external_id)
+
+
+def enforce_gate(db: Session, batch: PriceBatch) -> int:
+    """Turn the advisory report into a real GATE: for every CRITICAL finding,
+    open an IMPLAUSIBLE_PRICE incident on that action and BLOCK the batch, so a
+    bad number is held before it rolls out — not merely reported.
+
+    Pure, idempotent, and additive: it never duplicates an existing open
+    IMPLAUSIBLE_PRICE incident for the same action, writes an audit event for
+    each new one, and leaves the proven reconciliation engine untouched (this
+    runs alongside it, keying only on plausibility findings). Warnings are left
+    advisory — only critical findings gate. Returns the number of new incidents.
+
+    Called from execute_live() after the outbox drains, behind
+    settings.plausibility_gate_enabled.
+    """
+    # Local imports keep this module dependency-light and avoid an import cycle
+    # with the recovery/reconciliation services.
+    from app.ids import new_id
+    from app.models import (
+        ActionDecision,
+        BatchStatus,
+        Incident,
+        IncidentSeverity,
+        IncidentStatus,
+        IncidentType,
+    )
+    from app.services.audit import record_audit
+
+    report = check_actions(
+        db,
+        list(db.scalars(select(PriceAction).where(PriceAction.batch_id == batch.id))),
+        batch_external_id=batch.external_id,
+    )
+    critical = [f for f in report.findings if f.severity == "critical"]
+    if not critical:
+        return 0
+
+    opened = 0
+    for finding in critical:
+        # Idempotent: skip if this action already has an open implausible-price
+        # incident (re-running execute_live must not pile up duplicates).
+        existing = db.scalar(
+            select(Incident).where(
+                Incident.action_id == finding.action_id,
+                Incident.type == IncidentType.IMPLAUSIBLE_PRICE,
+                Incident.status.in_([IncidentStatus.OPEN, IncidentStatus.RETRYING]),
+            )
+        )
+        if existing is not None:
+            continue
+        action = db.get(PriceAction, finding.action_id)
+        if action is None:
+            continue
+        incident = Incident(
+            id=new_id("inc"),
+            batch_id=batch.id,
+            action_id=action.id,
+            type=IncidentType.IMPLAUSIBLE_PRICE,
+            severity=IncidentSeverity.CRITICAL,
+            status=IncidentStatus.OPEN,
+            summary=finding.message,
+            offending_channel=None,  # this is a data-quality issue, not a channel
+        )
+        db.add(incident)
+        # Hold the action: it must not roll out on a price that looks wrong.
+        action.decision = ActionDecision.BLOCKED
+        record_audit(
+            db,
+            incident_id=incident.id,
+            action_id=action.id,
+            batch_id=batch.id,
+            event="Plausibility gate blocked an implausible price",
+            detail=finding.message,
+            actor="system",
+        )
+        opened += 1
+
+    if opened:
+        # One bad approved price holds the batch, same containment guarantee as a
+        # canary mismatch — the rollout cannot widen on a suspect number.
+        batch.status = BatchStatus.BLOCKED
+        batch.expansion_blocked = True
+        db.commit()
+    return opened

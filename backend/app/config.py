@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     # Rollout policy
     canary_store_count: int = 2
     esl_timeout_seconds: int = 30
+    # Pre-execution plausibility gate. When true, a CRITICAL plausibility finding
+    # (below-cost, decimal-slip, cross-store outlier) opens an IMPLAUSIBLE_PRICE
+    # incident and HOLDS the batch — a bad number is stopped before it executes,
+    # not just reported. Warnings remain advisory either way. On by default; set
+    # false to fall back to advisory-only (the /plausibility report still works).
+    plausibility_gate_enabled: bool = True
 
     # Scraping demo — the fresh_market_demo spider scrapes the storefront the
     # API serves at /demo-storefront. Empty → resolve the app's own origin

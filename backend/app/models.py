@@ -147,6 +147,10 @@ class IncidentType(str, enum.Enum):
     PRICE_MISMATCH = "price_mismatch"
     CHANNEL_TIMEOUT = "channel_timeout"
     DEADLINE_RISK = "deadline_risk"
+    # Raised PRE-execution by the plausibility gate: the approved price itself
+    # looks like a data error (below cost, decimal slip, cross-store outlier).
+    # Distinct from PRICE_MISMATCH, which is a POST-execution channel disagreement.
+    IMPLAUSIBLE_PRICE = "implausible_price"
 
 
 class IncidentSeverity(str, enum.Enum):
@@ -309,7 +313,9 @@ class Incident(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     batch_id: Mapped[str] = mapped_column(ForeignKey("price_batches.id", ondelete="CASCADE"), index=True)
     action_id: Mapped[str] = mapped_column(ForeignKey("price_actions.id", ondelete="CASCADE"), index=True)
-    type: Mapped[IncidentType] = mapped_column(Enum(IncidentType))
+    # native_enum=False -> stored as VARCHAR so new IncidentType values (e.g.
+    # IMPLAUSIBLE_PRICE) are additive column-compatible without a PG enum ALTER.
+    type: Mapped[IncidentType] = mapped_column(Enum(IncidentType, native_enum=False, length=32))
     severity: Mapped[IncidentSeverity] = mapped_column(Enum(IncidentSeverity))
     status: Mapped[IncidentStatus] = mapped_column(Enum(IncidentStatus), default=IncidentStatus.OPEN, index=True)
     summary: Mapped[str] = mapped_column(Text)

@@ -205,40 +205,41 @@ def test_one_store_feed_entirely_broken_still_isolates_per_action(db):
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 3. THE HONEST GAP — a plausible-but-wrong price is NOT caught (yet)
+# 3. THE GAP IS NOW CLOSED — the plausibility GATE catches a decimal slip
+#    BEFORE it executes (was a documented limitation; now enforced).
 # ──────────────────────────────────────────────────────────────────────
-def test_KNOWN_GAP_plausible_wrong_price_is_not_flagged_as_anomalous(db):
-    """KNOWN LIMITATION — documented, not hidden.
+def test_decimal_slip_is_now_gated_before_execution(db):
+    """Previously the KNOWN_GAP: a decimal-slip price ($4.90 typed $0.49) is a
+    *plausible* number — > 0, numeric, non-duplicate — that passes every input
+    validation, and if all channels then agree on it the reconciliation engine
+    (which checks AGREEMENT, not PLAUSIBILITY) would let it sail through.
 
-    A decimal-slip price ($0.49 for milk that should be $4.90) is a *plausible*
-    number: > 0, < 5× prior, numeric, non-duplicate. It passes EVERY validation.
-    If all three channels then agree on $0.49, the engine reconciles it as
-    VERIFIED and opens NO incident — because today it checks channel AGREEMENT,
-    not price PLAUSIBILITY. There is no outlier / anomaly detection.
-
-    This test asserts that current (limited) behavior on purpose. When anomaly
-    detection ships, this incident count flips to >= 1 and this test gets
-    inverted — it is the executable definition of the next-build target.
-    """
+    The plausibility GATE now closes that hole: on execute, a CRITICAL finding
+    opens an IMPLAUSIBLE_PRICE incident and HOLDS the batch, so the wrong price
+    is stopped before rollout — not merely reported. This test is the inverted
+    proof: the gap that was documented open is now demonstrably shut."""
     payload = ScenarioIn(
         name="Decimal Slip", run_mode="live_rollout", zone_name="Region 7",
         store_ids=["store-A"], canary_store_ids=["store-A"],
         actions=[
-            # Approved $0.49 vs prior $0.55: a wrong price, but internally
-            # consistent and within all numeric guards. (0.49 < 0.55 * 5.)
+            # $4.90 typed as $0.49 — a 90% drop. Internally consistent and within
+            # the import numeric guards, but a textbook decimal slip.
             ScenarioActionIn(product_name="Organic Whole Milk 1gal", sku="milk-slip",
-                             previous_price=0.55, approved_price=0.49),
+                             previous_price=4.90, approved_price=0.49),
         ],
         behaviors=[],  # all channels succeed → they AGREE on the wrong price
     )
     cfg = scenarios.create_config(db, payload)
     batch = scenarios.execute_live(db, cfg)
 
-    incidents = db.query(Incident).filter(Incident.batch_id == batch.id).count()
+    # The gate opened an IMPLAUSIBLE_PRICE incident pre-execution.
+    implausible = db.query(Incident).filter(
+        Incident.batch_id == batch.id, Incident.type == IncidentType.IMPLAUSIBLE_PRICE
+    ).all()
+    assert len(implausible) == 1
+    assert implausible[0].severity.value == "critical"
 
-    # TODAY: zero incidents — the wrong-but-agreed price sails through.
-    # This is the gap. Channel reconciliation ≠ plausibility checking.
-    assert incidents == 0
-    # And it is even marked eligible for expansion, because every channel agrees.
+    # And the batch is HELD — the suspect price cannot roll out.
+    assert batch.status == BatchStatus.BLOCKED
     action = db.query(PriceAction).filter(PriceAction.batch_id == batch.id).one()
-    assert action.decision == ActionDecision.ELIGIBLE
+    assert action.decision == ActionDecision.BLOCKED

@@ -84,7 +84,8 @@ POS + ESL + ecommerce all confirm the approved price, and excludes the rest
 | **Plausibility guard** | Flags an approved price that looks like a *data error* at the execution gate — decimal slip ($4.90→$0.49), below-cost, one store wildly off the batch median | `services/plausibility.py`, `test_plausibility.py`, `GET /batches/{id}/plausibility` |
 | **Cross-surface reconciliation** | Independent receipts from POS + ESL + ecommerce, compared to the approved price | `services/reconciliation.py`, `test_reconciliation.py` |
 | **Canary containment** | One canary mismatch holds the whole batch; expansion hard-refused until verified | `services/orchestrator.py`, `test_canary.py` |
-| **Incident recovery w/ ownership** | Acknowledge → retry → resolve, never un-owned, full audit trail | `services/recovery.py`, `test_acknowledgement.py`, `test_recovery.py` |
+| **Pre-execution price gate** | A CRITICAL plausibility finding opens an `IMPLAUSIBLE_PRICE` incident and HOLDS the batch before rollout — a bad number is stopped, not just reported | `services/plausibility.py` (`enforce_gate`), `test_messy_data_robustness.py` |
+| **Incident recovery w/ recorded ownership** | Acknowledge → retry → resolve with a recorded owner on every recovery (auto-stamped if the operator acts directly — so recovery is never un-owned), full audit trail | `services/recovery.py`, `test_acknowledgement.py`, `test_recovery.py` |
 | **Measurement-eligibility gate** | Tells a downstream analytics layer which actions are valid to attribute | `services/measurement.py` |
 
 Their published case studies (Econo +7%, the specialty chain +26ppt promo lift)
@@ -133,6 +134,12 @@ This ties the product directly to BetterBasket's **own published** result.
   contexts, synthetic data.
 - The plausibility thresholds are conservative heuristics (explainable by
   design), not learned models, and are not yet zone-pricing-aware.
+- Acknowledgement is a *recorded* ownership stamp, not a mandatory approval
+  click before recovery — say "recorded ownership," not "human-approval gate."
+- The channel adapters are **mocks** that return structured receipts; there is
+  no real POS/ESL/ecommerce traffic. The adapter contract is designed to be
+  swapped for real integrations. State this up front — it's a strength, not a
+  thing to hide.
 
 ## The pitch, in three sentences
 

@@ -43,6 +43,13 @@ def db():
     # on PostgreSQL we also terminate any other backend on the test DB to start
     # each test from a clean, lock-free schema. SQLite enforces no such locks,
     # which is why this isolation gap only ever surfaced on Postgres.
+    #
+    # ⚠️  CI footgun: because this terminates EVERY other backend on the test DB,
+    # you CANNOT run two pytest processes against the same database at once —
+    # they will kill each other's connections (pytest-xdist, or two manual runs,
+    # will produce spurious setup errors). Run the suite single-process, or give
+    # each worker its own database (e.g. DATABASE_URL per xdist gw#) before
+    # parallelizing.
     engine.dispose()
     if engine.url.get_backend_name() == "postgresql":
         from sqlalchemy import text

@@ -324,6 +324,9 @@ def run_migrations() -> None:
             conn.execute(text(f"ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS {name} {ddl}"))
         for name, ddl in _INCIDENT_COLUMNS:
             conn.execute(text(f"ALTER TABLE incidents ADD COLUMN IF NOT EXISTS {name} {ddl}"))
+        # Widen incidents.type to VARCHAR so the IMPLAUSIBLE_PRICE enum value
+        # fits (mirrors Alembic 0010). Idempotent: a no-op once already textual.
+        conn.execute(text("ALTER TABLE incidents ALTER COLUMN type TYPE VARCHAR(32) USING type::text"))
         for name, ddl in _TEST_RUN_CONFIG_COLUMNS:
             conn.execute(text(f"ALTER TABLE test_run_configs ADD COLUMN IF NOT EXISTS {name} {ddl}"))
         conn.execute(

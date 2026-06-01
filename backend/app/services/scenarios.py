@@ -320,6 +320,19 @@ def execute_live(db: Session, config: TestRunConfig) -> PriceBatch:
             source_run_id=scope_id,
         )
 
+    # Pre-execution plausibility GATE (opt-in). A CRITICAL finding — below-cost,
+    # decimal slip, cross-store outlier — opens an IMPLAUSIBLE_PRICE incident and
+    # holds the batch, so a bad approved price is stopped here rather than only
+    # reported by the /plausibility endpoint. Runs alongside the reconciliation
+    # engine; warnings stay advisory. Seeded demos trip zero critical findings,
+    # so this never disturbs the showcase.
+    from app.config import settings
+
+    if settings.plausibility_gate_enabled:
+        from app.services import plausibility
+
+        plausibility.enforce_gate(db, result.batch)
+
     db.refresh(result.batch)
     return result.batch
 
