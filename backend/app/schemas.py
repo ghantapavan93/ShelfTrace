@@ -228,6 +228,33 @@ class StoreTaskView(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Plausibility guard — flags approved prices that look like DATA ERRORS before
+# they reach a shopper (decimal slips, below-cost, cross-store feed outliers).
+# Read-only derivation; see app/services/plausibility.py. This is the layer
+# BetterBasket's push→measure loop lacks: catch a bad number as a data error,
+# not after it's charged.
+# ---------------------------------------------------------------------------
+class PlausibilityFindingView(BaseModel):
+    action_id: str
+    sku: str
+    store_id: str
+    product_name: str
+    approved_price: float
+    code: str  # below_cost | extreme_swing | cross_store_outlier
+    severity: str  # critical | warning
+    message: str
+    evidence: dict
+
+
+class PlausibilityReportView(BaseModel):
+    batch_external_id: str
+    checked_actions: int
+    flagged_actions: int
+    critical_count: int
+    findings: list[PlausibilityFindingView]
+
+
+# ---------------------------------------------------------------------------
 # Decision Receipt — a derived, read-only evidence chain for one price action.
 #
 # It threads the state the validated core already maintains (upstream signal →

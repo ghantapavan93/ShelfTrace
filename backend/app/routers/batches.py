@@ -15,10 +15,16 @@ from app.models import (
 )
 from app.rate_limit import limit_write
 from app.routers.common import get_batch_or_404
-from app.schemas import BatchDetail, BatchLifecycleView, BatchSummary, PriceBatchIn
+from app.schemas import (
+    BatchDetail,
+    BatchLifecycleView,
+    BatchSummary,
+    PlausibilityReportView,
+    PriceBatchIn,
+)
 from app.scope import apply_filter, current_scope
 from app.security import Identity, require_operator
-from app.services import orchestrator, queries
+from app.services import orchestrator, plausibility, queries
 from app.services.ingestion import ingest_batch
 
 router = APIRouter(prefix="/api/v1", tags=["batches"])
@@ -70,6 +76,21 @@ def get_batch_lifecycle(external_id: str, db: Session = Depends(get_db)):
     per-action state — mirrors the detail route's scope/404 contract."""
     batch = get_batch_or_404(db, external_id)
     return queries.batch_lifecycle(db, batch)
+
+
+@router.get("/batches/{external_id}/plausibility", response_model=PlausibilityReportView)
+def get_batch_plausibility(external_id: str, db: Session = Depends(get_db)):
+    """Plausibility guard for one batch — flag approved prices that look like
+    DATA ERRORS (decimal slips, below-cost, cross-store feed outliers) before
+    they reach a shopper.
+
+    This is the integrity check BetterBasket's push→measure loop lacks: their
+    pipeline assumes the approved price is correct and pushes it. ShelfTrace
+    asks whether the number itself looks wrong first. Pure read-only derivation
+    over existing rows (mirrors the lifecycle route's contract); every finding
+    carries its evidence, none are auto-corrected — a human decides."""
+    batch = get_batch_or_404(db, external_id)
+    return plausibility.check_batch(db, batch).to_dict()
 
 
 @router.get("/batches/{external_id}/audit")
