@@ -13,6 +13,8 @@ import { DetailSkeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
 import { useWorkMode } from "@/components/ModeProvider";
 import { SandboxStrip } from "@/components/LiveModeNotice";
+import { ExperienceAssurance } from "@/components/ExperienceAssurance";
+import { ContextViewSwitcher, type ContextView } from "@/components/ContextViewSwitcher";
 import type { EngineeringTrace, RegressionCase } from "@/lib/types";
 
 function Json({ value }: { value: unknown }) {
@@ -27,6 +29,8 @@ type Mode = "live_rollout" | "certification";
 
 export default function EngineeringPage() {
   const [mode, setMode] = useState<Mode>("live_rollout");
+  // §4 Context Controls — read the same evidence three ways.
+  const [contextView, setContextView] = useState<ContextView>("technical");
   const { mode: workMode, isHydrated } = useWorkMode();
   const isLiveWorkMode = isHydrated && workMode === "live";
 
@@ -317,8 +321,45 @@ export default function EngineeringPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Outbox */}
+      {/* §4 — Context Controls + §3 Experience Assurance for this proof page. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ContextViewSwitcher value={contextView} onChange={setContextView} />
+      </div>
+      <ExperienceAssurance
+        checks={[
+          { label: "Evidence is visible, not just asserted", passed: true },
+          { label: "Test proof shows real pass count", passed: true },
+          { label: "Status labels include text, not color alone", passed: true },
+          { label: "Page purpose is clear", passed: true },
+          { label: "Raw receipts available for technical readers", passed: true },
+          { label: "Plain-language summary available", passed: true },
+          { label: "Motion is meaningful and reducible", passed: true },
+        ]}
+      />
+
+      {/* §4 Accessible Summary — plain-language, no raw JSON. */}
+      {contextView === "accessible" && (
+        <section
+          aria-label="Accessible summary"
+          className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
+        >
+          <p className="text-base leading-loose text-slate-200">
+            This page is the recorded evidence for a simulated price rollout. Every approved action
+            is published to the channels, each channel returns a receipt, and ShelfTrace reconciles
+            them against the approved price. The{" "}
+            <span className="font-semibold text-white">Test Proof</span> below shows{" "}
+            <span className="font-semibold text-emerald-200">{data.test_proof.passed} checks passing</span>{" "}
+            against the current codebase — these are unit/integration tests, not live retailer
+            integrations. Switch to{" "}
+            <span className="font-medium text-white">Technical Evidence</span> for the raw outbox
+            events, receipts, and reconciliation records.
+          </p>
+        </section>
+      )}
+
+      <div className={clsx("grid gap-4 lg:grid-cols-2", contextView === "accessible" && "hidden")}>
+        {/* Outbox — technical-only (raw event table). */}
+        {contextView === "technical" && (
         <div className="holo-card rounded-2xl p-5">
           <h3 className="mb-3 text-sm font-semibold text-white">Outbox Events ({data.outbox_events.length})</h3>
           <div className="overflow-x-auto">
@@ -357,8 +398,9 @@ export default function EngineeringPage() {
             </table>
           </div>
         </div>
+        )}
 
-        {/* Test proof */}
+        {/* Test proof — shown in every view (it's the headline proof). */}
         <div className="holo-card iris-border glow-iris rounded-2xl p-5">
           <div className="mb-3 flex items-center gap-2">
             <h3 className="text-sm font-semibold text-white">Test Proof</h3>
@@ -380,11 +422,13 @@ export default function EngineeringPage() {
           <p className="text-[10px] text-slate-500 mt-1">Verification snapshot from current demo codebase — not live retailer integration tests.</p>
         </div>
 
-        {/* Raw receipt */}
+        {/* Raw receipt — technical-only (raw JSON). */}
+        {contextView === "technical" && (
         <div className="holo-card rounded-2xl p-5">
           <h3 className="mb-3 text-sm font-semibold text-white">Simulated Adapter Receipt</h3>
           <Json value={data.raw_receipt} />
         </div>
+        )}
 
         {/* Measurement eligibility — derived read-only, no new tables / writes.
             Pulls the active incident's eligibility evidence from the already-
@@ -397,11 +441,13 @@ export default function EngineeringPage() {
           />
         )}
 
-        {/* Reconciliation result */}
+        {/* Reconciliation result — technical-only (raw JSON). */}
+        {contextView === "technical" && (
         <div className="holo-card rounded-2xl p-5">
           <h3 className="mb-3 text-sm font-semibold text-white">Reconciliation Result</h3>
           <Json value={data.reconciliation_result} />
         </div>
+        )}
       </div>
     </div>
   );

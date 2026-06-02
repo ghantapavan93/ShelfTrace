@@ -504,7 +504,7 @@ export default function ScenarioBuilder() {
                 <div><div className={label}>Approved $</div><input className={input} type="number" step="0.01" value={a.approved_price} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, approved_price: e.target.value as unknown as number } : x))} /></div>
                 <div className="flex items-center gap-2">
                   <div className="flex-1"><div className={label}>Reason</div><input className={input} value={a.reason} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, reason: e.target.value } : x))} /></div>
-                  <button onClick={() => setActions(actions.filter((_, j) => j !== i))} className="mb-1 text-slate-500 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
+                  <button type="button" aria-label="Remove this product" title="Remove product" onClick={() => setActions(actions.filter((_, j) => j !== i))} className="mb-1 rounded-md text-slate-500 transition hover:text-danger focus:outline-none focus-visible:ring-1 focus-visible:ring-rose-400/50"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </div>
               {/* Optional grocery context — these flow into the executed action.
@@ -591,7 +591,7 @@ export default function ScenarioBuilder() {
               <div><div className={label}>Observed $</div><input className={input} type="number" step="0.01" value={b.configured_observed_price ?? ""} onChange={(e) => setBehaviors(behaviors.map((x, j) => j === i ? { ...x, configured_observed_price: e.target.value as unknown as number } : x))} /></div>
               <div className="flex items-center gap-2">
                 <div className="flex-1"><div className={label}>Retry $</div><input className={input} type="number" step="0.01" value={b.retry_success_price ?? ""} onChange={(e) => setBehaviors(behaviors.map((x, j) => j === i ? { ...x, retry_success_price: e.target.value as unknown as number } : x))} /></div>
-                <button onClick={() => setBehaviors(behaviors.filter((_, j) => j !== i))} className="mb-1 text-slate-500 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
+                <button type="button" aria-label="Remove this behavior" title="Remove behavior" onClick={() => setBehaviors(behaviors.filter((_, j) => j !== i))} className="mb-1 rounded-md text-slate-500 transition hover:text-danger focus:outline-none focus-visible:ring-1 focus-visible:ring-rose-400/50"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           ))}

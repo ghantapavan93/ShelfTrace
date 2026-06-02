@@ -267,30 +267,30 @@ function OperationsContent() {
               <FlaskConical className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[.22em] text-violet-300">
-                Live mode clean slate
+              <div className="text-[10px] font-semibold uppercase leading-relaxed tracking-[.22em] text-violet-300">
+                Execution Assurance · Live mode
               </div>
               <h2 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
-                Demo rollout hidden. Upload or run a scenario to populate Live mode.
+                No active execution replay yet.
               </h2>
-              <p className="mt-3 max-w-2xl text-sm text-slate-400">
-                The backend still has the Memorial Day sample batch for Demo mode, but Live mode
-                now keeps it out of the command center unless you open that exact demo batch.
-                Your uploaded CSV or manually-created scenario will land here after execution.
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-300">
+                Import public data or upload a scenario to simulate channel delivery,
+                reconciliation, and evidence tracking. Your uploaded CSV or manually-created
+                scenario lands here after execution — the seeded Demo batch stays in Demo mode.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Link
                   href="/scenarios"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110 focus:outline-none focus-visible:ring-1 focus-visible:ring-brand/50"
                 >
-                  Upload or build scenario
+                  Build or import scenario
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
                   href={`/operations?external_id=${DEMO_BATCH}`}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30"
                 >
-                  Inspect demo batch explicitly
+                  View demo proof
                 </Link>
               </div>
             </div>

@@ -393,31 +393,30 @@ export default function MarkdownsPage() {
                 <FlaskConical className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[.22em] text-violet-300">
-                  No perishable markdowns in Live mode
+                <div className="text-[10px] font-semibold uppercase leading-relaxed tracking-[.22em] text-violet-300">
+                  Perishable Deadline Desk · Live mode
                 </div>
                 <h2 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
-                  Upload a batch with perishable deadlines to track its SLA here.
+                  No perishable actions yet.
                 </h2>
-                <p className="mt-3 max-w-2xl text-sm text-slate-400">
-                  This surface tracks every perishable markdown in your most recent live batch
-                  and reports whether each shelf label acknowledged the markdown before its
-                  sell-through deadline. Switch to Demo mode to watch the Memorial Day strawberry
-                  SLA, or run a scenario that includes a markdown deadline.
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-300">
+                  Import a produce observation or build a markdown scenario to track shelf-label
+                  acknowledgement before a sell-through deadline. Switch to Demo mode to watch the
+                  Memorial Day strawberry SLA.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link
                     href="/scenarios"
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-glow-brand transition hover:brightness-110 focus:outline-none focus-visible:ring-1 focus-visible:ring-brand/50"
                   >
-                    Build a perishable scenario
+                    Build a markdown scenario
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                   <Link
-                    href="/operations"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                    href="/operations/markdowns"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/[.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30"
                   >
-                    Back to live operations
+                    View demo proof
                   </Link>
                 </div>
               </div>

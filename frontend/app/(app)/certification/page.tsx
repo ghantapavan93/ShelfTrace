@@ -302,7 +302,7 @@ export default function CertificationPage() {
         reduced={!!reduced}
       />
 
-      <p className="text-xs text-slate-600">
+      <p className="max-w-3xl text-sm leading-relaxed text-slate-400">
         Certification and live rollout run on the same reliability engine. These results are derived from real
         execution receipts, incidents, retries and audit records produced by the shared pipeline.
       </p>
