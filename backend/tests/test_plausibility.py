@@ -137,6 +137,47 @@ def test_too_few_stores_no_outlier_call(db):
     assert not [f for f in report.findings if f.code == "cross_store_outlier"]
 
 
+def test_zone_aware_legit_regional_pricing_is_not_flagged(db):
+    """Gap 3: a SKU legitimately priced higher in one zone than another must NOT
+    be flagged as an outlier when stores are compared WITHIN their own zone.
+    Manhattan stores at $6.99, rural stores at $4.49 — both internally consistent."""
+    b = _batch(db)
+    actions = [
+        _action(db, b, sku="milk", store="mn1", approved=6.99, prior=7.20),
+        _action(db, b, sku="milk", store="mn2", approved=6.99, prior=7.20),
+        _action(db, b, sku="milk", store="mn3", approved=7.09, prior=7.20),
+        _action(db, b, sku="milk", store="ru1", approved=4.49, prior=4.60),
+        _action(db, b, sku="milk", store="ru2", approved=4.49, prior=4.60),
+        _action(db, b, sku="milk", store="ru3", approved=4.39, prior=4.60),
+    ]
+    db.commit()
+    zone = {"mn1": "Manhattan", "mn2": "Manhattan", "mn3": "Manhattan",
+            "ru1": "Rural", "ru2": "Rural", "ru3": "Rural"}
+    # Without zones, the cross-zone spread would look like outliers; WITH zones,
+    # each cohort is internally consistent → nothing flagged.
+    report = plausibility.check_actions(db, actions, store_zone=zone)
+    assert not [f for f in report.findings if f.code == "cross_store_outlier"]
+
+
+def test_zone_aware_still_catches_within_zone_outlier(db):
+    """Zone-awareness must not blind the check: an outlier WITHIN a zone is still
+    caught. Three Manhattan stores at ~$6.99, one at $0.99 → flagged."""
+    b = _batch(db)
+    actions = [
+        _action(db, b, sku="milk", store="mn1", approved=6.99, prior=7.20),
+        _action(db, b, sku="milk", store="mn2", approved=6.99, prior=7.20),
+        _action(db, b, sku="milk", store="mn3", approved=7.09, prior=7.20),
+        _action(db, b, sku="milk", store="mn4", approved=0.99, prior=7.20),  # in-zone outlier
+    ]
+    db.commit()
+    zone = {s: "Manhattan" for s in ("mn1", "mn2", "mn3", "mn4")}
+    report = plausibility.check_actions(db, actions, store_zone=zone)
+    outliers = [f for f in report.findings if f.code == "cross_store_outlier"]
+    assert len(outliers) == 1
+    assert outliers[0].store_id == "mn4"
+    assert outliers[0].evidence["zone"] == "Manhattan"
+
+
 # ── report shape + a clean batch ───────────────────────────────────────
 def test_clean_batch_has_zero_findings(db):
     b = _batch(db)

@@ -157,25 +157,40 @@ def _check_extreme_swing(action: PriceAction) -> PlausibilityFinding | None:
     return None
 
 
-def _check_cross_store_outliers(actions: list[PriceAction]) -> list[PlausibilityFinding]:
-    """The novel, in-lane signal: within ONE batch the same SKU should be priced
-    consistently across stores (zone pricing aside). If one store is a wild
-    outlier vs its siblings' median, that store's feed is suspect — and we know
-    this WITHOUT any external reference, because the batch is its own baseline.
+def _check_cross_store_outliers(
+    actions: list[PriceAction],
+    store_zone: dict[str, str] | None = None,
+) -> list[PlausibilityFinding]:
+    """The novel, in-lane signal: the same SKU should be priced consistently
+    across stores in the SAME pricing zone/tier. If one store is a wild outlier
+    vs its zone siblings' median, that store's feed is suspect — and we know this
+    WITHOUT any external reference, because the zone cohort is its own baseline.
+
+    Zone-aware (Gap 3): grocers price by region/tier on purpose — Manhattan milk
+    legitimately differs from a rural store. ``store_zone`` maps store_id -> zone
+    so we compare within a zone, never across. When it's omitted (or a store is
+    unmapped) every store falls into one default cohort, which is correct for a
+    single-zone batch — the common case — and avoids flagging legitimate regional
+    pricing as an error.
     """
+    store_zone = store_zone or {}
     findings: list[PlausibilityFinding] = []
-    by_sku: dict[str, list[PriceAction]] = {}
+    # Cohort key is (sku, zone) so a SKU priced differently per zone is fine; only
+    # a divergence WITHIN one zone's stores is suspect.
+    by_cohort: dict[tuple[str, str], list[PriceAction]] = {}
     for a in actions:
         if a.approved_price and a.approved_price > 0:
-            by_sku.setdefault(a.sku, []).append(a)
+            zone = store_zone.get(a.store_id, "__default__")
+            by_cohort.setdefault((a.sku, zone), []).append(a)
 
-    for sku, group in by_sku.items():
+    for (sku, zone), group in by_cohort.items():
         if len(group) < OUTLIER_MIN_STORES:
-            continue  # too few stores to call any one an outlier with confidence
+            continue  # too few stores in this zone to call an outlier with confidence
         prices = [a.approved_price for a in group]
         med = median(prices)
         if med <= 0:
             continue
+        zone_label = "" if zone == "__default__" else f" in {zone}"
         for a in group:
             deviation = abs(a.approved_price - med) / med
             if deviation > OUTLIER_DEVIATION:
@@ -185,22 +200,30 @@ def _check_cross_store_outliers(actions: list[PriceAction]) -> list[Plausibility
                     code="cross_store_outlier", severity="critical",
                     message=(
                         f"{a.product_name} is approved at ${a.approved_price:.2f} at "
-                        f"Store {a.store_id}, but the median across {len(group)} stores in "
-                        f"this batch is ${med:.2f} ({round(deviation * 100)}% off). One "
-                        f"store's price disagrees with its siblings — likely a feed error."
+                        f"Store {a.store_id}, but the median across {len(group)} stores"
+                        f"{zone_label} is ${med:.2f} ({round(deviation * 100)}% off). One "
+                        f"store's price disagrees with its same-zone siblings — likely a feed error."
                     ),
-                    evidence={"approved_price": a.approved_price, "batch_median": med,
+                    evidence={"approved_price": a.approved_price, "zone_median": med,
+                              "zone": zone if zone != "__default__" else None,
                               "store_count": len(group), "deviation_pct": round(deviation * 100, 1)},
                 ))
     return findings
 
 
-def check_actions(db: Session, actions: list[PriceAction], batch_external_id: str = "") -> PlausibilityReport:
+def check_actions(
+    db: Session,
+    actions: list[PriceAction],
+    batch_external_id: str = "",
+    store_zone: dict[str, str] | None = None,
+) -> PlausibilityReport:
     """Run all plausibility checks over a set of approved actions. Pure read.
 
-    Per-action checks (below_cost, extreme_swing) plus the batch-relative
-    cross_store_outlier check. Returns every finding; an action can carry more
-    than one (e.g. below cost AND a cross-store outlier), which is itself a
+    Per-action checks (below_cost, extreme_swing) plus the zone-aware
+    cross_store_outlier check. ``store_zone`` (store_id -> zone) keeps the outlier
+    comparison within a pricing zone so legitimate regional pricing isn't flagged;
+    omit it for a single-zone batch. Returns every finding; an action can carry
+    more than one (e.g. below cost AND a cross-store outlier), which is itself a
     stronger signal that the row is bad.
     """
     costs = _cost_index(db, {a.sku for a in actions})
@@ -212,7 +235,7 @@ def check_actions(db: Session, actions: list[PriceAction], batch_external_id: st
         sw = _check_extreme_swing(a)
         if sw:
             findings.append(sw)
-    findings.extend(_check_cross_store_outliers(actions))
+    findings.extend(_check_cross_store_outliers(actions, store_zone))
     # Stable, reviewer-friendly order: critical first, then by store/sku.
     findings.sort(key=lambda f: (f.severity != "critical", f.store_id, f.sku, f.code))
     return PlausibilityReport(
