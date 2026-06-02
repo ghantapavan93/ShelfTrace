@@ -93,6 +93,16 @@ def _resolve(x_api_key: Optional[str], x_actor_name: Optional[str]) -> Optional[
     """Look the key up; return Identity on hit, None on miss."""
     keys = _load_key_map()
     if not keys:
+        # Auth disabled (open demo). Still honor an explicit X-Actor-Name so a
+        # reviewer's recovery actions are attributed to a real person in the audit
+        # trail ("Sarah Chen") instead of the generic "operator". Trimmed/bounded;
+        # falls back to the anonymous operator when no name is given.
+        if x_actor_name and x_actor_name.strip():
+            return Identity(
+                role="operator",
+                actor=x_actor_name.strip()[:128],
+                key_label="unauthenticated",
+            )
         return ANONYMOUS_OPERATOR
     if not x_api_key:
         return None

@@ -84,6 +84,44 @@ def test_operator_key_accepts_write_and_records_actor(db, keys_enabled):
     assert any(a.actor == "Avery Davis" for a in rows), [a.actor for a in rows]
 
 
+def test_open_demo_honors_actor_name_in_audit(db):
+    """Gap 5: even with auth DISABLED (the open demo), an explicit X-Actor-Name is
+    attributed to a real person in the audit trail — so a reviewer's recovery
+    action reads 'Sarah Chen', not the generic 'operator'. No API key required."""
+    from app.models import AuditEvent, Incident
+    from tests._helpers import seed_live_demo
+
+    seed_live_demo(db)
+    incident = db.query(Incident).first()
+    assert incident is not None
+
+    client = TestClient(app)
+    r = client.post(
+        f"/api/v1/incidents/{incident.id}/retry",
+        headers={"X-Actor-Name": "Sarah Chen"},  # no X-API-Key — open demo
+    )
+    assert r.status_code == 200, r.text
+
+    db.expire_all()
+    rows = (
+        db.query(AuditEvent)
+        .filter(AuditEvent.incident_id == incident.id)
+        .all()
+    )
+    assert any(a.actor == "Sarah Chen" for a in rows), [a.actor for a in rows]
+
+
+def test_open_demo_without_actor_name_falls_back_to_operator(db):
+    """No name given → the anonymous operator identity, exactly as before (the
+    fix doesn't change the default, only enables an opt-in override)."""
+    from app.security import _resolve, ANONYMOUS_OPERATOR
+
+    assert _resolve(None, None) is ANONYMOUS_OPERATOR
+    assert _resolve(None, "   ") is ANONYMOUS_OPERATOR  # blank is ignored
+    ident = _resolve(None, "Jordan Lee")
+    assert ident.actor == "Jordan Lee" and ident.role == "operator"
+
+
 def test_unknown_key_returns_401(db, keys_enabled):
     client = TestClient(app)
     r = client.post("/api/v1/demo/reset", headers={"X-API-Key": "nope"})
