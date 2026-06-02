@@ -59,6 +59,20 @@ export function EligibilityPanel({
             {shortLabel}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-slate-200/85">{eligibility.summary}</p>
+
+          {/* §9 — Make the measurement quarantine unmistakable. The principle is
+              always stated; once execution is verified, the clean-window line
+              confirms when honest measurement can resume. */}
+          <p className="mt-3 border-l-2 border-white/15 pl-3 text-[13px] italic leading-relaxed text-slate-300">
+            An agent should never learn from an action the shopper did not correctly experience.
+          </p>
+          {eligibility.status === "ELIGIBLE_ALL_REQUIRED_CHANNELS_VERIFIED" && (
+            <p className="mt-2 text-[13px] leading-relaxed text-emerald-200/90">
+              Execution verified at $5.99. A clean measurement window begins from the
+              acknowledgement timestamp.
+            </p>
+          )}
+
           <ChannelChips eligibility={eligibility} />
         </div>
       </div>

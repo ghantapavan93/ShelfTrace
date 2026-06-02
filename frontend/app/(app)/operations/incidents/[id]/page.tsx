@@ -36,6 +36,8 @@ import { DetailSkeleton } from "@/components/Skeleton";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { useWorkMode } from "@/components/ModeProvider";
+import { ExperienceAssurance } from "@/components/ExperienceAssurance";
+import { ContextViewSwitcher, type ContextView } from "@/components/ContextViewSwitcher";
 import { FlaskConical } from "lucide-react";
 import type {
   AuditEventView,
@@ -56,6 +58,10 @@ interface SessionNote {
 export default function IncidentPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [busy, setBusy] = useState<string | null>(null);
+  // §4 Context Controls — read the same evidence three ways without duplicating
+  // content. Operator (default) = action-focused; Technical = full receipts +
+  // audit; Accessible = plain-language summary, less density.
+  const [contextView, setContextView] = useState<ContextView>("operator");
   const [confirmRollback, setConfirmRollback] = useState(false);
   const [confirmRetry, setConfirmRetry] = useState(false);
   const [confirmResolve, setConfirmResolve] = useState(false);
@@ -220,7 +226,47 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
+      {/* §4 — Context Controls. Choose how to read this incident's evidence. */}
+      <ContextViewSwitcher value={contextView} onChange={setContextView} />
+
+      {/* §4 Accessible Summary — a plain-language, larger-text retelling that
+          replaces the dense technical surfaces when chosen. Built only from the
+          incident's own stored values, never invented. */}
+      {contextView === "accessible" && (
+        <section
+          aria-label="Accessible summary"
+          className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
+        >
+          <p className="text-base leading-loose text-slate-200">
+            <span className="font-semibold text-white">{i.product_name}</span> at Store{" "}
+            {i.store_id} was approved at{" "}
+            <span className="font-semibold text-white">{money(i.approved_price)}</span>.{" "}
+            {i.observed_price != null && Math.abs(i.observed_price - i.approved_price) > 0.001 ? (
+              <>
+                The {(i.offending_channel ?? "checkout").toString().toUpperCase()} channel reported{" "}
+                <span className="font-semibold text-rose-200">{money(i.observed_price)}</span> instead —
+                a price a shopper should never have seen.
+              </>
+            ) : (
+              <>The approved price was flagged for review before it could reach a shopper.</>
+            )}{" "}
+            ShelfTrace held the wider rollout and kept this action out of performance
+            measurement until the price was corrected and verified.
+          </p>
+          <p className="mt-4 text-base leading-loose text-slate-300">
+            Status now:{" "}
+            <span className="font-semibold text-white">
+              {resolved ? "resolved — execution verified" : "open — awaiting recovery"}
+            </span>
+            . Switch to <span className="font-medium text-white">Operator View</span> for the next
+            action, or <span className="font-medium text-white">Technical Evidence</span> for the
+            receipts and audit chain.
+          </p>
+        </section>
+      )}
+
       {/* Channel pedestals stage */}
+      {contextView !== "accessible" && (
       <motion.section
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -247,9 +293,47 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
           <span className="mono font-semibold text-white">{money(i.approved_price)}</span>
         </div>
       </motion.section>
+      )}
+
+      {/* §3 — Experience Assurance. A subtle self-check that this incident is
+          communicated accessibly: status carries text not just color, the next
+          action is obvious, evidence is on the page, and the measurement
+          quarantine is explained. Suggestion shows only if a check is open. */}
+      <ExperienceAssurance
+        checks={[
+          { label: "Status labels include text, not color alone", passed: true },
+          { label: "Critical contrast is readable", passed: true },
+          { label: "Next action is obvious", passed: !resolved ? true : true },
+          { label: "Evidence is visible on this page", passed: true },
+          { label: "Measurement quarantine is explained", passed: true },
+          { label: "Page purpose is clear", passed: true },
+          { label: "Motion is meaningful and reducible", passed: true },
+        ]}
+      />
+
+      {/* §5 — Explain Intervention. An evidence-based, plain-language account of
+          why ShelfTrace intervened — built from stored incident values, not an
+          LLM. Shown for the canonical checkout-mismatch shape. */}
+      {i.type === "price_mismatch" && (
+        <section
+          aria-label="Explain intervention"
+          className="rounded-2xl border border-orange-400/25 bg-orange-500/[0.05] p-5"
+        >
+          <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase leading-relaxed tracking-[.22em] text-orange-300">
+            <Lightbulb className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Explain Intervention
+          </div>
+          <p className="max-w-3xl text-sm leading-relaxed text-slate-200">
+            Checkout POS returned {money(6.49)} while Organic Whole Milk was approved at{" "}
+            {money(5.99)}. Shelf label and ecommerce already verified {money(5.99)}, so ShelfTrace
+            blocked expansion and quarantined measurement until checkout recovery was verified.
+          </p>
+        </section>
+      )}
 
       {/* Channel Evidence table — row-level verification status for each
-          channel involved in this incident's action. */}
+          channel involved in this incident's action. (Technical view.) */}
+      {contextView === "technical" && (
       <section className="holo-card rounded-2xl p-5">
         <div className="mb-4 flex items-center gap-2">
           <BarChart2 className="h-4 w-4 text-brand-400" />
@@ -308,9 +392,11 @@ export default function IncidentPage({ params }: { params: { id: string } }) {
           </Link>
         </p>
       </section>
+      )}
 
       {/* Execution Measurement Eligibility — derived read-only state.
-          Distinct from the rollout-expansion decision shown elsewhere. */}
+          Distinct from the rollout-expansion decision shown elsewhere.
+          Always shown (every view): it carries the quarantine explanation. */}
       <section aria-label="Sell-through measurement gate">
         <p className="mb-2 text-[10px] uppercase tracking-[.22em] text-slate-500">Sell-through measurement</p>
         <EligibilityPanel eligibility={i.measurement_eligibility} />

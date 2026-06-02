@@ -134,7 +134,7 @@ export default function ScrapersPage() {
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Competitor <span className="iris-text">Scraping</span></h1>
+          <h1 className="text-2xl font-bold text-white">Market Signal <span className="iris-text">Intake</span></h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Production-shaped data extraction pipeline. Fetch → parse →
             validate → normalize → deduplicate → preserve observations. The

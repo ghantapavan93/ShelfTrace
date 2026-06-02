@@ -968,6 +968,49 @@ function Hero({ onScanner }: { onScanner: () => void }) {
           ShelfTrace protects approved grocery price actions as they move through shelf labels,
           checkout systems and ecommerce channels.
         </motion.p>
+
+        {/* §1 — Purpose / Proof / Code strip. The first 10 seconds: what it's
+            for, the proof it stands on, and the stack underneath — concise,
+            evidence-first, in the dark control-plane card style. */}
+        <motion.div
+          initial={reduced ? false : MOTION_VARIANTS.fadeUp.initial}
+          animate={MOTION_VARIANTS.fadeUp.animate}
+          transition={{ ...PRESET.fadeUp, delay: 0.58 }}
+          className="mt-8 grid max-w-4xl gap-3 sm:grid-cols-3"
+        >
+          {[
+            {
+              icon: Sparkles,
+              eyebrow: "Purpose",
+              tone: "text-orange-300",
+              body: "Protect agent-driven grocery actions before they reach shoppers.",
+            },
+            {
+              icon: BadgeCheck,
+              eyebrow: "Proof",
+              tone: "text-emerald-300",
+              body: "Organic Whole Milk approved at $5.99, POS returned $6.49, expansion blocked, measurement quarantined, recovery verified.",
+            },
+            {
+              icon: Database,
+              eyebrow: "Code",
+              tone: "text-violet-300",
+              body: "FastAPI + PostgreSQL evidence records, simulated channel receipts, deterministic reconciliation, regression replay, deployed on Vercel + Render.",
+            },
+          ].map((c) => (
+            <div
+              key={c.eyebrow}
+              className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl"
+            >
+              <div className={`flex items-center gap-2 text-[10px] font-semibold uppercase leading-relaxed tracking-[.22em] ${c.tone}`}>
+                <c.icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {c.eyebrow}
+              </div>
+              <p className="mt-2 text-[13px] leading-relaxed text-white/70">{c.body}</p>
+            </div>
+          ))}
+        </motion.div>
+
         <motion.div
           initial={reduced ? false : MOTION_VARIANTS.fadeUp.initial}
           animate={MOTION_VARIANTS.fadeUp.animate}
@@ -978,9 +1021,20 @@ function Hero({ onScanner }: { onScanner: () => void }) {
             Watch the price move
             <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
           </MagneticButton>
-          <MagneticLink href="/operations" variant="ghost">
-            Open Working Platform <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-          </MagneticLink>
+          {/* §8 — Open Working Proof. On hover/focus, a subtle preview reveals
+              the exact state chain the demo will show, then routes into the
+              populated milk demo. Motion explains product state — no decoration. */}
+          <div className="group/proof relative">
+            <MagneticLink href="/operations" variant="ghost">
+              Open Working Proof <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </MagneticLink>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-[calc(100%+8px)] z-20 rounded-lg border border-white/10 bg-black/70 px-3 py-1.5 text-center font-mono text-[11px] leading-relaxed text-white/55 opacity-0 backdrop-blur transition-all duration-200 group-hover/proof:opacity-100 group-focus-within/proof:opacity-100 motion-reduce:transition-none"
+            >
+              $5.99 approved → POS $6.49 mismatch → expansion blocked → measurement quarantined → recovery verified
+            </div>
+          </div>
           <MagneticLink href="/engineering" variant="quiet">
             View Engineering Proof <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </MagneticLink>

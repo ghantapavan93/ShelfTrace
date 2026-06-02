@@ -190,7 +190,7 @@ export default function PricingPage() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white"><span className="iris-text">Pricing</span> Engine</h1>
+          <h1 className="text-2xl font-bold text-white">Candidate Action <span className="iris-text">Studio</span></h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-400">
             Econometric price-elasticity estimation + constrained profit
             optimization. OLS log-log fit on 90 days of sales →
