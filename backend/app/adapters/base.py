@@ -54,12 +54,22 @@ class ChannelAdapter:
         behavior_type: str = "success",
         duplicate_ack: bool = False,
         delay_ms: int | None = None,
+        accepted_prices: "list[float] | None" = None,
     ) -> AdapterReceipt:
         """Build a normalized receipt from a resolved observation.
 
         ``observed`` is either a float price or the TIMEOUT marker. ``delay_ms``
         is the channel's acknowledgement latency from the behavior profile.
+
+        ``accepted_prices`` is the set of prices a shopper could legitimately be
+        charged — the approved base price PLUS any active promo/loyalty price.
+        The observed price VERIFIES if it matches ANY of them; a true MISMATCH is
+        a price that is none of the accepted values. Defaults to just the approved
+        price (exact-match — the original behavior, so no caller regresses). The
+        adapter still holds no product logic: the accepted set is computed upstream
+        and passed in.
         """
+        valid = accepted_prices if accepted_prices else [approved_price]
         if observed == TIMEOUT:
             receipt = AdapterReceipt(
                 adapter=self.system_name,
@@ -77,7 +87,7 @@ class ChannelAdapter:
                 timestamp=_now(),
             )
         else:
-            status = "VERIFIED" if abs(observed - approved_price) < 0.001 else "MISMATCH"
+            status = "VERIFIED" if any(abs(observed - p) < 0.001 for p in valid) else "MISMATCH"
             receipt = AdapterReceipt(
                 adapter=self.system_name,
                 channel=self.channel,

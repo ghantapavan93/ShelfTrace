@@ -226,6 +226,11 @@ class PriceAction(Base):
     store_id: Mapped[str] = mapped_column(String, index=True)
     approved_price: Mapped[float] = mapped_column(Float)
     prior_price: Mapped[float] = mapped_column(Float)
+    # A legitimate alternate shopper-facing price (TPR / loyalty / multi-buy).
+    # When set, a register ringing THIS price is correct, not a mismatch — so
+    # reconciliation accepts either approved_price or promotional_price. NULL =
+    # only the approved price is valid (the default; exact-match behavior).
+    promotional_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     reason: Mapped[str] = mapped_column(String)
     # Upstream context (preserved, not recomputed)
     is_kvi: Mapped[bool] = mapped_column(Boolean, default=False)

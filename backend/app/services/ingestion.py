@@ -75,6 +75,7 @@ def ingest_batch(db: Session, payload: PriceBatchIn) -> IngestionResult:
                     is_perishable=a.is_perishable,
                     markdown_deadline=a.markdown_deadline,
                     effective_at=a.effective_at,
+                    promotional_price=a.promotional_price,
                     projected_impact=a.projected_impact,
                 )
             )

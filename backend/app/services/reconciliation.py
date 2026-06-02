@@ -44,6 +44,12 @@ def verify_channel(db: Session, delivery: ChannelDelivery, action: PriceAction) 
         delivery.channel.value,
     )
     observed = behavior.observe(profile, action.approved_price, max(delivery.attempts, 1))
+    # Promo-aware matching: a register may legitimately ring the promotional price
+    # instead of the approved base (a TPR/loyalty price). Accept either, so a real
+    # promo isn't flagged as a shopper-overcharge mismatch. NULL promo = base only.
+    accepted = [action.approved_price]
+    if action.promotional_price is not None:
+        accepted.append(action.promotional_price)
     raw = adapter.build_verify_receipt(
         sku=action.sku,
         store_id=action.store_id,
@@ -52,6 +58,7 @@ def verify_channel(db: Session, delivery: ChannelDelivery, action: PriceAction) 
         behavior_type=profile.behavior_type.value if profile else "success",
         duplicate_ack=behavior.is_duplicate_ack(profile),
         delay_ms=profile.configured_delay_ms if profile else None,
+        accepted_prices=accepted,
     )
 
     if raw["status"] == "TIMEOUT":

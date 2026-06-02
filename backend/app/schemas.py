@@ -21,6 +21,9 @@ class ApprovedActionIn(BaseModel):
     # the price is "pending activation" — channels still show the old price and
     # reconciliation won't flag that as a mismatch until it takes effect.
     effective_at: datetime | None = None
+    # Legitimate alternate shopper-facing price (TPR/loyalty). When set, a register
+    # ringing this is correct, not a mismatch. NULL = only approved_price is valid.
+    promotional_price: float | None = None
     projected_impact: str | None = None
 
 

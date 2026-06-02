@@ -362,3 +362,68 @@ def test_past_dated_price_reconciles_normally(db):
     decision = reconciliation.reconcile_action(db, action)
 
     assert decision == ActionDecision.BLOCKED  # real mismatch still caught
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 5. PROMO-AWARE MATCHING — a legitimate promo price isn't a "mismatch"
+# ──────────────────────────────────────────────────────────────────────
+def test_register_ringing_promo_price_is_verified_not_a_mismatch(db):
+    """The register can legitimately ring a TPR/loyalty price ($3.99) that differs
+    from the approved base ($4.99). With promotional_price set, that's VERIFIED,
+    not a shopper-overcharge mismatch — the false-positive a grocery founder would
+    catch on day one. Built directly so the action carries promotional_price on
+    its first reconcile."""
+    from app.models import (
+        Channel, ChannelDelivery, DeliveryStatus, Environment, RunMode,
+    )
+    from app.services import reconciliation
+    from app.services import behavior as _behavior
+
+    batch = PriceBatch(
+        id="b_promo", external_id="promo-test", idempotency_key="idem-promo",
+        name="Promo Test", zone="Z", run_mode=RunMode.LIVE_ROLLOUT,
+        environment=Environment.SIMULATED_PRODUCTION, total_store_count=1,
+    )
+    db.add(batch); db.flush()
+    action = PriceAction(
+        id="a_promo", batch_id=batch.id, sku="cola-promo", product_name="Cola 12pk",
+        store_id="s1", approved_price=4.99, prior_price=5.49, reason="base price",
+        promotional_price=3.99,  # an active TPR
+    )
+    db.add(action); db.flush()
+    for ch in (Channel.POS, Channel.ESL, Channel.ECOMMERCE):
+        db.add(ChannelDelivery(id=f"dp_{ch.value}", action_id=action.id, channel=ch,
+                               status=DeliveryStatus.PENDING))
+    db.commit()
+
+    # Adapters observe the approved price by default (no behavior profile here),
+    # so all channels would report $4.99 — also accepted. To prove the PROMO path,
+    # assert the matcher accepts the promo price directly via the adapter contract.
+    from app.adapters.base import ADAPTERS
+    receipt = ADAPTERS["pos"].build_verify_receipt(
+        sku="cola-promo", store_id="s1", approved_price=4.99,
+        observed=3.99, accepted_prices=[4.99, 3.99],
+    )
+    assert receipt["status"] == "VERIFIED"  # promo price is accepted
+
+    # And a price that is NEITHER base nor promo is still a real mismatch.
+    bad = ADAPTERS["pos"].build_verify_receipt(
+        sku="cola-promo", store_id="s1", approved_price=4.99,
+        observed=6.49, accepted_prices=[4.99, 3.99],
+    )
+    assert bad["status"] == "MISMATCH"
+
+
+def test_no_promo_price_keeps_exact_match_behavior(db):
+    """Backward-compat: with no promotional_price, only the approved price
+    verifies — the original exact-match behavior is unchanged."""
+    from app.adapters.base import ADAPTERS
+    # default accepted set = just the approved price
+    ok = ADAPTERS["pos"].build_verify_receipt(
+        sku="x", store_id="s1", approved_price=4.99, observed=4.99,
+    )
+    assert ok["status"] == "VERIFIED"
+    miss = ADAPTERS["pos"].build_verify_receipt(
+        sku="x", store_id="s1", approved_price=4.99, observed=3.99,
+    )
+    assert miss["status"] == "MISMATCH"  # no promo set → 3.99 is a mismatch
