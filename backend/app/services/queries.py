@@ -22,6 +22,7 @@ from app.schemas import (
     BatchDetail,
     BatchLifecycleView,
     BatchSummary,
+    BlastRadiusView,
     ChannelView,
     IncidentExplanation,
     IncidentView,
@@ -260,6 +261,10 @@ def incident_view(db: Session, incident: Incident) -> IncidentView:
         )
     # Two bounded queries (incidents + store tasks for this one action).
     eligibility = measurement.derive_eligibility_for_action(db, action)
+    # Money-at-risk per day — delta × sales velocity. Read-only derivation.
+    from app.services import blast_radius as _blast
+
+    blast = _blast.for_incident(db, incident, observed)
     return IncidentView(
         id=incident.id,
         batch_id=incident.batch_id,
@@ -282,6 +287,7 @@ def incident_view(db: Session, incident: Incident) -> IncidentView:
         acknowledged=incident.acknowledged_at is not None,
         acknowledged_at=incident.acknowledged_at,
         acknowledged_by=incident.acknowledged_by,
+        blast_radius=BlastRadiusView(**blast.to_dict()),
         measurement_eligibility=MeasurementEligibilityView(**eligibility.to_dict()),
     )
 

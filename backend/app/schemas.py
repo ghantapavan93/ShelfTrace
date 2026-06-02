@@ -64,6 +64,20 @@ class MeasurementEligibilityView(BaseModel):
     summary: str  # one-line plain English
 
 
+class BlastRadiusView(BaseModel):
+    """Money-at-risk for an incident: per-unit price delta × sales velocity.
+    Turns 'an incident' into 'a $X/day fire' so operators triage by dollars.
+    See :mod:`app.services.blast_radius`. daily_units / daily_dollars_at_risk
+    are null when the SKU has no sales history (never fabricated)."""
+
+    per_unit_delta: float
+    daily_units: float | None = None
+    daily_dollars_at_risk: float | None = None
+    has_velocity: bool = False
+    is_kvi: bool = False
+    basis: str = ""
+
+
 class ActionView(BaseModel):
     id: str
     sku: str
@@ -160,6 +174,9 @@ class IncidentView(BaseModel):
     acknowledged: bool = False
     acknowledged_at: datetime | None = None
     acknowledged_by: str | None = None
+    # Blast radius — money-at-risk per day (delta × sales velocity). Optional so
+    # existing clients keep working; null until the incident-view computes it.
+    blast_radius: BlastRadiusView | None = None
     # Forward-compatible.
     measurement_eligibility: MeasurementEligibilityView | None = None
 
