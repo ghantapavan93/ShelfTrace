@@ -327,6 +327,8 @@ def run_migrations() -> None:
         # Widen incidents.type to VARCHAR so the IMPLAUSIBLE_PRICE enum value
         # fits (mirrors Alembic 0010). Idempotent: a no-op once already textual.
         conn.execute(text("ALTER TABLE incidents ALTER COLUMN type TYPE VARCHAR(32) USING type::text"))
+        # Effective-dating: scheduled go-live time per action (mirrors Alembic 0011).
+        conn.execute(text("ALTER TABLE price_actions ADD COLUMN IF NOT EXISTS effective_at TIMESTAMP WITH TIME ZONE"))
         for name, ddl in _TEST_RUN_CONFIG_COLUMNS:
             conn.execute(text(f"ALTER TABLE test_run_configs ADD COLUMN IF NOT EXISTS {name} {ddl}"))
         conn.execute(

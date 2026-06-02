@@ -231,6 +231,11 @@ class PriceAction(Base):
     is_kvi: Mapped[bool] = mapped_column(Boolean, default=False)
     is_perishable: Mapped[bool] = mapped_column(Boolean, default=False)
     markdown_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When this price is scheduled to take effect on the shelf (e.g. weekly ad
+    # starts Wednesday 6am). NULL = effective immediately. A price whose
+    # effective_at is in the future is "pending activation": the channels still
+    # show the OLD price, and reconciliation must not flag that as a mismatch.
+    effective_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     projected_impact: Mapped[str | None] = mapped_column(String, nullable=True)
     decision: Mapped[ActionDecision] = mapped_column(Enum(ActionDecision), default=ActionDecision.PENDING)
 

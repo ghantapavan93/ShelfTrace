@@ -17,6 +17,10 @@ class ApprovedActionIn(BaseModel):
     is_kvi: bool = False
     is_perishable: bool = False
     markdown_deadline: datetime | None = None
+    # Scheduled go-live time. NULL = effective immediately. A future value means
+    # the price is "pending activation" — channels still show the old price and
+    # reconciliation won't flag that as a mismatch until it takes effect.
+    effective_at: datetime | None = None
     projected_impact: str | None = None
 
 

@@ -227,8 +227,33 @@ def _sync_incident(db: Session, action: PriceAction, receipts: list[ExecutionRec
         )
 
 
+def _is_pending_activation(action: PriceAction) -> bool:
+    """True when this price is scheduled for the future and hasn't taken effect.
+
+    Grocery prices are time-bound (the weekly ad starts Wednesday 6am). Before
+    effective_at, the channels CORRECTLY still show the old price — flagging that
+    as a mismatch would be a false alarm. NULL effective_at = live immediately."""
+    if action.effective_at is None:
+        return False
+    from app.models import utcnow
+
+    eff = action.effective_at
+    now = utcnow()
+    # Compare tz-aware vs naive safely (SQLite returns naive, PG tz-aware).
+    if eff.tzinfo is None:
+        now = now.replace(tzinfo=None)
+    return eff > now
+
+
 def reconcile_action(db: Session, action: PriceAction) -> ActionDecision:
     """Verify every channel for an action, persist receipts, and set its decision."""
+    # Effective-dating guard: a not-yet-live price is PENDING activation, not a
+    # mismatch. Skip channel verification (the old price showing is correct) and
+    # do not open an incident — the action reconciles for real once it takes effect.
+    if _is_pending_activation(action):
+        action.decision = ActionDecision.PENDING
+        db.flush()
+        return ActionDecision.PENDING
     receipts = [verify_channel(db, d, action) for d in action.deliveries]
     decision = decide_action(action, receipts)
     action.decision = decision

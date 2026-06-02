@@ -30,6 +30,7 @@ from app.models import (
     IncidentStatus,
     IncidentType,
     PriceAction,
+    PriceBatch,
 )
 from app.schemas import ConnectorBehaviorIn, ScenarioActionIn, ScenarioIn
 from app.services import bulk_import, recovery, scenarios
@@ -285,3 +286,79 @@ def test_implausible_price_incident_cannot_be_retried_or_resolved_away(db):
     recovery.rollback_incident(db, inc.id, actor="reviewer")
     db.refresh(inc)
     assert inc.status == IncidentStatus.ROLLED_BACK
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 4. EFFECTIVE-DATING — a not-yet-live price isn't a mismatch
+# ──────────────────────────────────────────────────────────────────────
+def test_future_dated_price_is_pending_not_a_mismatch(db):
+    """Grocery prices are time-bound: the weekly ad starts Wednesday. A price
+    scheduled for the future hasn't taken effect, so the channels correctly still
+    show the OLD price. Reconciliation must treat it as PENDING activation and
+    open NO incident — flagging a not-yet-live price would be a false alarm.
+
+    Built future-dated from the start (the realistic path), so the very first
+    reconcile sees it as pending and never opens a mismatch."""
+    from datetime import timedelta
+    from app.models import (
+        Channel, ChannelDelivery, DeliveryStatus, Environment, RunMode, utcnow,
+    )
+    from app.services import reconciliation
+
+    # Construct a batch + a single future-dated action directly, with its three
+    # channel deliveries, so reconcile_action runs against a genuinely not-yet-live
+    # price on its FIRST pass (mirrors how ingestion would set effective_at).
+    batch = PriceBatch(
+        id="b_future", external_id="future-ad", idempotency_key="idem-future",
+        name="Future Ad", zone="Region 7", run_mode=RunMode.LIVE_ROLLOUT,
+        environment=Environment.SIMULATED_PRODUCTION, total_store_count=1,
+    )
+    db.add(batch); db.flush()
+    action = PriceAction(
+        id="a_future", batch_id=batch.id, sku="cola-future", product_name="Cola 12pk",
+        store_id="s1", approved_price=4.99, prior_price=6.99, reason="weekly ad",
+        effective_at=utcnow() + timedelta(days=2),  # not live yet
+    )
+    db.add(action); db.flush()
+    for ch in (Channel.POS, Channel.ESL, Channel.ECOMMERCE):
+        db.add(ChannelDelivery(id=f"d_{ch.value}", action_id=action.id, channel=ch,
+                               status=DeliveryStatus.PENDING))
+    db.commit()
+
+    decision = reconciliation.reconcile_action(db, action)
+
+    # Not-yet-live → PENDING activation, and NO incident opened at all.
+    assert decision == ActionDecision.PENDING
+    assert db.query(Incident).filter(Incident.action_id == action.id).count() == 0
+
+
+def test_past_dated_price_reconciles_normally(db):
+    """Once effective_at is in the past (the ad has started), the price is live
+    and a genuine POS mismatch IS flagged — effective-dating doesn't suppress
+    real incidents, only premature ones."""
+    from datetime import timedelta
+    from app.models import utcnow
+    from app.services import reconciliation
+
+    payload = ScenarioIn(
+        name="Live Ad Price", run_mode="live_rollout", zone_name="Region 7",
+        store_ids=["s1"], canary_store_ids=["s1"],
+        actions=[
+            ScenarioActionIn(product_name="Cola 12pk", sku="cola-live",
+                             previous_price=6.99, approved_price=4.99),
+        ],
+        behaviors=[
+            ConnectorBehaviorIn(store_id="s1", sku="cola-live", channel_type="pos",
+                                behavior_type="stale_price", configured_observed_price=6.99),
+        ],
+    )
+    cfg = scenarios.create_config(db, payload)
+    batch = scenarios.execute_live(db, cfg)
+    action = db.query(PriceAction).filter(
+        PriceAction.batch_id == batch.id, PriceAction.store_id == "s1"
+    ).one()
+    action.effective_at = utcnow() - timedelta(hours=1)  # already live
+    db.commit()
+    decision = reconciliation.reconcile_action(db, action)
+
+    assert decision == ActionDecision.BLOCKED  # real mismatch still caught
