@@ -333,6 +333,10 @@ def run_migrations() -> None:
         conn.execute(text("ALTER TABLE price_actions ADD COLUMN IF NOT EXISTS promotional_price DOUBLE PRECISION"))
         for name, ddl in _TEST_RUN_CONFIG_COLUMNS:
             conn.execute(text(f"ALTER TABLE test_run_configs ADD COLUMN IF NOT EXISTS {name} {ddl}"))
+        # Scenario-action grocery fields (mirrors Alembic 0013): scheduled go-live
+        # + legitimate promo price, settable from the Scenario Builder.
+        conn.execute(text("ALTER TABLE test_run_actions ADD COLUMN IF NOT EXISTS effective_at TIMESTAMP WITH TIME ZONE"))
+        conn.execute(text("ALTER TABLE test_run_actions ADD COLUMN IF NOT EXISTS promotional_price DOUBLE PRECISION"))
         conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS ix_test_run_configs_import_source_hash "

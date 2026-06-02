@@ -95,6 +95,36 @@ def test_scenario_persists_import_provenance(db):
     assert cfg.created_by == "QA Operator"
 
 
+def test_scenario_action_carries_promo_and_effective_at_through_to_execution(db):
+    """The two grocery fields settable from the Scenario Builder must persist on
+    the config action AND flow into the executed PriceAction — proving the whole
+    front-to-back thread (UI -> schema -> config -> build_payload -> ingest)."""
+    from datetime import timedelta
+    from app.models import PriceAction, utcnow
+
+    eff = utcnow() + timedelta(days=2)
+    payload = ScenarioIn(
+        name="Promo + Effective", run_mode="live_rollout", zone_name="Z",
+        store_ids=["s1"], canary_store_ids=["s1"],
+        actions=[ScenarioActionIn(
+            product_name="Cola 12pk", sku="cola-thread",
+            previous_price=6.99, approved_price=4.99,
+            promotional_price=3.99, effective_at=eff,
+        )],
+        behaviors=[],
+    )
+    cfg = scenarios.create_config(db, payload)
+    # Persisted on the config action.
+    assert cfg.actions[0].promotional_price == 3.99
+    assert cfg.actions[0].effective_at is not None
+
+    batch = scenarios.execute_live(db, cfg)
+    pa = db.query(PriceAction).filter(PriceAction.batch_id == batch.id).first()
+    # Carried into the executed action.
+    assert pa.promotional_price == 3.99
+    assert pa.effective_at is not None
+
+
 def test_timeout_then_success_resolves_after_retry(db):
     cfg = scenarios.create_config(db, _milk_scenario([
         ConnectorBehaviorIn(store_id="s1", sku="milk-1gal", channel_type="esl",

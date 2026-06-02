@@ -23,7 +23,7 @@ const BEHAVIORS: { value: BehaviorType; label: string }[] = [
 const CHANNELS = ["pos", "esl", "ecommerce"] as const;
 
 function emptyAction(): ScenarioAction {
-  return { product_name: "", sku: "", previous_price: 0, approved_price: 0, reason: "Price update", is_kvi: false, deadline_at: null };
+  return { product_name: "", sku: "", previous_price: 0, approved_price: 0, reason: "Price update", is_kvi: false, deadline_at: null, effective_at: null, promotional_price: null };
 }
 function emptyBehavior(): ConnectorBehavior {
   return { store_id: "", sku: "", channel_type: "pos", behavior_type: "stale_price", configured_observed_price: null, configured_delay_ms: null, retry_success_price: null };
@@ -506,6 +506,39 @@ export default function ScenarioBuilder() {
                   <div className="flex-1"><div className={label}>Reason</div><input className={input} value={a.reason} onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, reason: e.target.value } : x))} /></div>
                   <button onClick={() => setActions(actions.filter((_, j) => j !== i))} className="mb-1 text-slate-500 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
                 </div>
+              </div>
+              {/* Optional grocery context — these flow into the executed action.
+                  Promo price: a register ringing this is verified, not a mismatch.
+                  Effective date: a future value holds the price as pending, not flagged. */}
+              <div className="mt-2 grid gap-2 md:grid-cols-6">
+                <div className="md:col-span-2">
+                  <div className={label}>Promo price $ <span className="text-slate-600">(optional)</span></div>
+                  <input
+                    className={input}
+                    type="number"
+                    step="0.01"
+                    placeholder="none"
+                    value={a.promotional_price ?? ""}
+                    onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, promotional_price: e.target.value === "" ? null : (e.target.value as unknown as number) } : x))}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <div className={label}>Effective at <span className="text-slate-600">(optional)</span></div>
+                  <input
+                    className={input}
+                    type="datetime-local"
+                    value={a.effective_at ? a.effective_at.slice(0, 16) : ""}
+                    onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, effective_at: e.target.value === "" ? null : new Date(e.target.value).toISOString() } : x))}
+                  />
+                </div>
+                <label className="flex items-center gap-2 md:col-span-2 mt-5 text-xs text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={a.is_kvi}
+                    onChange={(e) => setActions(actions.map((x, j) => j === i ? { ...x, is_kvi: e.target.checked } : x))}
+                  />
+                  KVI item (shapes price image)
+                </label>
               </div>
               {a.sku && (
                 <ScenarioActionHints

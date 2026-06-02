@@ -351,6 +351,11 @@ export interface ScenarioAction {
   reason: string;
   is_kvi: boolean;
   deadline_at: string | null;
+  // Optional grocery refinements (carried through to the executed PriceAction):
+  //  • effective_at      — scheduled go-live (ISO string); future = pending.
+  //  • promotional_price — a legit alternate shopper price (TPR/loyalty).
+  effective_at?: string | null;
+  promotional_price?: number | null;
 }
 
 export type BehaviorType =

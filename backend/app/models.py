@@ -474,6 +474,11 @@ class TestRunAction(Base):
     reason: Mapped[str] = mapped_column(String, default="Price update")
     is_kvi: Mapped[bool] = mapped_column(Boolean, default=False)
     deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Grocery refinements (carried into the executed PriceAction):
+    #  • effective_at      — scheduled go-live; future = pending, not a mismatch.
+    #  • promotional_price — a legit alternate shopper price (TPR/loyalty).
+    effective_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    promotional_price: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     config: Mapped[TestRunConfig] = relationship(back_populates="actions")
 

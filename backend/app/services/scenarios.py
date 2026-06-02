@@ -255,6 +255,8 @@ def build_payload(config: TestRunConfig, run_mode: str, external_id: str, idempo
             is_kvi=a.is_kvi,
             is_perishable=a.deadline_at is not None,
             markdown_deadline=a.deadline_at,
+            effective_at=a.effective_at,
+            promotional_price=a.promotional_price,
         )
         for a in config.actions
     ]
@@ -413,6 +415,7 @@ def create_config(db: Session, payload: ScenarioIn, actor: str | None = None) ->
             id=new_id("tra"), test_run_config_id=cfg.id, product_name=a.product_name, sku=a.sku,
             previous_price=a.previous_price, approved_price=a.approved_price, reason=a.reason,
             is_kvi=a.is_kvi, deadline_at=a.deadline_at,
+            effective_at=a.effective_at, promotional_price=a.promotional_price,
         ))
         # Auto-seed cost catalog so margin-target dashboards work for
         # CSV-uploaded SKUs without a manual ProductCost step.

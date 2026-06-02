@@ -411,6 +411,12 @@ class ScenarioActionIn(BaseModel):
     reason: str = "Price update"
     is_kvi: bool = False
     deadline_at: datetime | None = None
+    # Scheduled go-live; a future value means the price is pending activation
+    # (channels still show the old price — not flagged as a mismatch).
+    effective_at: datetime | None = None
+    # Legitimate alternate shopper price (TPR/loyalty); register ringing this is
+    # verified, not a mismatch. NULL = only the approved price is valid.
+    promotional_price: float | None = None
 
 
 # ─── Bulk import preview ──────────────────────────────────────────────
