@@ -83,6 +83,37 @@ def test_demo_full_potential_and_live_clean_slate(db):
     assert demo_after >= 100, "the demo showcase must be preserved by the purge"
 
 
+def test_ensure_realistic_scale_rebuilds_when_incomplete(db):
+    """The deployed failure mode: the showcase exists but is PARTIAL/mis-scoped, so
+    Demo's pricing surfaces are starved (margin/KVI covered ~16 SKUs instead of the
+    full catalog). ensure_realistic_scale_demo must detect incompleteness and
+    rebuild to the full catalog; once complete it's a no-op."""
+    from app.models import ProductCost
+
+    ensure_realistic_scale_demo(db)
+    full = db.scalar(
+        select(func.count()).select_from(ProductCost).where(ProductCost.source_run_id == DEMO_REALISTIC_SCALE)
+    )
+    assert full >= int(len(CATALOG) * 0.9)
+    assert ensure_realistic_scale_demo(db) is False  # already complete → no-op
+
+    # Simulate the partial/starved state: drop most demo-scoped costs.
+    db.execute(
+        text(
+            "DELETE FROM product_costs WHERE source_run_id = :s "
+            "AND id NOT IN (SELECT id FROM product_costs WHERE source_run_id = :s LIMIT 5)"
+        ),
+        {"s": DEMO_REALISTIC_SCALE},
+    )
+    db.commit()
+    assert ensure_realistic_scale_demo(db) is True  # detected incomplete → rebuilt
+    db.expire_all()
+    rebuilt = db.scalar(
+        select(func.count()).select_from(ProductCost).where(ProductCost.source_run_id == DEMO_REALISTIC_SCALE)
+    )
+    assert rebuilt >= int(len(CATALOG) * 0.9), "rebuild must restore the full catalog"
+
+
 def test_purge_user_scope_is_idempotent_and_demo_safe(db):
     """A second purge is a no-op, and demo:* rows are never touched."""
     db.add(ProductEntity(id="e_demo_keep", canonical_title="Keep Me", source_run_id="demo:memorial-day"))

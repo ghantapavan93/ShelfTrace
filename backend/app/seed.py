@@ -175,43 +175,87 @@ def purge_user_scope(db: Session) -> dict:
     return counts
 
 
+def _wipe_realistic_scale(db: Session) -> None:
+    """Remove EVERY Realistic Scale row — correctly-scoped demo:realistic-scale AND
+    any mis-scoped rows for its SKUs (NULL / user:legacy / user:<hash>) — plus its
+    competitor products, so the loader can repopulate a clean, internally-consistent
+    set. Strictly bounded to the realistic-scale catalog + its SKUs; never touches
+    Memorial Day, the milk hero, or genuine user uploads of OTHER SKUs."""
+    from sqlalchemy import bindparam
+    from sqlalchemy import text as _text
+
+    from app.scenarios.realistic_scale import CATALOG
+    from app.scope import DEMO_REALISTIC_SCALE
+
+    rs_skus = [c.sku for c in CATALOG]
+
+    def _ex(sql: str) -> None:
+        db.execute(
+            _text(sql).bindparams(bindparam("skus", expanding=True)),
+            {"scope": DEMO_REALISTIC_SCALE, "skus": rs_skus},
+        )
+
+    wipe_batch(db, REALISTIC_SCALE_EXTERNAL_ID)  # cascades its price_actions
+    # Competitor products for realistic-scale SKUs (stable_key = '<source>:<sku>').
+    # The loader skips observation creation when a stable_key already exists, so
+    # orphans from an old load must go for observations to repopulate. Postgres-only
+    # split_part; on a fresh SQLite dev DB there are none, so the guard is harmless.
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        _ex("DELETE FROM competitor_products WHERE split_part(stable_key, ':', 2) IN :skus")
+    for table in ("historical_sales", "pricing_recommendations", "product_costs"):
+        _ex(f"DELETE FROM {table} WHERE source_run_id = :scope OR sku IN :skus")
+    _ex(
+        "DELETE FROM product_entities WHERE source_run_id = :scope "
+        "OR id IN (SELECT entity_id FROM sku_product_links WHERE sku IN :skus)"
+    )
+    _ex("DELETE FROM sku_product_links WHERE source_run_id = :scope OR sku IN :skus")
+    db.commit()
+
+
 def ensure_realistic_scale_demo(db: Session) -> bool:
-    """Guarantee Demo mode shows the system's FULL POTENTIAL: the Realistic Scale
-    catalog (150-SKU product graph, competitor index, pricing recommendations, KVI
-    watchlist, margin targets, substitutes), all demo-scoped.
+    """Guarantee Demo mode shows the system's FULL POTENTIAL: the COMPLETE,
+    correctly demo-scoped Realistic Scale catalog (150-SKU product graph, competitor
+    index, pricing recommendations, KVI watchlist, margin targets, substitutes),
+    populated with zero clicks.
 
-    Non-destructive and idempotent:
-      • If the catalog is absent (a fresh DB), load it (~6s, one-time).
-      • Recommendations are ENGINE output, not seed rows, so run the pricing engine
-        when no realistic-scale recommendations exist yet (~2s, one-time).
-      • Scope correctness for any pre-existing mis-scoped rows (e.g. an old load
-        that left entities as 'user:legacy') is fixed IN PLACE by
-        db_migrate._reclassify_demo_rows on boot — so existing recommendations,
-        history, and competitor observations are PRESERVED, never wiped.
-
-    Cheap (two small SELECTs) once everything is present. Returns True if it did
-    any work. Safe to call on every boot.
+    Idempotent: a fast no-op (two small COUNTs) once the showcase is complete and
+    demo-scoped. If it's missing, INCOMPLETE, or mis-scoped — e.g. an old load left
+    rows as 'user:legacy' / 'user:<hash>', which would wrongly surface in Live and
+    starve Demo's pricing surfaces (the failure that left margin/KVI covering ~16
+    SKUs instead of the full catalog) — it rebuilds cleanly: a bounded wipe of just
+    the realistic-scale rows, a fresh load, and a pricing-engine run (recommendations
+    are engine output, not seed rows). ~8s one-time, then a no-op. Returns True if it
+    rebuilt.
     """
-    from app.models import PricingRecommendation, SKUProductLink
+    from app.models import PricingRecommendation, ProductCost
     from app.scenarios.realistic_scale import CATALOG, load_realistic_scale
     from app.scope import DEMO_REALISTIC_SCALE
 
-    did_work = False
-    sample = db.scalar(select(SKUProductLink).where(SKUProductLink.sku == CATALOG[0].sku))
-    if sample is None:
-        load_realistic_scale(db)  # entities, links, costs, history, competitor obs, catalog batch
-        did_work = True
-    recs = db.scalar(
+    rs_skus = [c.sku for c in CATALOG]
+    batch_present = db.scalar(
+        select(PriceBatch.id).where(PriceBatch.external_id == REALISTIC_SCALE_EXTERNAL_ID)
+    )
+    demo_costs = db.scalar(
+        select(func.count())
+        .select_from(ProductCost)
+        .where(ProductCost.sku.in_(rs_skus), ProductCost.source_run_id == DEMO_REALISTIC_SCALE)
+    )
+    demo_recs = db.scalar(
         select(func.count())
         .select_from(PricingRecommendation)
         .where(PricingRecommendation.source_run_id == DEMO_REALISTIC_SCALE)
     )
-    if not recs:
-        try:
-            from app.pricing.pipeline import run_pricing_engine
+    # Complete = catalog batch present, (almost) every SKU has a demo-scoped cost,
+    # and the engine has produced recommendations. The 0.9 factor tolerates minor
+    # catalog drift without forcing an unnecessary rebuild.
+    if batch_present and demo_costs >= int(len(rs_skus) * 0.9) and demo_recs > 0:
+        return False
+    _wipe_realistic_scale(db)
+    load_realistic_scale(db)  # entities, links, costs, history, competitor obs, catalog batch
+    try:
+        from app.pricing.pipeline import run_pricing_engine
 
-            run_pricing_engine(db)  # recommendations are engine output, not loader rows
-            did_work = True
-        except Exception:
-            logger.exception("Realistic Scale pricing-engine run skipped")
-    return did_work
+        run_pricing_engine(db)  # recommendations are engine output, not loader rows
+    except Exception:
+        logger.exception("Realistic Scale pricing-engine run skipped")
+    return True

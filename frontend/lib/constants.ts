@@ -3,5 +3,5 @@
 // constant updates every surface that cites the number, so the figure can't
 // drift per-page again.
 //
-// Last verified: 409/409 passing on PostgreSQL 15 (commit on `main`).
-export const TEST_COUNT = 409;
+// Last verified: 410/410 passing on PostgreSQL 15 (commit on `main`).
+export const TEST_COUNT = 410;
