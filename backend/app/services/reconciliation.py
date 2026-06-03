@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.adapters.base import ADAPTERS
@@ -252,6 +252,34 @@ def _is_pending_activation(action: PriceAction) -> bool:
     return eff > now
 
 
+def _is_held_against_reconcile(db: Session, action: PriceAction) -> bool:
+    """True when the action is under a hold that channel agreement must NOT lift:
+
+      • a non-terminal IMPLAUSIBLE_PRICE incident — the plausibility gate caught a
+        likely DATA ERROR, where every channel may agree on the *wrong* number, or
+      • a ROLLED_BACK incident — an operator deliberately reverted the shelf.
+
+    Re-reconciling such an action would otherwise flip its decision to ELIGIBLE
+    (defeating the gate / undoing the rollback) and let the bad price expand. These
+    holds clear ONLY via an upstream price correction (a fresh batch) — never by the
+    channels agreeing on the held number. This is the single enforcement point that
+    makes the gate undefeatable across every reconcile caller (retry/resolve already
+    reject; complete_store_task and the outbox drain are covered here)."""
+    held = db.scalar(
+        select(Incident.id).where(
+            Incident.action_id == action.id,
+            or_(
+                and_(
+                    Incident.type == IncidentType.IMPLAUSIBLE_PRICE,
+                    Incident.status.in_([IncidentStatus.OPEN, IncidentStatus.RETRYING]),
+                ),
+                Incident.status == IncidentStatus.ROLLED_BACK,
+            ),
+        )
+    )
+    return held is not None
+
+
 def reconcile_action(db: Session, action: PriceAction) -> ActionDecision:
     """Verify every channel for an action, persist receipts, and set its decision."""
     # Effective-dating guard: a not-yet-live price is PENDING activation, not a
@@ -261,6 +289,12 @@ def reconcile_action(db: Session, action: PriceAction) -> ActionDecision:
         action.decision = ActionDecision.PENDING
         db.flush()
         return ActionDecision.PENDING
+    # Hold guard: a gated (implausible) or rolled-back price stays BLOCKED no matter
+    # what the channels report — channel agreement must never lift an integrity hold.
+    if _is_held_against_reconcile(db, action):
+        action.decision = ActionDecision.BLOCKED
+        db.flush()
+        return ActionDecision.BLOCKED
     receipts = [verify_channel(db, d, action) for d in action.deliveries]
     decision = decide_action(action, receipts)
     action.decision = decision

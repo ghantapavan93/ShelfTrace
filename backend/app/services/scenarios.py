@@ -492,6 +492,7 @@ def clone_config(db: Session, config: TestRunConfig, new_name: str | None = None
             id=new_id("tra"), test_run_config_id=clone.id, product_name=a.product_name, sku=a.sku,
             previous_price=a.previous_price, approved_price=a.approved_price, reason=a.reason,
             is_kvi=a.is_kvi, deadline_at=a.deadline_at,
+            effective_at=a.effective_at, promotional_price=a.promotional_price,
         ))
         _ensure_cost_for_action(db, a.sku, a.approved_price)
     for b in config.behaviors:

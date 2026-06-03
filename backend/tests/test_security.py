@@ -156,6 +156,88 @@ def test_production_startup_rejects_demo_defaults(monkeypatch):
     assert "CORS_ORIGINS cannot use localhost origins in production" in errors
 
 
+def _all_dependency_calls(dependant):
+    """Recursively collect every dependency callable in a route's dependant tree."""
+    calls = []
+    for dep in dependant.dependencies:
+        if dep.call is not None:
+            calls.append(dep.call)
+        calls.extend(_all_dependency_calls(dep))
+    return calls
+
+
+def test_every_mutating_endpoint_requires_operator():
+    """Blanket contract: EVERY mutating route (POST/PUT/PATCH/DELETE) must carry
+    the operator auth dependency. This is the test whose absence let several
+    product-graph / scenario-enrichment / data-replay write endpoints ship without
+    `require_operator` — a viewer key (or anyone, when auth is on) could mutate
+    pricing-influencing state. Introspects the dependency tree directly, so it
+    catches a missing guard on ANY current or future write route, not just a
+    sampled one. (Deep-audit P0: authorization coverage.)"""
+    from fastapi.routing import APIRoute
+
+    from app.main import app
+    from app.security import require_any, require_operator
+
+    mutating = {"POST", "PUT", "PATCH", "DELETE"}
+    # Read-only endpoints that use POST purely to accept a request body (they
+    # perform NO writes). These are semantically GETs and are intentionally open
+    # like every other read, so they are exempt from the operator requirement.
+    # Vetted individually — a real write must never be added here.
+    read_only_post_allowlist = {
+        # "Ask ShelfTrace" — deterministic, template-driven explanation assembled
+        # from existing rows; takes a natural-language `query` in the body. A
+        # viewer/reviewer must be able to ask "why is this blocked?".
+        "/api/v1/operations/explain",
+    }
+    unguarded = []
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        methods = (route.methods or set()) & mutating
+        if not methods:
+            continue
+        if route.path in read_only_post_allowlist:
+            continue
+        calls = _all_dependency_calls(route.dependant)
+        # require_operator is the only acceptable guard for a write. (require_any
+        # alone would let a viewer through, so it does NOT satisfy the contract.)
+        if require_operator not in calls:
+            # Surface require_any too, to make a misconfiguration obvious in the diff.
+            has_any = require_any in calls
+            unguarded.append(
+                f"{sorted(methods)} {route.path}"
+                + ("  (has require_any but NOT require_operator)" if has_any else "")
+            )
+    assert not unguarded, (
+        "Mutating endpoints missing require_operator:\n  " + "\n  ".join(sorted(unguarded))
+    )
+
+
+def test_viewer_key_cannot_write_product_graph_entity(db, keys_enabled):
+    """End-to-end proof for one of the newly-guarded endpoints: a viewer key is
+    rejected with 403 on POST /product-graph/entities (previously fully open)."""
+    client = TestClient(app)
+    r = client.post(
+        "/api/v1/product-graph/entities",
+        json={"canonical_title": "Sneaky Entity"},
+        headers={"X-API-Key": "view-key-test"},
+    )
+    assert r.status_code == 403
+    assert "Operator role" in r.json()["detail"]
+
+
+def test_viewer_key_cannot_trigger_data_replay_import(db, keys_enabled):
+    """Second newly-guarded path: a viewer cannot import a USDA dataset (which
+    creates source rows that feed the engine)."""
+    client = TestClient(app)
+    r = client.post(
+        "/api/v1/data-sources/import/usda-fdc",
+        headers={"X-API-Key": "view-key-test"},
+    )
+    assert r.status_code == 403
+
+
 def test_production_startup_accepts_hardened_config(monkeypatch):
     from app.config import production_startup_errors, settings as live_settings
 

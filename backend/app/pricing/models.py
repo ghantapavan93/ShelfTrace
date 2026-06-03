@@ -92,6 +92,12 @@ class ElasticityFit:
         the model is trustworthy enough to override the current price."""
         if not self.sufficient_data:
             return False
+        # A zero (or non-positive) standard error means the CI has collapsed onto
+        # the point estimate — a degenerate/perfect fit, not real evidence. Without
+        # this guard, beta_ci_low*beta_ci_high = beta² > 0 would read as maximally
+        # "significant" and over-trust a fit with no measurable uncertainty.
+        if self.beta_se <= 0:
+            return False
         return self.beta_ci_low * self.beta_ci_high > 0  # same sign on both bounds
 
 
@@ -116,6 +122,7 @@ ReasonCode = Literal[
     "EXTERNAL_SIGNAL_APPLIED",
     "SNAPPED_TO_LADDER",
     "CATEGORY_MARGIN_FLOOR",
+    "COST_FLOOR_REASSERTED",
 ]
 
 

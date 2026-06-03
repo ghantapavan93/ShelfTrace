@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models import (
     AuditEvent,
@@ -40,6 +41,15 @@ def create_batch(
     result = ingest_batch(db, payload)
     # Single-node demo: drain the outbox inline so results are immediately visible.
     orchestrator.drain(db)
+    # Pre-execution plausibility GATE (opt-in) — identical to the scenario
+    # execute_live() path, so this machine-to-machine REST ingest enforces the
+    # SAME "hold a bad approved price before it rolls out" guarantee. A CRITICAL
+    # finding (decimal slip, below-cost, cross-store outlier) opens an
+    # IMPLAUSIBLE_PRICE incident and BLOCKS the batch; warnings stay advisory.
+    # Without this the gate only guarded the scenario UI, leaving the primary
+    # upstream-pricing ingest path un-gated (deep-audit P0).
+    if settings.plausibility_gate_enabled:
+        plausibility.enforce_gate(db, result.batch)
     db.refresh(result.batch)
     return queries.batch_summary(db, result.batch)
 

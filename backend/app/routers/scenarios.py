@@ -46,6 +46,7 @@ def _view(config: TestRunConfig) -> ScenarioView:
             ScenarioActionView(
                 id=a.id, product_name=a.product_name, sku=a.sku, previous_price=a.previous_price,
                 approved_price=a.approved_price, reason=a.reason, is_kvi=a.is_kvi, deadline_at=a.deadline_at,
+                effective_at=a.effective_at, promotional_price=a.promotional_price,
             )
             for a in config.actions
         ],
@@ -165,6 +166,7 @@ def delete_scenario(
 def auto_enrich_scenario(
     body: dict,
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
 ):
     """One-shot enrichment for a fresh scenario.
 
@@ -209,6 +211,7 @@ def auto_enrich_scenario(
 def load_realistic_scale(
     reload: bool = False,
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
 ):
     """Load the production-shape "Realistic Scale" preset.
 

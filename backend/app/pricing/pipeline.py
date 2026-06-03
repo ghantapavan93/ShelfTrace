@@ -233,6 +233,35 @@ def recommend_for_sku(features: PricingFeatures) -> PricingRecommendation:
         constraints_applied.append("price_ladder")
         candidate = snapped
 
+    # ── Re-assert the cost floor as the FINAL hard guard ──────────────
+    # Downward constraints that run AFTER the initial cost-floor check — KVI lock,
+    # competitor ceiling, and the shock cap clamping toward a low current_price —
+    # plus the ladder snap, can each drag the price back BELOW cost+margin. The
+    # cost floor is priority #1, so re-clamp here to guarantee a recommendation is
+    # never below cost. The ONE legitimate below-cost case is a perishable being
+    # marked down to clear before its deadline (priority #2 intentionally overrides
+    # the floor), so skip the re-floor for an item in its perishable clear-out window.
+    _perishable_clearout = (
+        features.is_perishable
+        and features.days_to_deadline is not None
+        and features.days_to_deadline <= 2
+    )
+    if not _perishable_clearout:
+        refloor = apply_cost_floor(candidate, features)
+        if refloor.price > candidate + 1e-9:
+            candidate = refloor.price
+            constraints_applied.append("cost_floor_reasserted")
+            reasons.append(
+                PricingReason(
+                    code="COST_FLOOR_REASSERTED",
+                    message=(
+                        f"A later constraint had clipped the price below the "
+                        f"cost-plus-margin floor; re-clamped to ${candidate:.2f} so the "
+                        "recommendation never sells below cost."
+                    ),
+                )
+            )
+
     # ── 5. Final no-change check ──────────────────────────────────
     if abs(candidate - features.current_price) < 0.01:
         reasons.append(

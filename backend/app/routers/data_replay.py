@@ -13,6 +13,7 @@ from app.schemas import (
     SourceDatasetView,
     SourceObservationView,
 )
+from app.security import Identity, require_operator
 from app.services import data_replay, scenarios
 
 router = APIRouter(prefix="/api/v1", tags=["data-replay"])
@@ -56,13 +57,19 @@ def list_data_sources(db: Session = Depends(get_db)):
 
 
 @router.post("/data-sources/import/usda-fdc", response_model=SourceObservationView, status_code=201)
-def import_usda_fdc(db: Session = Depends(get_db)):
+def import_usda_fdc(
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     obs = data_replay.import_source(db, SourceDatasetType.USDA_FDC)
     return _observation_view(db, obs)
 
 
 @router.post("/data-sources/import/usda-ams", response_model=SourceObservationView, status_code=201)
-def import_usda_ams(db: Session = Depends(get_db)):
+def import_usda_ams(
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+):
     obs = data_replay.import_source(db, SourceDatasetType.USDA_AMS)
     return _observation_view(db, obs)
 
@@ -82,7 +89,10 @@ def get_observation(obs_id: str, db: Session = Depends(get_db)):
 
 @router.post("/source-observations/{obs_id}/create-scenario", response_model=ScenarioExecuteResult)
 def create_scenario_from_observation(
-    obs_id: str, payload: CreateScenarioFromObservationIn, db: Session = Depends(get_db)
+    obs_id: str,
+    payload: CreateScenarioFromObservationIn,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
 ):
     obs = data_replay.get_observation(db, obs_id)
     if obs is None:

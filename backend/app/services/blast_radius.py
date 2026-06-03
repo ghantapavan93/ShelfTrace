@@ -35,15 +35,17 @@ class BlastRadius:
         return asdict(self)
 
 
-def _avg_daily_units(db: Session, sku: str) -> float | None:
-    """Average units/day for a SKU from its recent sales history. Returns None
-    when there is no history (e.g. a freshly uploaded SKU) — we never fabricate
-    a velocity. Bounded: one aggregate query, sums units over distinct dates."""
+def _avg_daily_units(db: Session, sku: str, store_id: str) -> float | None:
+    """Average units/day for a SKU AT ONE STORE from its recent sales history.
+    Returns None when there is no history (e.g. a freshly uploaded SKU) — we never
+    fabricate a velocity. Filtered to the incident's store so a single-store
+    incident's exposure isn't overstated by summing every store's volume (deep-audit
+    P2). Bounded: one aggregate query, sums units over distinct dates."""
     row = db.execute(
         select(
             func.coalesce(func.sum(HistoricalSale.units_sold), 0),
             func.count(func.distinct(func.date(HistoricalSale.date))),
-        ).where(HistoricalSale.sku == sku)
+        ).where(HistoricalSale.sku == sku, HistoricalSale.store_id == store_id)
     ).one()
     total_units, day_count = row[0] or 0, row[1] or 0
     if day_count == 0:
@@ -70,7 +72,7 @@ def for_incident(db: Session, incident: Incident, observed_price: float | None) 
         per_unit = abs(action.approved_price - action.prior_price)
         delta_kind = "vs the prior price (no channel divergence on record)"
 
-    daily_units = _avg_daily_units(db, action.sku)
+    daily_units = _avg_daily_units(db, action.sku, action.store_id)
     is_kvi = bool(action.is_kvi)
 
     if daily_units is None:

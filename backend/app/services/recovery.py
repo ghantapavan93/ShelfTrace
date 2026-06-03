@@ -182,6 +182,12 @@ def rollback_incident(db: Session, incident_id: str, actor: str = "operator") ->
         f"restored to ${action.prior_price:.2f} to match checkout while the mismatch is resolved.",
         actor=actor,
     )
+    # Recompute batch-level status/block_reason so they reflect the rollback —
+    # exactly as retry/resolve/complete-store-task do. Without this the batch kept a
+    # stale block_reason after a rollback (deep-audit P1).
+    batch = db.get(PriceBatch, action.batch_id)
+    if batch is not None:
+        reconciliation.refresh_batch(db, batch)
     db.commit()
     db.refresh(incident)
     return incident

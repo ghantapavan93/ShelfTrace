@@ -21,6 +21,7 @@ from app.models import (
 )
 from app.schemas import CpiIntegrityView
 from app.scope import DEMO_MEMORIAL_DAY, Scope, apply_filter, current_scope
+from app.security import Identity, require_operator
 from app.services import entity_matcher, product_graph
 
 router = APIRouter(prefix="/api/v1/product-graph", tags=["product-knowledge-graph"])
@@ -424,6 +425,7 @@ def list_categories(db: Session = Depends(get_db)) -> dict:
 def create_entity(
     body: dict,
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
 ) -> dict:
     """Create a new canonical product entity."""
     entity = product_graph.create_product_entity(
@@ -442,7 +444,11 @@ def create_entity(
 
 
 @router.post("/bulk-match")
-def trigger_bulk_match(min_score: float = Query(0.70, ge=0.0, le=1.0), db: Session = Depends(get_db)) -> dict:
+def trigger_bulk_match(
+    min_score: float = Query(0.70, ge=0.0, le=1.0),
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+) -> dict:
     """Automatically match all unmatched competitor products to entities."""
     matched, skipped = entity_matcher.bulk_match_competitors(db, min_score=min_score)
     return {
@@ -453,7 +459,11 @@ def trigger_bulk_match(min_score: float = Query(0.70, ge=0.0, le=1.0), db: Sessi
 
 
 @router.post("/bootstrap-from-scenario", status_code=201)
-def bootstrap_from_scenario(body: dict, db: Session = Depends(get_db)) -> dict:
+def bootstrap_from_scenario(
+    body: dict,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+) -> dict:
     """Auto-create entities + synthetic competitor observations for each SKU in
     a scenario's action list.
 
@@ -617,7 +627,10 @@ def bootstrap_from_scenario(body: dict, db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/seed-demo", status_code=201)
-def seed_demo_graph(db: Session = Depends(get_db)) -> dict:
+def seed_demo_graph(
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_operator),
+) -> dict:
     """Seed the knowledge graph with Memorial Day demo entities.
 
     Idempotent — no-op if the canonical entities already exist. Creates:
