@@ -221,6 +221,24 @@ def _reclassify_demo_rows(conn) -> None:
             {"scope": scope_id, "skus": skus},
         )
 
+    # Entities themselves: a user:legacy / NULL entity whose linked SKU belongs to
+    # a known demo set IS demo data, so reclassify it. This MUST run before the
+    # graph-row inherit step below — without it the entities stay 'user:legacy',
+    # the inherit step finds no demo entity to copy from, and the whole
+    # entity→link→observation chain wrongly remains in Live (and hidden from Demo).
+    # Keyed via sku_product_links (works regardless of the link's own scope).
+    for skus, scope_id in ((md_skus, "demo:memorial-day"), (rs_skus, "demo:realistic-scale")):
+        if not skus:
+            continue
+        conn.execute(
+            text(
+                "UPDATE product_entities SET source_run_id = :scope "
+                "WHERE (source_run_id IS NULL OR source_run_id = 'user:legacy') "
+                "AND id IN (SELECT entity_id FROM sku_product_links WHERE sku IN :skus)"
+            ).bindparams(bindparam("skus", expanding=True)),
+            {"scope": scope_id, "skus": skus},
+        )
+
     # Graph rows carry no SKU on the row itself — inherit the linked entity's
     # demo scope. Cross-dialect correlated UPDATE (no table alias).
     for table in ("competitor_price_observations", "sku_product_links"):

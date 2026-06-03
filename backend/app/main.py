@@ -17,7 +17,7 @@ from app.observability import setup_tracing
 from app.rate_limit import get_limiter
 from app.routers import batches, certification, data_replay, demo, engineering, incidents, operations, pricing, product_graph, receipts, regression, scenarios, scraping, storefront
 from app.security import auth_enabled
-from app.seed import seed_live
+from app.seed import ensure_realistic_scale_demo, purge_user_scope, seed_live
 from app.services import certification as cert_service
 from app.services import data_replay as data_replay_service
 from app.services import scenarios as scenario_service
@@ -97,12 +97,31 @@ async def lifespan(app: FastAPI):
                 data_replay_service.import_source(db, SourceDatasetType.USDA_AMS)
             except Exception:
                 logger.exception("Real Data Replay fixture import skipped")
-            # Milk hero: seed the primary POS-mismatch scenario
+            # DEMO = full potential: the Realistic Scale catalog (150-SKU product
+            # graph, competitor index, pricing recommendations, KVI watchlist,
+            # margin targets, substitutes) — all demo-scoped. Idempotent: a fast
+            # no-op once consistent; only (re)loads (~6s) if missing/mis-scoped.
+            # Runs BEFORE the milk hero so the milk POS-mismatch batch stays the
+            # freshest live-rollout (the one Operations defaults to).
+            try:
+                if ensure_realistic_scale_demo(db):
+                    logger.info("Demo mode: loaded Realistic Scale showcase (full-potential catalog)")
+            except Exception:
+                logger.exception("Realistic Scale showcase seeding skipped")
+            # Milk hero: seed the primary POS-mismatch scenario (freshest live batch)
             try:
                 from app.services.scenarios import ensure_milk_hero
                 ensure_milk_hero(db)
             except Exception:
                 logger.exception("Milk hero seeding skipped")
+            # LIVE = true clean slate: drop any stray user-scoped data so Live mode
+            # starts empty (bring-your-own-data). The demo:* showcase is untouched.
+            try:
+                purged = purge_user_scope(db)
+                if any(purged.values()):
+                    logger.info("Demo mode: purged stray user-scope data for a clean Live slate: %s", purged)
+            except Exception:
+                logger.exception("Live-scope purge skipped")
     yield
     # No teardown work for now.
 
